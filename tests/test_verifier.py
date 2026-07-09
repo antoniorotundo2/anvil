@@ -84,7 +84,7 @@ def test_parse_directives_all_forms():
     d = parse_directives(script)
     assert d["--time"] == "1:00"
     assert d["--mem"] == "2G"
-    assert d["-N"] == "2"
+    assert d["--nodes"] == "2"      # -N is normalised to its long form
 
 
 def test_misplaced_directive_detected():
@@ -507,3 +507,64 @@ def test_verify_warns_on_unknown_task_ids(tmp_path, capsys):
     rc = main(["verify", "--generations", str(gen), "--tasks", str(TASKS)])
     assert rc == 1                       # nothing verified
     assert "unknown task ids" in capsys.readouterr().err
+
+
+# ------------------------------------------------- multi-option #SBATCH lines
+# Found by a real run: the container's scheduler reported "Invalid --time
+# specification" while Anvil reported "--time missing". Both cannot be right.
+# SLURM parses a #SBATCH line like a command line: several options are legal.
+# Reading only the first swallowed the rest - another false negative from
+# surface-form parsing.
+def test_multiple_options_on_one_sbatch_line():
+    script = "#!/bin/bash\n#SBATCH --ntasks=1 --time=00:01:00 --mem=512M\necho hi\n"
+    d = parse_directives(script)
+    assert d["--ntasks"] == "1"
+    assert d["--time"] == "00:01:00"
+    assert d["--mem"] == "512M"
+
+
+def test_multi_option_line_satisfies_resource_fit():
+    """The regression this bug caused: a correct script scored as missing --time."""
+    script = "#!/bin/bash\n#SBATCH --ntasks=1 --time=00:05:00 --mem=1G\necho ANVIL_OK\n"
+    t = Task(id="x", prompt="p",
+             constraints={"ntasks": 1, "time_max_minutes": 10, "mem_min_mb": 512},
+             required_directives=["--time"])
+    r = check_resource_fit(script, t)
+    assert r.passed, r.detail
+
+
+@pytest.mark.parametrize(
+    ("short", "long_", "value"),
+    [("-t", "--time", "00:10:00"), ("-N", "--nodes", "2"),
+     ("-n", "--ntasks", "4"), ("-c", "--cpus-per-task", "8"),
+     ("-J", "--job-name", "x"), ("-a", "--array", "1-5")],
+)
+def test_short_options_normalise_to_long(short, long_, value):
+    """`-t` IS `--time`. Demanding the long spelling measures style, not correctness."""
+    d = parse_directives(f"#!/bin/bash\n#SBATCH {short} {value}\necho hi\n")
+    assert d[long_] == value
+
+
+def test_short_option_with_attached_value():
+    assert parse_directives("#!/bin/bash\n#SBATCH -c4\n")["--cpus-per-task"] == "4"
+
+
+def test_required_directive_accepts_the_short_form():
+    script = "#!/bin/bash\n#SBATCH -t 00:05:00\necho hi\n"
+    t = Task(id="x", prompt="p", required_directives=["--time"])
+    assert check_resource_fit(script, t).passed
+
+
+def test_flag_without_value_does_not_eat_the_next_option():
+    d = parse_directives("#!/bin/bash\n#SBATCH --exclusive --time=00:10:00\n")
+    assert d["--exclusive"] == "" and d["--time"] == "00:10:00"
+
+
+def test_quoted_value_survives():
+    d = parse_directives('#!/bin/bash\n#SBATCH --job-name="my job" --time=00:05:00\n')
+    assert d["--job-name"] == "my job" and d["--time"] == "00:05:00"
+
+
+def test_trailing_comment_is_stripped():
+    d = parse_directives("#!/bin/bash\n#SBATCH --time=00:10:00  # ten minutes\n")
+    assert d["--time"] == "00:10:00"

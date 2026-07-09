@@ -7,6 +7,7 @@ validation is strict (see checks in verifier.py).
 from __future__ import annotations
 
 import re
+import shlex
 
 # ```bash ... ```  or ``` ... ```
 _FENCE = re.compile(r"```(?:[a-zA-Z]*)\n(.*?)```", re.DOTALL)
@@ -58,11 +59,45 @@ def parse_mem_to_mb(value: str) -> float | None:
     return num * _MEM_MULT[unit]
 
 
-def parse_directives(script: str) -> dict[str, str]:
-    """Collect #SBATCH directives into a {--key: value} mapping.
+# SLURM short options and their long equivalents. `-t` and `--time` are the same
+# request; a benchmark that measures semantics must not care which was written.
+_SHORT_TO_LONG = {
+    "-N": "--nodes",
+    "-n": "--ntasks",
+    "-c": "--cpus-per-task",
+    "-t": "--time",
+    "-G": "--gpus",
+    "-J": "--job-name",
+    "-o": "--output",
+    "-e": "--error",
+    "-a": "--array",
+    "-d": "--dependency",
+    "-p": "--partition",
+    "-A": "--account",
+    "-w": "--nodelist",
+    "-D": "--chdir",
+    "-C": "--constraint",
+}
 
-    Note: SLURM stops reading directives at the first real command. We collect
-    them all here; `misplaced_directives` reports the late ones.
+
+def _normalise(key: str) -> str:
+    return _SHORT_TO_LONG.get(key, key)
+
+
+def parse_directives(script: str) -> dict[str, str]:
+    """Collect #SBATCH directives into a {--long-key: value} mapping.
+
+    Two things a naive parser gets wrong, and both produce false negatives:
+
+    1. **SLURM allows several options on one `#SBATCH` line** - the line is parsed
+       like a command line. Reading only the first option swallows the rest:
+       `#SBATCH --ntasks=1 --time=00:01:00` would report `--time` as missing while
+       `sbatch` reports its value as invalid. The two disagree, and the parser is wrong.
+    2. **Short and long forms are the same request.** `-t` is `--time`. Demanding the
+       long spelling measures style, not correctness.
+
+    Note: SLURM stops reading directives at the first real command. We collect them
+    all here; `misplaced_directives` reports the late ones.
     """
     out: dict[str, str] = {}
     for line in script.splitlines():
@@ -72,19 +107,40 @@ def parse_directives(script: str) -> dict[str, str]:
         body = s[len("#SBATCH"):].strip()
         if not body:
             continue
-        # forms: --key=value | --key value | -k value | --flag
-        if body.startswith("--"):
-            if "=" in body:
-                key, _, val = body.partition("=")
+        body = body.split("#", 1)[0].strip()   # trailing comment
+        try:
+            tokens = shlex.split(body)
+        except ValueError:                     # unbalanced quotes: fall back
+            tokens = body.split()
+
+        i = 0
+        while i < len(tokens):
+            tok = tokens[i]
+            if not tok.startswith("-"):        # stray word (e.g. leaked prose)
+                i += 1
+                continue
+
+            if tok.startswith("--"):
+                if "=" in tok:
+                    key, _, val = tok.partition("=")
+                    out[_normalise(key)] = val
+                    i += 1
+                    continue
+                key = tok
+            else:                              # short option
+                if len(tok) > 2:               # attached value, e.g. -c4
+                    out[_normalise(tok[:2])] = tok[2:]
+                    i += 1
+                    continue
+                key = tok
+
+            # value is the next token, unless it is another option (i.e. a flag)
+            if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+                out[_normalise(key)] = tokens[i + 1]
+                i += 2
             else:
-                parts = body.split(None, 1)
-                key, val = parts[0], (parts[1] if len(parts) > 1 else "")
-        elif body.startswith("-"):
-            parts = body.split(None, 1)
-            key, val = parts[0], (parts[1] if len(parts) > 1 else "")
-        else:
-            continue
-        out[key.strip()] = val.strip().split("#")[0].strip()
+                out[_normalise(key)] = ""
+                i += 1
     return out
 
 
