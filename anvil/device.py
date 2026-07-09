@@ -87,10 +87,18 @@ def detect() -> DeviceInfo:
 
     # --- Apple Silicon ----------------------------------------------------
     if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        # Unified memory: the ceiling for Metal is not the whole RAM. Report the
+        # number torch actually enforces, so the paper's setup section is exact.
+        budget = None
+        try:
+            budget = round(torch.mps.recommended_max_memory() / 1024**3, 1)
+        except Exception:  # noqa: BLE001
+            pass
         return DeviceInfo(
             device="mps",
             dtype="float16",
             name=f"Apple Silicon ({platform.machine()})",
+            vram_gb=budget,
             supports_4bit=False,
             supports_bf16=False,
             supports_fp8=False,
@@ -118,31 +126,56 @@ def torch_dtype(info: DeviceInfo):
     ]
 
 
-def _first_line(cmd: list[str]) -> str:
-    """First line of `cmd --version`, or the empty string."""
+def _version_probe(cmd: list[str]) -> tuple[bool, str]:
+    """Run `cmd`, return (exited_zero, first_line_of_output).
+
+    The exit code is the reliable signal. GNU and uutils implement `--version`
+    and exit 0; BSD and BusyBox reject it and exit non-zero. Their error wording
+    varies ("illegal option", "unrecognized option", "invalid option", ...), so
+    matching the message is fragile - as an earlier version of this code proved.
+    """
     import subprocess  # noqa: PLC0415
 
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-        return (p.stdout or p.stderr).splitlines()[0].strip()
+        text = (p.stdout or p.stderr).strip()
+        first = text.splitlines()[0].strip() if text else ""
+        return p.returncode == 0, first
     except Exception:  # noqa: BLE001
-        return ""
+        return False, ""
 
 
-def classify_coreutils(ls_version_line: str) -> str:
-    """Classify the coreutils flavour from the first line of `ls --version`.
+def _first_line(cmd: list[str]) -> str:
+    return _version_probe(cmd)[1]
 
-    Pure function: testable without having all four implementations at hand.
-    On BSD/macOS `ls --version` does not exist and returns the empty string.
+
+def classify_coreutils(line: str, supports_version: bool = True, system: str = "") -> str:
+    """Classify the coreutils flavour.
+
+    `supports_version` is the primary signal: whether `ls --version` exited 0.
+    `line` only disambiguates among implementations that DO support it.
+
+    Pure function: testable without having the four implementations at hand.
     """
-    if not ls_version_line:
+    if not supports_version:
+        if system == "Darwin":
+            return "BSD (ls rejects --version)"
+        return "non-GNU (ls rejects --version)"
+
+    if not line:
         return "BSD (no --version)"
-    if "uutils" in ls_version_line or "uu_ls" in ls_version_line:
+    # Fallbacks for callers that only pass the message.
+    low = line.lower()
+    if "illegal option" in low or "unrecognized option" in low or "invalid option" in low:
+        return "BSD (ls rejects --version)"
+    if low.startswith("usage:"):
+        return "BSD (ls rejects --version)"
+    if "uutils" in line or "uu_ls" in line:
         return "uutils (Rust) - NOT GNU"
-    if "BusyBox" in ls_version_line:
+    if "BusyBox" in line:
         return "BusyBox - NOT GNU"
-    if "GNU coreutils" in ls_version_line:
-        return ls_version_line
+    if "GNU coreutils" in line:
+        return line
     return "unknown"
 
 
@@ -158,7 +191,8 @@ def shell_environment() -> dict[str, str]:
     the paper's setup section.
     """
     bash_v = _first_line(["bash", "--version"])
-    flavour = classify_coreutils(_first_line(["ls", "--version"]))
+    ok, ls_line = _version_probe(["ls", "--version"])
+    flavour = classify_coreutils(ls_line, supports_version=ok, system=platform.system())
 
     m = re.search(r"version (\d+\.\d+)", bash_v)
     bash_major = m.group(1) if m else "?"

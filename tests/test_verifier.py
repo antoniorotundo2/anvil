@@ -336,3 +336,115 @@ def test_healthy_cluster_runs_submittability(monkeypatch):
     r = v.check_submittability(GOOD)
     assert r.passed and not r.skipped
     v._health = None
+
+
+# ------------------------------------------------- L4a: SLURM defaults
+# Discovered by running a real 1.5B model: it omitted --nodes on a task asking
+# for one node. SLURM defaults --nodes to 1, so the script was CORRECT and
+# `sbatch --test-only` accepted it - yet Anvil failed it. The verifier was
+# checking for the presence of a string instead of the effective request:
+# surface-form matching, the very thing this benchmark exists to replace.
+
+_NO_NODES = """#!/bin/bash
+#SBATCH --job-name=hello
+#SBATCH --time=00:10:00
+#SBATCH --mem=512M
+
+echo ANVIL_OK
+"""
+
+
+def test_omitted_nodes_uses_slurm_default_of_one():
+    """A serial script without --nodes effectively requests 1 node: correct."""
+    t = _task(nodes=1, ntasks=1, time_max_minutes=10, mem_min_mb=512)
+    r = check_resource_fit(_NO_NODES, t)
+    assert r.passed, r.detail
+
+
+def test_omitted_nodes_still_fails_when_more_are_required():
+    t = _task(nodes=2)
+    r = check_resource_fit(_NO_NODES, t)
+    assert not r.passed and "effective 1" in r.detail
+
+
+def test_ntasks_defaults_to_one_task_per_node():
+    """SLURM's default is one task per node, not one task overall."""
+    script = "#!/bin/bash\n#SBATCH --nodes=2\n#SBATCH --time=00:10:00\nsrun hostname\n"
+    assert check_resource_fit(script, _task(nodes=2, ntasks=2)).passed
+    assert not check_resource_fit(script, _task(nodes=2, ntasks=4)).passed
+
+
+def test_omitted_cpus_per_task_defaults_to_one():
+    assert check_resource_fit(_NO_NODES, _task(cpus_per_task=1)).passed
+    assert not check_resource_fit(_NO_NODES, _task(cpus_per_task=4)).passed
+
+
+def test_detail_marks_implicit_values():
+    """The report must say the value came from a default, not from the script."""
+    r = check_resource_fit(_NO_NODES, _task(nodes=2))
+    assert "SLURM default, not declared" in r.detail
+
+
+@pytest.mark.parametrize("constraint", [{"time_max_minutes": 10}, {"mem_min_mb": 512}])
+def test_directives_without_universal_default_must_be_declared(constraint):
+    """--time and --mem depend on partition config: omitting them means the
+    resource was never requested. Absence is a genuine failure here."""
+    bare = "#!/bin/bash\n#SBATCH --job-name=x\necho hi\n"
+    r = check_resource_fit(bare, _task(**constraint))
+    assert not r.passed and "not requested" in r.detail
+
+
+def test_required_directives_still_force_explicitness():
+    """Defaults do not weaken the benchmark: a task may still demand the
+    directive be written out."""
+    t = Task(id="x", prompt="p", constraints={"nodes": 1},
+             required_directives=["--nodes"])
+    assert not check_resource_fit(_NO_NODES, t).passed
+
+
+def test_gpus_absent_is_a_failure_not_a_default():
+    assert not check_resource_fit(_NO_NODES, _task(gpus_min=1)).passed
+
+
+# ------------------------------------------------- macOS coreutils detection
+def test_bsd_ls_error_is_classified_as_bsd_not_unknown():
+    """macOS `ls --version` prints an illegal-option error, not nothing.
+    Mislabelling it 'unknown' would corrupt the environment report."""
+    bsd_outputs = ("ls: illegal option -- -", "usage: ls [-@ABCFGHILOPRSTUW]")
+    for line in bsd_outputs:
+        assert "BSD" in classify_coreutils(line)
+    assert "BSD" in classify_coreutils("")
+
+
+# ------------------------------------------------- coreutils: behaviour, not wording
+# Third time the same mistake: matching a STRING instead of checking BEHAVIOUR.
+# BSD/BusyBox reject `--version` with at least four different messages; the exit
+# code is the invariant.
+@pytest.mark.parametrize(
+    "message",
+    [
+        "ls: illegal option -- -",
+        "ls: unrecognized option: --version",
+        "ls: unrecognized option `--version'",
+        "ls: invalid option -- '-'",
+        "usage: ls [-@ABCFGHILOPRSTUW]",
+        "",
+    ],
+)
+def test_nonzero_exit_means_not_gnu_whatever_the_wording(message):
+    """The exit code decides. The message only disambiguates among the
+    implementations that DO support --version."""
+    got = classify_coreutils(message, supports_version=False, system="Darwin")
+    assert "BSD" in got
+    assert "GNU coreutils" not in got
+
+
+def test_nonzero_exit_on_linux_is_not_labelled_bsd():
+    got = classify_coreutils("ls: unrecognized option", supports_version=False, system="Linux")
+    assert "non-GNU" in got and "BSD" not in got
+
+
+def test_zero_exit_disambiguates_implementations():
+    assert "GNU coreutils" in classify_coreutils("ls (GNU coreutils) 9.4", supports_version=True)
+    assert "NOT GNU" in classify_coreutils("ls (uutils coreutils) 0.0.30", supports_version=True)
+    assert "NOT GNU" in classify_coreutils("BusyBox v1.36.1", supports_version=True)

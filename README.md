@@ -46,6 +46,19 @@ SLURM stops reading `#SBATCH` lines at the first real command. Directives after 
 **silently ignored** — `sbatch` accepts the job and the request is wrong. Anvil catches this;
 `sbatch --test-only` cannot.
 
+### Effective requests, not string presence
+`resource_fit` compares the **effective** resource request against the spec, applying SLURM's
+documented defaults: `--nodes` → 1, `--ntasks` → one task per node, `--cpus-per-task` → 1.
+A serial script that omits `--nodes` still requests one node, and is correct.
+
+Directives with no universal default — `--time`, `--mem`, `--gpus` — depend on partition
+configuration. Omitting them means the resource was never requested: a genuine failure against a
+spec that asks for it. Tasks can still demand explicitness through `required_directives`.
+
+The distinction is the point. Checking whether a string appears is surface-form matching —
+precisely what this benchmark exists to replace. An early version did exactly that, and failed
+scripts that `sbatch` accepted.
+
 ---
 
 ## Quickstart

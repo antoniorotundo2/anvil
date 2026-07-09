@@ -15,6 +15,11 @@ results/
 results*.json
 *.log
 
+# --- Archives dropped into the working tree (downloaded snapshots, backups) ---
+*.tar.gz
+*.tgz
+*.zip
+
 # NOTE: `sweep/` (litsweep.py output) is deliberately NOT ignored.
 # It is small text and it is the documentary evidence of the literature review:
 # it makes the review reproducible and citable in the paper.

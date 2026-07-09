@@ -114,10 +114,12 @@ class HFModel(Model):
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.load_in_4bit = load_in_4bit
-        self._pipe = None
+        self._model = None      # sentinel: the model is loaded lazily, ONCE
 
     def _ensure_loaded(self) -> None:
-        if self._pipe is not None:
+        # Guard on `_model`, not on a never-assigned attribute: getting this wrong
+        # reloads the weights from disk on every task (8x slowdown, silently).
+        if self._model is not None:
             return
         from transformers import (  # noqa: PLC0415
             AutoModelForCausalLM,

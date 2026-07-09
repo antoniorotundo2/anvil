@@ -213,6 +213,19 @@ def check_functional(script: str, task: Task, timeout: int = 60) -> LevelResult:
 # --------------------------------------------------------------------------
 # L4a - resource fit against the specification
 # --------------------------------------------------------------------------
+# SLURM defaults for directives that are ALWAYS defined when omitted:
+#   --nodes           -> 1
+#   --ntasks          -> one task per node  (so it follows the effective node count)
+#   --cpus-per-task   -> 1
+# Omitting them is not an error: the effective request still matches the spec.
+#
+# Directives WITHOUT a universal default (--mem, --time, --gpus) depend on the
+# partition configuration. Omitting them means the resource was never requested,
+# which is a genuine failure against a spec that asks for it.
+#
+# This distinction is the whole point. Checking for the presence of a string is
+# surface-form matching - exactly what this benchmark accuses similarity metrics
+# of doing. `resource_fit` must compare the EFFECTIVE request, not the text.
 def check_resource_fit(script: str, task: Task) -> LevelResult:
     d = parse_directives(script)
     c = task.constraints
@@ -224,51 +237,82 @@ def check_resource_fit(script: str, task: Task) -> LevelResult:
 
     def _int(*aliases: str) -> int | None:
         v = directive_value(d, *aliases)
+        if v is None:
+            return None
         try:
-            return int(v) if v is not None else None
+            return int(v)
         except ValueError:
             problems.append(f"non-integer value for {aliases[0]}: {v!r}")
             return None
 
-    if "nodes" in c:
-        got = _int("--nodes", "-N")
-        if got != c["nodes"]:
-            problems.append(f"nodes expected {c['nodes']}, found {got}")
+    # Effective values, with SLURM's documented defaults applied.
+    eff_nodes = _int("--nodes", "-N")
+    implicit_nodes = eff_nodes is None
+    if implicit_nodes:
+        eff_nodes = 1
 
-    if "ntasks" in c:
-        got = _int("--ntasks", "-n")
-        if got != c["ntasks"]:
-            problems.append(f"ntasks expected {c['ntasks']}, found {got}")
+    eff_ntasks = _int("--ntasks", "-n")
+    implicit_ntasks = eff_ntasks is None
+    if implicit_ntasks:
+        eff_ntasks = eff_nodes           # default: one task per node
 
-    if "cpus_per_task" in c:
-        got = _int("--cpus-per-task", "-c")
-        if got != c["cpus_per_task"]:
-            problems.append(f"cpus-per-task expected {c['cpus_per_task']}, found {got}")
+    eff_cpus = _int("--cpus-per-task", "-c")
+    implicit_cpus = eff_cpus is None
+    if implicit_cpus:
+        eff_cpus = 1
 
+    def _hint(implicit: bool) -> str:
+        return " (SLURM default, not declared)" if implicit else ""
+
+    if "nodes" in c and eff_nodes != c["nodes"]:
+        problems.append(
+            f"nodes expected {c['nodes']}, effective {eff_nodes}{_hint(implicit_nodes)}"
+        )
+
+    if "ntasks" in c and eff_ntasks != c["ntasks"]:
+        problems.append(
+            f"ntasks expected {c['ntasks']}, effective {eff_ntasks}{_hint(implicit_ntasks)}"
+        )
+
+    if "cpus_per_task" in c and eff_cpus != c["cpus_per_task"]:
+        problems.append(
+            f"cpus-per-task expected {c['cpus_per_task']}, "
+            f"effective {eff_cpus}{_hint(implicit_cpus)}"
+        )
+
+    # --- no universal default below: absence is a real failure ---------------
     if "gpus_min" in c:
         raw = directive_value(d, "--gpus", "-G", "--gres")
         n = None
         if raw:
             m = re.search(r"(\d+)\s*$", raw)
             n = int(m.group(1)) if m else None
-        if n is None or n < c["gpus_min"]:
+        if n is None:
+            problems.append(f"gpus expected >= {c['gpus_min']}, none requested")
+        elif n < c["gpus_min"]:
             problems.append(f"gpus expected >= {c['gpus_min']}, found {n}")
 
     if "time_max_minutes" in c:
         raw = directive_value(d, "--time", "-t")
-        mins = parse_time_to_minutes(raw) if raw else None
-        if mins is None:
-            problems.append(f"--time missing or unparsable: {raw!r}")
-        elif mins > c["time_max_minutes"]:
-            problems.append(f"--time {mins}min exceeds maximum {c['time_max_minutes']}min")
+        if raw is None:
+            problems.append("--time not requested (no universal default)")
+        else:
+            mins = parse_time_to_minutes(raw)
+            if mins is None:
+                problems.append(f"--time unparsable: {raw!r}")
+            elif mins > c["time_max_minutes"]:
+                problems.append(f"--time {mins}min exceeds maximum {c['time_max_minutes']}min")
 
     if "mem_min_mb" in c:
         raw = directive_value(d, "--mem")
-        mb = parse_mem_to_mb(raw) if raw else None
-        if mb is None:
-            problems.append(f"--mem missing or unparsable: {raw!r}")
-        elif mb < c["mem_min_mb"]:
-            problems.append(f"--mem {mb}MB below minimum {c['mem_min_mb']}MB")
+        if raw is None:
+            problems.append("--mem not requested (no universal default)")
+        else:
+            mb = parse_mem_to_mb(raw)
+            if mb is None:
+                problems.append(f"--mem unparsable: {raw!r}")
+            elif mb < c["mem_min_mb"]:
+                problems.append(f"--mem {mb}MB below minimum {c['mem_min_mb']}MB")
 
     if "array" in c and "--array" not in d:
         problems.append("job array requested but --array missing")
