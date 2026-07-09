@@ -1,0 +1,39 @@
+# --- Virtual environments (never commit: hundreds of MB) ---
+.venv/
+venv/
+env/
+
+# --- Model caches: run_experiments.sh defaults HF_HOME to $PWD/.hf_cache.
+#     A single 7B model in fp16 weighs ~15 GB. ---
+.hf_cache/
+*.safetensors
+*.gguf
+*.sif
+
+# --- Experiment outputs: heavy, and they embed the generated scripts ---
+results/
+results*.json
+*.log
+
+# NOTE: `sweep/` (litsweep.py output) is deliberately NOT ignored.
+# It is small text and it is the documentary evidence of the literature review:
+# it makes the review reproducible and citable in the paper.
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# --- OS / editors ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- Secrets ---
+.env

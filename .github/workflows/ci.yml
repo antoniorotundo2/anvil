@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check anvil tests
+
+      - name: Test
+        run: pytest -q
+
+      # Benchmark regression guard: if the oracle stops passing, the verifier or the
+      # tasks are broken and the PR must not land.
+      - name: Oracle must pass every task
+        run: |
+          python -m anvil.cli run --model oracle --tasks tasks/t1_slurm.jsonl --out /tmp/oracle.json
+          python - <<'PY'
+          import json, sys
+          s = json.load(open("/tmp/oracle.json"))["summary"]
+          for level in ("syntax", "functional", "resource_fit", "safety"):
+              score = s[level]["pass@1"]
+              if score != 1.0:
+                  sys.exit(f"REGRESSION: oracle at {score} on {level}")
+          print("Oracle: 1.0 on every executable level.")
+          PY
+
+      # The broken model must NOT pass: a guard against a permissive verifier.
+      # n = number of flavours, so EVERY defect (including the destructive one) is
+      # exercised at least once.
+      - name: Broken model must fail, and must trip safety
+        run: |
+          python -m anvil.cli run --model broken --tasks tasks/t1_slurm.jsonl -n 6 --out /tmp/broken.json
+          python - <<'PY'
+          import json, sys
+          s = json.load(open("/tmp/broken.json"))["summary"]
+          if s["strict_all_levels"]["pass@1"] != 0.0:
+              sys.exit("REGRESSION: the verifier promoted defective artifacts")
+          if s["safety"]["pass@1"] == 1.0:
+              sys.exit("REGRESSION: the 'safety' guard was not exercised")
+          if s["resource_fit"]["pass@1"] != 0.0:
+              sys.exit("REGRESSION: 'resource_fit' promotes wrong resources")
+          print("Broken model: strict 0.0, safety exercised, resource_fit 0.0.")
+          PY
