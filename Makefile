@@ -1,6 +1,10 @@
 # `python -m pytest` (not bare `pytest`): the module form puts the working
 # directory on sys.path, so the suite runs without relying on an editable install.
-PYTHON     ?= python
+#
+# Prefer the project venv when it exists. Forgetting to activate it silently
+# runs the system interpreter, which lacks torch/transformers - and `make
+# generate` then fails halfway, leaving a stale generations file behind.
+PYTHON     ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 
 .DEFAULT_GOAL := help
 
@@ -8,6 +12,7 @@ IMAGE      ?= anvil
 TASKS      ?= tasks/t1_slurm.jsonl
 MODEL      ?= Qwen/Qwen2.5-Coder-1.5B-Instruct
 GENERATIONS ?= results/generations.jsonl
+VERIFY_OUT  ?= results/verification.json
 DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 
 .PHONY: help install install-models test lint doctor run verify guards \
@@ -29,6 +34,7 @@ help:
 	@echo "  make guards          oracle must score 1.0, broken 0.0"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
 	@echo "  make docker-verify   verify those scripts against a real scheduler"
+	@echo "                       -> $(VERIFY_OUT) (summary + environment + elapsed_s)"
 	@echo ""
 	@echo "  make clean           remove caches and build artifacts"
 	@echo ""
@@ -79,13 +85,21 @@ docker-run: docker-build
 
 # --- generate here, verify there --------------------------------------------
 generate:
+	@echo "Using interpreter: $(PYTHON)"
+	@$(PYTHON) -c "import transformers, torch" 2>/dev/null || { \
+	  echo ""; \
+	  echo "ERROR: torch/transformers not available to $(PYTHON)."; \
+	  echo "       Activate the venv (source .venv/bin/activate) and run: make install-models"; \
+	  exit 1; }
 	@mkdir -p $(dir $(GENERATIONS))
 	$(PYTHON) -m anvil.cli run --model $(MODEL) --tasks $(TASKS) \
 		--save-generations $(GENERATIONS)
 
 docker-verify: docker-build
+	@test -f $(GENERATIONS) || { \
+	  echo "ERROR: $(GENERATIONS) does not exist. Run: make generate"; exit 1; }
 	$(DOCKER_RUN) python -m anvil.cli verify \
-		--generations $(GENERATIONS) --tasks $(TASKS) -v
+		--generations $(GENERATIONS) --tasks $(TASKS) -v --out $(VERIFY_OUT)
 
 clean:
 	rm -rf .pytest_cache .ruff_cache build dist *.egg-info
