@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use Anvil, please cite it as below."
+title: "Anvil: an executable benchmark for LLM-generated HPC operational artifacts"
+abstract: >-
+  Anvil measures whether the SLURM job scripts an LLM writes for a supercomputer
+  are correct, verifying them by submission, execution and effective resource fit
+  rather than by textual similarity.
+type: software
+authors:
+  - family-names: Rotundo
+    given-names: Antonio
+license: MIT
+repository-code: "https://github.com/antoniorotundo2/anvil"
+keywords:
+  - benchmark
+  - high-performance computing
+  - large language models
+  - execution-based evaluation
+  - SLURM

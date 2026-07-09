@@ -15,6 +15,12 @@ results/
 results*.json
 *.log
 
+# Generated scripts awaiting verification. `make generate` writes them under
+# results/, but a stray gen.jsonl in the root is easy to commit by accident -
+# and a stale one is worse than none: it predates whatever bug you just fixed.
+gen*.jsonl
+generations*.jsonl
+
 # --- Archives dropped into the working tree (downloaded snapshots, backups) ---
 *.tar.gz
 *.tgz
