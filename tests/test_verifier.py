@@ -568,3 +568,54 @@ def test_quoted_value_survives():
 def test_trailing_comment_is_stripped():
     d = parse_directives("#!/bin/bash\n#SBATCH --time=00:10:00  # ten minutes\n")
     assert d["--time"] == "00:10:00"
+
+
+# ------------------------------------------------- stale generations guard
+# `make generate` once failed halfway (wrong interpreter, no transformers) and
+# `make docker-verify` happily verified a leftover file, saying nothing. If the
+# task set had changed, the scores would have answered questions never asked.
+def test_generations_carry_the_task_file_digest(tmp_path):
+    from anvil.cli import main
+
+    gen = tmp_path / "gen.jsonl"
+    main(["run", "--model", "oracle", "--tasks", str(TASKS), "--save-generations", str(gen)])
+    records = [json.loads(line) for line in gen.read_text().splitlines() if line.strip()]
+    assert all(r["tasks_sha"] for r in records)
+    assert len({r["tasks_sha"] for r in records}) == 1
+
+
+def test_verify_refuses_generations_from_a_different_task_file(tmp_path, capsys):
+    from anvil.cli import main
+
+    gen = tmp_path / "gen.jsonl"
+    main(["run", "--model", "oracle", "--tasks", str(TASKS), "--save-generations", str(gen)])
+
+    altered = tmp_path / "altered.jsonl"
+    altered.write_text(TASKS.read_text() + json.dumps(
+        {"id": "extra", "prompt": "p", "constraints": {}}) + "\n")
+
+    rc = main(["verify", "--generations", str(gen), "--tasks", str(altered)])
+    assert rc == 2
+    assert "different task file" in capsys.readouterr().err
+
+
+def test_verify_accepts_generations_from_the_same_task_file(tmp_path):
+    from anvil.cli import main
+
+    gen = tmp_path / "gen.jsonl"
+    main(["run", "--model", "oracle", "--tasks", str(TASKS), "--save-generations", str(gen)])
+    assert main(["verify", "--generations", str(gen), "--tasks", str(TASKS)]) == 0
+
+
+def test_legacy_generations_without_a_digest_are_refused(tmp_path, capsys):
+    """Old files predate the guard. Silently accepting them defeats its purpose."""
+    from anvil.cli import main
+
+    gen = tmp_path / "old.jsonl"
+    gen.write_text(json.dumps({
+        "task_id": "t1_hello_serial", "sample": 0, "model": "x", "seed": 0,
+        "script": "#!/bin/bash\n#SBATCH --time=00:10:00\necho ANVIL_OK\n",
+    }) + "\n")
+    rc = main(["verify", "--generations", str(gen), "--tasks", str(TASKS)])
+    assert rc == 2
+    assert "different task file" in capsys.readouterr().err

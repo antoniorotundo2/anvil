@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -23,6 +24,16 @@ from .verifier import slurm_healthy, verify
 
 def _fmt(v: object, w: int) -> str:
     return str(v).ljust(w)
+
+
+def _file_sha(path: str | Path) -> str:
+    """Short digest of the task file.
+
+    Generations are produced *for a specific task set*. Verifying them against a
+    different one is a silent scientific error: the scripts answer questions that
+    were never asked. The digest travels with the generations so `verify` can refuse.
+    """
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -82,6 +93,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             "temperature": args.temperature,
         }
     model = build_model(args.model, args.tasks, **model_kw)
+    tasks_sha = _file_sha(args.tasks)
 
     healthy, why = slurm_healthy()
     if not healthy:
@@ -102,6 +114,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "sample": sample_idx,
                 "model": model.name,
                 "seed": args.seed,
+                "tasks_sha": tasks_sha,
                 "script": script,
             })
             results.append(verify(script, task, run_functional=not args.no_exec))
@@ -137,9 +150,12 @@ def cmd_verify(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
+    expected_sha = _file_sha(args.tasks)
+
     results = []
     models = set()
     unknown: set[str] = set()
+    shas: set[str] = set()
     t0 = time.time()
     with open(args.generations, encoding="utf-8") as fh:
         for line in fh:
@@ -151,6 +167,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
                 unknown.add(g["task_id"])
                 continue
             models.add(g.get("model", "?"))
+            shas.add(g.get("tasks_sha", "unknown"))
             results.append(verify(g["script"], task, run_functional=not args.no_exec))
             if args.verbose and (len(results) % 1 == 0):
                 _print_task_detail(task, results[-1])
@@ -159,6 +176,18 @@ def cmd_verify(args: argparse.Namespace) -> int:
     if unknown:
         print(f"[warning] {len(unknown)} generations reference unknown task ids: "
               f"{sorted(unknown)[:3]}", file=sys.stderr)
+
+    stale = shas - {expected_sha}
+    if stale:
+        print(
+            f"[ERROR] these generations were produced against a different task file "
+            f"(theirs: {sorted(stale)}, current: {expected_sha}).\n"
+            f"        Verifying them would score answers to questions that were never "
+            f"asked. Re-run `make generate`.",
+            file=sys.stderr,
+        )
+        return 2
+
     if not results:
         print("No generations verified.", file=sys.stderr)
         return 1
@@ -182,7 +211,7 @@ def _report(model_name, tasks_file, tasks, results, args, elapsed) -> None:
 
     n_per_task = len(results) / max(len(tasks), 1)
     print(f"\nModel: {model_name}   tasks: {len(tasks)}   samples/task: {n_per_task:g}   "
-          f"time: {elapsed:.1f}s")
+          f"time: {elapsed:.2f}s")
     print("-" * 62)
     print(f"{_fmt('level', 22)}{_fmt(f'pass@{args.k}', 12)}{_fmt('skipped', 10)}")
     print("-" * 62)

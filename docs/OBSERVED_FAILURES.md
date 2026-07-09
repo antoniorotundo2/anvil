@@ -42,6 +42,15 @@ beyond dry-run validation.
 The model narrates inside the directive. Degenerate small-model behaviour, but it produces an
 artifact that parses as a script and fails only at the semantic level.
 
+### F3 note: the diagnosis is parser-dependent
+Before the multi-option parser fix, `#SBATCH --mem=2 referencing GB` was reported as
+`--mem unparsable`. After it, `shlex` splits the line, the value becomes `2`, which parses
+cleanly as 2 MB — so the same artifact is now reported as `--mem 2MB below minimum 2048MB`.
+
+The error is still caught, but **its category changed**: degenerate prose now masquerades as an
+under-request. For a taxonomy built on these categories this matters, and the two must be told
+apart before T2 induction relies on them.
+
 ## F4 — Missing directive with no universal default
 `--time` and `--mem` omitted where the spec demanded them. Unlike F1 there is no defensible
 default: the resource is simply never requested.
