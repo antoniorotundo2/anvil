@@ -6,6 +6,7 @@ A test that never fails on a broken script is not testing anything.
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 
@@ -448,3 +449,61 @@ def test_zero_exit_disambiguates_implementations():
     assert "GNU coreutils" in classify_coreutils("ls (GNU coreutils) 9.4", supports_version=True)
     assert "NOT GNU" in classify_coreutils("ls (uutils coreutils) 0.0.30", supports_version=True)
     assert "NOT GNU" in classify_coreutils("BusyBox v1.36.1", supports_version=True)
+
+
+# ------------------------------------------------- generate / verify decoupling
+def test_run_then_verify_gives_identical_summaries(tmp_path):
+    """Generation needs the accelerator; faithful verification needs the scheduler.
+    Splitting them must not change a single number."""
+    from anvil.cli import main
+
+    gen = tmp_path / "gen.jsonl"
+    run_out = tmp_path / "run.json"
+    ver_out = tmp_path / "ver.json"
+
+    assert main(["run", "--model", "oracle", "--tasks", str(TASKS),
+                 "--save-generations", str(gen), "--out", str(run_out)]) == 0
+    assert main(["verify", "--generations", str(gen), "--tasks", str(TASKS),
+                 "--out", str(ver_out)]) == 0
+
+    a = json.loads(run_out.read_text())["summary"]
+    b = json.loads(ver_out.read_text())["summary"]
+    assert a == b
+
+
+def test_generations_file_is_one_script_per_sample(tmp_path):
+    from anvil.cli import main
+
+    gen = tmp_path / "gen.jsonl"
+    main(["run", "--model", "broken", "--tasks", str(TASKS), "-n", "3",
+          "--save-generations", str(gen)])
+    records = [json.loads(line) for line in gen.read_text().splitlines() if line.strip()]
+    n_tasks = len(Task.load_jsonl(TASKS))
+    assert len(records) == n_tasks * 3
+    assert {r["sample"] for r in records} == {0, 1, 2}
+    assert all(r["script"].strip() for r in records)
+
+
+def test_verify_records_the_environment(tmp_path):
+    """Which bash, which coreutils, which base image produced each number."""
+    from anvil.cli import main
+
+    gen = tmp_path / "gen.jsonl"
+    out = tmp_path / "ver.json"
+    main(["run", "--model", "oracle", "--tasks", str(TASKS), "--save-generations", str(gen)])
+    main(["verify", "--generations", str(gen), "--tasks", str(TASKS), "--out", str(out)])
+
+    env = json.loads(out.read_text())["environment"]
+    for key in ("bash", "coreutils", "gnu_faithful", "base_image", "functional_executor"):
+        assert key in env
+
+
+def test_verify_warns_on_unknown_task_ids(tmp_path, capsys):
+    from anvil.cli import main
+
+    gen = tmp_path / "gen.jsonl"
+    gen.write_text(json.dumps({"task_id": "does_not_exist", "sample": 0,
+                               "model": "x", "seed": 0, "script": "#!/bin/bash\necho hi\n"}) + "\n")
+    rc = main(["verify", "--generations", str(gen), "--tasks", str(TASKS)])
+    assert rc == 1                       # nothing verified
+    assert "unknown task ids" in capsys.readouterr().err

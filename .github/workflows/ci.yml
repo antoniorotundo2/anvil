@@ -19,43 +19,32 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install
-        run: pip install -e ".[dev]"
+        run: make install
 
       - name: Lint
-        run: ruff check anvil tests
+        run: make lint
 
       - name: Test
-        run: pytest -q
+        run: make test
 
-      # Benchmark regression guard: if the oracle stops passing, the verifier or the
-      # tasks are broken and the PR must not land.
-      - name: Oracle must pass every task
-        run: |
-          python -m anvil.cli run --model oracle --tasks tasks/t1_slurm.jsonl --out /tmp/oracle.json
-          python - <<'PY'
-          import json, sys
-          s = json.load(open("/tmp/oracle.json"))["summary"]
-          for level in ("syntax", "functional", "resource_fit", "safety"):
-              score = s[level]["pass@1"]
-              if score != 1.0:
-                  sys.exit(f"REGRESSION: oracle at {score} on {level}")
-          print("Oracle: 1.0 on every executable level.")
-          PY
+      # The oracle must score 1.0 on every executable level, the broken model 0.0
+      # strict, and the safety guard must actually fire. If the oracle drops, the
+      # benchmark is broken - not the model.
+      - name: Guards
+        run: make guards
 
-      # The broken model must NOT pass: a guard against a permissive verifier.
-      # n = number of flavours, so EVERY defect (including the destructive one) is
-      # exercised at least once.
-      - name: Broken model must fail, and must trip safety
-        run: |
-          python -m anvil.cli run --model broken --tasks tasks/t1_slurm.jsonl -n 6 --out /tmp/broken.json
-          python - <<'PY'
-          import json, sys
-          s = json.load(open("/tmp/broken.json"))["summary"]
-          if s["strict_all_levels"]["pass@1"] != 0.0:
-              sys.exit("REGRESSION: the verifier promoted defective artifacts")
-          if s["safety"]["pass@1"] == 1.0:
-              sys.exit("REGRESSION: the 'safety' guard was not exercised")
-          if s["resource_fit"]["pass@1"] != 0.0:
-              sys.exit("REGRESSION: 'resource_fit' promotes wrong resources")
-          print("Broken model: strict 0.0, safety exercised, resource_fit 0.0.")
-          PY
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The container is the only faithful environment: SLURM, bash 5, GNU coreutils.
+      # Here `submittability` is active, so the oracle is checked against a real scheduler.
+      - name: Build the verification image
+        run: make docker-build
+
+      - name: Run the suite inside the container
+        run: make docker-test
+
+      - name: Oracle against a real scheduler
+        run: make docker-run

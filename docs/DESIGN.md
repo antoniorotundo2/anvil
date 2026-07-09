@@ -1,0 +1,115 @@
+# Design
+
+Why this benchmark exists, and why it is built the way it is.
+
+## The question
+
+*When an LLM writes the SLURM job script a supercomputer user actually needs, is it correct?*
+
+Not "does it resemble the reference answer" — **does it parse, does the scheduler accept it, does
+it run, and does it request the right resources?**
+
+Assistants that help HPC users are appearing, but they are evaluated with semantic similarity
+metrics because no validated HPC benchmark exists — their own authors say so. Meanwhile,
+execution-based benchmarks are the norm everywhere else: parallel code, PDE solvers, quantum SDKs,
+and cloud infrastructure-as-code. **Operational HPC artifacts are the empty slot.**
+
+Cloud IaC benchmarks fall back on graph-edit-distance and LLM judges because a Terraform plan
+cannot be executed cheaply or repaired iteratively. HPC operational artifacts are the opposite:
+`sbatch --test-only` costs milliseconds, the job really runs, and repair is iterable. Objective,
+execution-based ground truth is *possible* here where it is not possible there.
+
+A wrong `--mem` does not look wrong. It looks plausible. Then the job dies at hour six.
+
+## The verifier
+
+Five independent levels, weakest to strongest:
+
+| Level | Question | How |
+|---|---|---|
+| `syntax` | Is it a valid script? | shebang, `bash -n`, misplaced `#SBATCH` |
+| `submittability` | Would SLURM accept it? | `sbatch --test-only` |
+| `functional` | Does it run and exit 0? | sandboxed execution, expected output |
+| `resource_fit` | Does it request what was asked? | effective request vs. task constraints |
+| `safety` | Is it dangerous? | destructive-pattern probes |
+
+Two design choices carry the scientific weight.
+
+**`skipped` is never `passed`.** No scheduler on your laptop? `submittability` is skipped and
+scored as *not passed*. The metrics stay honest on any machine.
+
+**Dangerous scripts are never executed.** `safety` gates `functional`.
+
+### The misplaced-directive check
+
+SLURM stops reading `#SBATCH` lines at the first real command. Directives after it are **silently
+ignored** — `sbatch` accepts the job and the request is wrong. Anvil catches this;
+`sbatch --test-only` cannot.
+
+### Effective requests, not string presence
+
+`resource_fit` compares the **effective** resource request against the spec, applying SLURM's
+documented defaults: `--nodes` → 1, `--ntasks` → one task per node, `--cpus-per-task` → 1. A serial
+script that omits `--nodes` still requests one node, and is correct.
+
+Directives with no universal default — `--time`, `--mem`, `--gpus` — depend on partition
+configuration. Omitting them means the resource was never requested: a genuine failure against a
+spec that asks for it. Tasks can still demand explicitness through `required_directives`.
+
+The distinction is the point. Checking whether a string appears is surface-form matching —
+precisely what this benchmark exists to replace. An early version did exactly that, and failed
+scripts that `sbatch` accepted.
+
+## Oracle and broken model
+
+Every benchmark should ship both. Few do.
+
+- **Oracle** — canonical solutions. Proves the tasks are solvable and the verifier is not too
+  strict. CI fails if it drops below 1.0.
+- **Broken** — faulty artifacts (missing shebang, misplaced directive, walltime overrun,
+  `rm -rf /`, non-zero exit). Proves the verifier is not too permissive. CI fails if it scores
+  above 0.0 strict, **or if the safety guard is never exercised**.
+
+Together they bracket the verifier from both sides. Neither test is decorative: the oracle caught
+a real bug during development, where the harness injected `SLURM_CPUS_PER_TASK=1` into a task that
+requested 4 cores — the harness was contradicting the spec it was checking.
+
+An earlier broken model sampled the same three flavours for every task, so the destructive one was
+never drawn and `check_safety` was never tested. A guard that never fires is decoration.
+
+## The preflight
+
+Before scoring anything, the verifier submits a **canary** to the scheduler: a minimal,
+certainly-valid script. If the canary fails, `submittability` is marked *skipped*, not *failed*.
+
+Without this, a misconfigured cluster produces eight zeros that are **indistinguishable from a
+terrible model**. It happened during development. A benchmark that executes code must be able to
+tell a failure of its subject from a failure of itself.
+
+## Metrics
+
+`pass@k` with the unbiased estimator (Chen et al., 2021), computed per level, plus
+`strict_all_levels` (every non-skipped level passed).
+
+## Limitations
+
+`functional` runs the script under `bash` in a sandbox; it does not submit it to `sbatch`. This is
+recorded as `functional_executor: "bash"` in every result file. OOM kills, walltime overruns and
+CPU/GPU binding are therefore not observed — precisely the failure modes most interesting for the
+planned repair task. See [`REFERENCE_CLUSTER.md`](REFERENCE_CLUSTER.md).
+
+T2 failures will be partly synthetic, induced to obtain ground truth. The taxonomy is anchored to
+[failures observed on real models](OBSERVED_FAILURES.md) and to published HPC-centre FAQs, and we
+say so plainly.
+
+## Roadmap
+
+- [x] **Phase 1** — verifier (5 levels), 8 T1 tasks, oracle + broken, `pass@k`, reference cluster,
+      preflight, generate/verify decoupling
+- [ ] **Phase 2** — T2 diagnose-and-repair; Apptainer recipes; retrieval ablation
+      (zero-shot / vector / vectorless); cross-distribution ablation; failure-category breakdown
+- [ ] **Phase 3** — QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
+- [ ] **Phase 4** — dataset release, leaderboard, preprint
+
+Evaluated models will include a **state-space** model alongside transformers, to test whether
+architecture matters for operational artifacts.

@@ -1,151 +1,132 @@
 # Anvil
 
-**Executable benchmarking of LLM-generated HPC operational artifacts.**
+The project aims to measure whether the operational artifacts an LLM writes for a supercomputer —
+SLURM job scripts, and later container recipes — are actually correct: verified by submission,
+execution and resource fit, not by textual similarity.
 
-Anvil asks a question the existing benchmarks don't: *when an LLM writes the SLURM job
-script or the container recipe that a supercomputer user actually needs — is it correct?*
-Not "does it look like the reference answer" (cosine similarity), but **does it parse, does
-the scheduler accept it, does it run, and does it request the right resources?**
+## Requirements
 
-> Status: **Phase 1** — task T1 (generation) for SLURM job scripts.
-> Planned: T2 (diagnose-and-repair), Apptainer recipes, retrieval ablation. See Roadmap.
+### Hardware
 
----
+- Any machine, to develop and to verify
+- [Optional] An NVIDIA GPU or Apple Silicon, to generate scripts with a real model
+- [Optional] A machine with SLURM installed, if you do not want to use Docker
 
-## Why
+### Software
 
-Assistants that help HPC users are appearing, but they are evaluated with **semantic
-similarity metrics** because no validated HPC benchmark exists — their own authors say so.
-Meanwhile, execution-based benchmarks are the norm everywhere else: parallel code, PDE
-solvers, quantum SDKs. **Operational HPC artifacts are the empty slot.** Anvil fills it.
+- Python >= 3.10
+- Docker Community Edition (recommended: it provides SLURM and GNU coreutils)
+- [Optional] PyTorch and Transformers, only to generate with a model
+- [Optional] `bitsandbytes`, for 4-bit quantization on CUDA
 
-A wrong `--mem` doesn't look wrong. It looks *plausible*. Then the job dies at hour six.
+## Configuration
 
----
+The benchmark validates artifacts against a **declared** reference cluster, not against the
+hardware of the machine that runs it. Otherwise scores would depend on who runs the benchmark.
+The topology is defined by environment variables read by the container:
 
-## The verifier
-
-Five independent levels, weakest to strongest:
-
-| Level | Question | How |
-|---|---|---|
-| `syntax` | Is it a valid script? | shebang, `bash -n`, misplaced `#SBATCH` |
-| `submittability` | Would SLURM accept it? | `sbatch --test-only` |
-| `functional` | Does it run and exit 0? | sandboxed execution, expected output |
-| `resource_fit` | Does it request what was asked? | parse directives vs. task constraints |
-| `safety` | Is it dangerous? | destructive-pattern probes |
-
-Two design choices carry the scientific weight:
-
-- **`skipped` is never `passed`.** No SLURM on your laptop? `submittability` is skipped and
-  scored as *not passed*. The metrics stay honest on any machine.
-- **Dangerous scripts are never executed.** `safety` gates `functional`.
-
-### The misplaced-directive check
-SLURM stops reading `#SBATCH` lines at the first real command. Directives after it are
-**silently ignored** — `sbatch` accepts the job and the request is wrong. Anvil catches this;
-`sbatch --test-only` cannot.
-
-### Effective requests, not string presence
-`resource_fit` compares the **effective** resource request against the spec, applying SLURM's
-documented defaults: `--nodes` → 1, `--ntasks` → one task per node, `--cpus-per-task` → 1.
-A serial script that omits `--nodes` still requests one node, and is correct.
-
-Directives with no universal default — `--time`, `--mem`, `--gpus` — depend on partition
-configuration. Omitting them means the resource was never requested: a genuine failure against a
-spec that asks for it. Tasks can still demand explicitness through `required_directives`.
-
-The distinction is the point. Checking whether a string appears is surface-form matching —
-precisely what this benchmark exists to replace. An early version did exactly that, and failed
-scripts that `sbatch` accepted.
-
----
-
-## Quickstart
-
-```bash
-pip install -e ".[dev]"
-
-# The oracle returns canonical solutions: it must score 1.0. If it doesn't, the
-# benchmark is broken, not the model.
-python -m anvil.cli run --model oracle --tasks tasks/t1_slurm.jsonl -v
-
-# The broken model returns deliberately faulty artifacts: it must score 0.0 strict.
-python -m anvil.cli run --model broken --tasks tasks/t1_slurm.jsonl -n 3
-
-# A real model. CPU by default; uses your GPU automatically if present.
-pip install -e ".[models]"
-python -m anvil.cli run --model Qwen/Qwen2.5-Coder-1.5B-Instruct \
-    --tasks tasks/t1_slurm.jsonl -n 5 -k 1 --out results.json
+```
+ANVIL_NODES=4        # virtual nodes
+ANVIL_CPUS=16        # cores per node
+ANVIL_MEM_MB=64000   # memory per node, in MB
+ANVIL_GPUS=4         # GPUs per node
 ```
 
-Nothing above needs a cluster. Check what your machine can do:
+Changing the topology changes the results: it is part of the benchmark definition. See
+[`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md).
 
-```bash
-python -m anvil.cli doctor
+Tasks live in `tasks/t1_slurm.jsonl`; their canonical solutions in `tasks/t1_reference.jsonl`.
+
+## Install
+
+```
+make install
 ```
 
-To unlock `submittability`, either install SLURM locally
-(`sudo ./scripts/setup_slurm_single_node.sh`) or use the Linux container, which ships
-with SLURM and gives faithful bash/coreutils behaviour on macOS:
+To generate scripts with a real model, also install the model extras:
 
-```bash
-docker build -t anvil docker/
-docker run --rm -v "$PWD":/work -w /work anvil pytest -q
+```
+make install-models
 ```
 
-For batch runs on a GPU machine you only access occasionally:
+## Run
 
-```bash
-N=5 SEEDS="0 1 2" ./scripts/run_experiments.sh
+To run the project you can use two methods. The first one (recommended) uses Docker, which ships a
+SLURM reference cluster and GNU coreutils, so every verification level is active. The second one is
+the manual way, on your own machine, where `submittability` is skipped unless you install SLURM and
+where `functional` runs under whatever `bash` and coreutils you happen to have.
+
+### Docker (Recommended)
+
+```
+make docker-run
 ```
 
-See [docs/HARDWARE.md](docs/HARDWARE.md) for the dev-machine / experiment-machine split.
+Verify what the environment can actually check:
 
----
+```
+make doctor
+```
 
-## Oracle and broken model
+### Manually
 
-Every benchmark should ship both, and few do.
+```
+make run
+```
 
-- **Oracle** — canonical solutions. Proves the tasks are solvable and the verifier isn't
-  too strict. CI fails if it drops below 1.0.
-- **Broken** — faulty artifacts (missing shebang, misplaced directive, walltime overrun,
-  `rm -rf /`, non-zero exit). Proves the verifier isn't too permissive. CI fails if it
-  scores above 0.0 strict.
+### Guards
 
-Together they bracket the verifier from both sides. Neither test is decorative: the
-oracle caught a real bug during development, where the harness injected
-`SLURM_CPUS_PER_TASK=1` into a task that requested 4 cores — the harness was contradicting
-the spec it was checking. Environment variables are now derived from task constraints.
+The oracle returns canonical solutions and must score 1.0; the broken model returns deliberately
+faulty artifacts and must score 0.0. If the oracle drops, the benchmark is broken — not the model.
 
----
+```
+make guards
+```
 
-## Metrics
+## Development
 
-`pass@k` with the unbiased estimator (Chen et al., 2021), computed per level, plus
-`strict_all_levels` (every non-skipped level passed).
+### Tests
 
----
+```
+make test
+make lint
+```
 
-## Roadmap
+### Generate here, verify there
 
-- [x] **Phase 1** — verifier (5 levels), 8 T1 tasks, oracle + broken, `pass@k`, CI
-- [ ] **Phase 2** — T2 diagnose-and-repair; Apptainer recipes; retrieval ablation
-      (zero-shot / vector / vectorless); failure-category breakdown
-- [ ] **Phase 3** — QLoRA reference model; SSM arm (Mamba-Codestral); hybrid
-      classical-quantum artifacts (simulator-verified)
-- [ ] **Phase 4** — dataset release, leaderboard, preprint
+Generation needs the machine with the accelerator. Faithful verification needs the machine with the
+scheduler and GNU coreutils. They are rarely the same machine.
 
-Evaluated models will include a **state-space** model alongside transformers, to test
-whether architecture matters for operational artifacts.
+```
+make generate MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct
+make docker-verify
+```
 
-## Limitations
+`verify` records `bash`, `coreutils`, `base_image` and `functional_executor` in its JSON output, so
+every number carries the environment that produced it. This also enables the cross-distribution
+ablation: generate once, verify against several base images.
 
-Failures in T2 will be **partly synthetic**, induced deliberately to obtain ground truth.
-We anchor the taxonomy to published HPC-centre FAQs and to failure statistics from public
-scheduler datasets, and we say so plainly. Without a cluster, `submittability` is skipped
-and `functional` runs under `bash` rather than `sbatch`; results report which mode was used.
+### Base image
+
+The container defaults to `ubuntu:24.04`, not the newest LTS: Ubuntu 26.04 replaces GNU coreutils
+with `uutils`, which no HPC centre runs. Fidelity beats freshness.
+
+```
+docker build -t anvil:2604 --build-arg BASE_IMAGE=ubuntu:26.04 docker/
+```
+
+### Adding tasks
+
+A task declares a natural-language prompt, the resource constraints to check, the directives that
+must be written out explicitly, and the strings its output must contain. Every new task needs a
+canonical solution in `tasks/t1_reference.jsonl`, or `make guards` will fail.
+
+## Documentation
+
+- [`docs/DESIGN.md`](docs/DESIGN.md) — why execution-based verification, the five levels, the preflight
+- [`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md) — the declared topology and its non-obvious details
+- [`docs/OBSERVED_FAILURES.md`](docs/OBSERVED_FAILURES.md) — failure classes observed on a real model
+- [`docs/HARDWARE.md`](docs/HARDWARE.md) — development machine vs experiment machine
 
 ## License
 

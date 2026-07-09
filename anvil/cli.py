@@ -91,25 +91,97 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
 
     results = []
+    generations: list[dict] = []
     t0 = time.time()
     for task in tasks:
         raw_outputs = model.generate(task.prompt, n=args.n, seed=args.seed)
-        for raw in raw_outputs:
+        for sample_idx, raw in enumerate(raw_outputs):
             script = extract_script(raw)
+            generations.append({
+                "task_id": task.id,
+                "sample": sample_idx,
+                "model": model.name,
+                "seed": args.seed,
+                "script": script,
+            })
             results.append(verify(script, task, run_functional=not args.no_exec))
         if args.verbose:
-            last = results[-1]
-            status = "PASS" if last.all_passed else "FAIL"
-            print(f"  {_fmt(task.id, 26)} {status}")
-            if not last.all_passed:
-                for lr in last.levels:
-                    if not lr.passed and not lr.skipped:
-                        print(f"      - {lr.level.value}: {lr.detail}")
+            _print_task_detail(task, results[-1])
     elapsed = time.time() - t0
 
+    if args.save_generations:
+        with open(args.save_generations, "w", encoding="utf-8") as fh:
+            for g in generations:
+                fh.write(json.dumps(g, ensure_ascii=False) + "\n")
+        print(f"Generations written to {args.save_generations} "
+              f"({len(generations)} scripts) — verify them elsewhere with `anvil verify`.")
+
+    _report(model.name, args.tasks, tasks, results, args, elapsed)
+    return 0
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    """Verify previously generated scripts. No model, no GPU.
+
+    Generation needs the machine with the accelerator; faithful verification needs
+    the machine with the scheduler and GNU coreutils. Decoupling them lets you
+    generate once and verify anywhere — including across several base images, to
+    test whether artifact correctness is portable between distributions.
+    """
+    tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
+
+    healthy, why = slurm_healthy()
+    if not healthy:
+        print(
+            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
+            file=sys.stderr,
+        )
+
+    results = []
+    models = set()
+    unknown: set[str] = set()
+    t0 = time.time()
+    with open(args.generations, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            g = json.loads(line)
+            task = tasks.get(g["task_id"])
+            if task is None:
+                unknown.add(g["task_id"])
+                continue
+            models.add(g.get("model", "?"))
+            results.append(verify(g["script"], task, run_functional=not args.no_exec))
+            if args.verbose and (len(results) % 1 == 0):
+                _print_task_detail(task, results[-1])
+    elapsed = time.time() - t0
+
+    if unknown:
+        print(f"[warning] {len(unknown)} generations reference unknown task ids: "
+              f"{sorted(unknown)[:3]}", file=sys.stderr)
+    if not results:
+        print("No generations verified.", file=sys.stderr)
+        return 1
+
+    name = models.pop() if len(models) == 1 else f"{len(models)} models"
+    _report(name, args.tasks, list(tasks.values()), results, args, elapsed)
+    return 0
+
+
+def _print_task_detail(task: Task, res) -> None:
+    status = "PASS" if res.all_passed else "FAIL"
+    print(f"  {_fmt(task.id, 26)} {status}")
+    if not res.all_passed:
+        for lr in res.levels:
+            if not lr.passed and not lr.skipped:
+                print(f"      - {lr.level.value}: {lr.detail}")
+
+
+def _report(model_name, tasks_file, tasks, results, args, elapsed) -> None:
     summary = aggregate(results, k=args.k)
 
-    print(f"\nModel: {model.name}   tasks: {len(tasks)}   samples/task: {args.n}   "
+    n_per_task = len(results) / max(len(tasks), 1)
+    print(f"\nModel: {model_name}   tasks: {len(tasks)}   samples/task: {n_per_task:g}   "
           f"time: {elapsed:.1f}s")
     print("-" * 62)
     print(f"{_fmt('level', 22)}{_fmt(f'pass@{args.k}', 12)}{_fmt('skipped', 10)}")
@@ -124,20 +196,20 @@ def cmd_run(args: argparse.Namespace) -> int:
     print("-" * 62)
 
     if args.out:
+        from .device import environment_report
+
+        env = environment_report()
         payload = {
-            "model": model.name,
-            "tasks_file": str(args.tasks),
-            "n_samples": args.n,
+            "model": model_name,
+            "tasks_file": str(tasks_file),
             "k": args.k,
-            "slurm_healthy": slurm_healthy()[0],
+            "environment": env,          # base image, bash, coreutils, device: all recorded
             "elapsed_s": round(elapsed, 2),
             "summary": summary,
             "results": [r.to_dict() for r in results],
         }
         Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Full results written to {args.out}")
-
-    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -150,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--json", action="store_true")
     d.set_defaults(func=cmd_doctor)
 
-    r = sub.add_parser("run", help="run the benchmark")
+    r = sub.add_parser("run", help="generate with a model and verify")
     r.add_argument("--model", required=True, help="'oracle' | 'broken' | a HF model_id")
     r.add_argument("--tasks", default="tasks/t1_slurm.jsonl")
     r.add_argument("-n", type=int, default=1, help="samples per task")
@@ -161,9 +233,25 @@ def main(argv: list[str] | None = None) -> int:
                    help="4-bit quantization (requires CUDA + bitsandbytes)")
     r.add_argument("--max-new-tokens", type=int, default=512)
     r.add_argument("--temperature", type=float, default=0.2)
+    r.add_argument("--save-generations", metavar="PATH",
+                   help="write the generated scripts to JSONL for later `anvil verify`")
     r.add_argument("--out", help="write full results to JSON")
     r.add_argument("--verbose", "-v", action="store_true")
     r.set_defaults(func=cmd_run)
+
+    v = sub.add_parser(
+        "verify",
+        help="verify previously generated scripts (no model, no GPU)",
+        description="Generate where the accelerator is, verify where the scheduler is.",
+    )
+    v.add_argument("--generations", required=True, metavar="PATH",
+                   help="JSONL produced by `anvil run --save-generations`")
+    v.add_argument("--tasks", default="tasks/t1_slurm.jsonl")
+    v.add_argument("-k", type=int, default=1, help="budget for pass@k")
+    v.add_argument("--no-exec", action="store_true", help="skip the functional level")
+    v.add_argument("--out", help="write full results to JSON")
+    v.add_argument("--verbose", "-v", action="store_true")
+    v.set_defaults(func=cmd_verify)
 
     args = p.parse_args(argv)
     return args.func(args)
