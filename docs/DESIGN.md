@@ -91,6 +91,33 @@ tell a failure of its subject from a failure of itself.
 `pass@k` with the unbiased estimator (Chen et al., 2021), computed per level, plus
 `strict_all_levels` (every non-skipped level passed).
 
+## Diagnose-and-repair (T2)
+
+T1 measures whether a model can write a correct artifact from scratch. T2 measures whether it can
+recognise and fix a broken one — a distinct and, for an assistant embedded in a support workflow,
+arguably more common situation: a user already has a script, and it is already wrong.
+
+**Repair is graded by the same verifier, not a softer one.** A repaired script must clear every
+level that a from-scratch T1 solution would have to clear against the same task. There is no
+partial credit for "closer to correct" — that would reintroduce the similarity-based scoring this
+benchmark exists to replace.
+
+**The faults are induced, not hand-written.** `anvil/inducer.py` mechanically derives seven fault
+classes from the T1 canonical solutions, anchored to [failures observed on a real
+model](OBSERVED_FAILURES.md) (F1–F7): a silently under-requested resource, a misplaced directive, a
+prose-corrupted value, a missing no-default directive, a script with no `#SBATCH` at all, a
+payload that no longer matches its own spec, and a directive value the scheduler rejects outright.
+Hand-authoring this many broken variants across every task does not scale; mechanical induction
+from a known-good starting point does.
+
+**Broken must mean broken.** Building `tasks/t2_repair.jsonl` (`anvil induce`) runs each induced
+variant through the real verifier and discards any that still verifies clean. Not every fault class
+applies to every task — F1 needs a directive with a SLURM default to hide behind, F6 needs a
+derived-value payload — so applicability is decided empirically, not declared in advance. The same
+bracket as T1's oracle/broken guard applies here: the oracle repair (the T1 canonical solution,
+returned regardless of the diagnosis) must score 1.0, and a no-op repair (the broken script,
+unchanged) must score 0.0. `make guards-t2` checks both.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox; it does not submit it to `sbatch`. This is
@@ -106,8 +133,13 @@ say so plainly.
 
 - [x] **Phase 1** — verifier (5 levels), 8 T1 tasks, oracle + broken, `pass@k`, reference cluster,
       preflight, generate/verify decoupling
-- [ ] **Phase 2** — T2 diagnose-and-repair; Apptainer recipes; retrieval ablation
-      (zero-shot / vector / vectorless); cross-distribution ablation; failure-category breakdown
+- [ ] **Phase 2**
+  - [x] T2 diagnose-and-repair — mechanical fault induction (F1–F7), `tasks/t2_repair.jsonl`,
+        `anvil repair` / `anvil verify-repair`, oracle-repair/no-op-repair guards
+  - [ ] Apptainer recipes
+  - [ ] retrieval ablation (zero-shot / vector / vectorless)
+  - [ ] cross-distribution ablation
+  - [ ] failure-category breakdown
 - [ ] **Phase 3** — QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
 

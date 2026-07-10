@@ -102,7 +102,9 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 
 ## What this changes
 
-1. **T2 induction can be grounded.** F1–F6 are real, and each maps to an inducer.
+1. **T2 induction can be grounded.** F1–F7 are real, and each maps to an inducer in
+   `anvil/inducer.py`, mechanically applied to the T1 canonical solutions to build
+   `tasks/t2_repair.jsonl` (see [DESIGN.md](DESIGN.md#diagnose-and-repair-t2)).
 2. **F1 is the class to build the paper around.** It is invisible to every proxy metric, invisible
    to the scheduler, and expensive in practice.
 3. **`resource_fit` must reason about effective requests.** An earlier version compared string

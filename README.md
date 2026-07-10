@@ -2,7 +2,9 @@
 
 The project aims to measure whether the operational artifacts an LLM writes for a supercomputer —
 SLURM job scripts, and later container recipes — are actually correct: verified by submission,
-execution and resource fit, not by textual similarity.
+execution and resource fit, not by textual similarity. Beyond writing scripts from scratch (T1),
+Anvil also measures whether a model can **diagnose and repair** a broken one (T2): see
+[Diagnose-and-repair (T2)](#diagnose-and-repair-t2) below.
 
 ## Requirements
 
@@ -36,6 +38,8 @@ Changing the topology changes the results: it is part of the benchmark definitio
 [`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md).
 
 Tasks live in `tasks/t1_slurm.jsonl`; their canonical solutions in `tasks/t1_reference.jsonl`.
+Induced repair tasks (T2) live in `tasks/t2_repair.jsonl` — see
+[Diagnose-and-repair (T2)](#diagnose-and-repair-t2).
 
 ## Install
 
@@ -120,6 +124,43 @@ docker build -t anvil:2604 --build-arg BASE_IMAGE=ubuntu:26.04 docker/
 A task declares a natural-language prompt, the resource constraints to check, the directives that
 must be written out explicitly, and the strings its output must contain. Every new task needs a
 canonical solution in `tasks/t1_reference.jsonl`, or `make guards` will fail.
+
+## Diagnose-and-repair (T2)
+
+T1 asks a model to write a script from scratch. T2 hands it a **broken** one — one of seven fault
+classes anchored to failures observed on a real model (`docs/OBSERVED_FAILURES.md`, F1–F7) — and
+asks it to diagnose and fix it. A repair is correct if and only if it clears the exact same
+verifier used to grade a from-scratch T1 solution: repair is not a softer notion of correctness.
+
+`tasks/t2_repair.jsonl` is not hand-written: it is induced mechanically from the T1 canonical
+solutions (`anvil/inducer.py`), and only variants that actually fail verification are kept.
+Rebuild it after changing a T1 task or its reference solution:
+
+```
+make induce-t2
+```
+
+Run a model against it and verify, same shape as T1:
+
+```
+make repair MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct
+```
+
+```
+anvil repair --model oracle --repair-tasks tasks/t2_repair.jsonl --tasks tasks/t1_slurm.jsonl -v
+anvil repair --model <hf-model-id> --repair-tasks tasks/t2_repair.jsonl --save-generations results/repair_generations.jsonl
+anvil verify-repair --generations results/repair_generations.jsonl --repair-tasks tasks/t2_repair.jsonl -v
+```
+
+### Guards
+
+The oracle repair (returns the T1 canonical solution, ignoring the diagnosis) must pass every
+induced fault; a no-op "repair" that returns the broken script unchanged must pass none. If either
+fails, `t2_repair.jsonl` or the repair verifier is broken — not a model.
+
+```
+make guards-t2
+```
 
 ## Documentation
 
