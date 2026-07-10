@@ -13,12 +13,20 @@ import hashlib
 import json
 import sys
 import time
+from dataclasses import asdict
 from pathlib import Path
 
+from .inducer import FAULT_CATEGORIES
 from .metrics import aggregate
-from .models import build_model
+from .models import build_model, reference_path_for
 from .parse import extract_script
-from .schema import Level, Task
+from .repair import (
+    build_repair_model,
+    build_repair_prompt,
+    induce_t2_tasks,
+    verify_repair,
+)
+from .schema import Level, RepairTask, Task
 from .verifier import slurm_healthy, verify
 
 
@@ -197,6 +205,182 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_induce(args: argparse.Namespace) -> int:
+    """Build the T2 task set: mechanically break every T1 reference solution
+    (see anvil/inducer.py) and keep only the variants that actually fail
+    verification. An inducer that produces an accidentally-valid script is a
+    bug in the inducer, not a fault worth teaching a model to repair."""
+    tasks = Task.load_jsonl(args.tasks)
+    reference: dict[str, str] = {}
+    with open(args.reference, encoding="utf-8") as fh:
+        for line in fh:
+            if line.strip():
+                rec = json.loads(line)
+                reference[rec["id"]] = rec["script"]
+
+    repair_tasks, warnings = induce_t2_tasks(tasks, reference, run_functional=not args.no_exec)
+    for w in warnings:
+        print(f"[induce] {w}", file=sys.stderr)
+
+    with open(args.out, "w", encoding="utf-8") as fh:
+        for rt in repair_tasks:
+            fh.write(json.dumps(asdict(rt), ensure_ascii=False) + "\n")
+
+    by_category: dict[str, int] = {}
+    for rt in repair_tasks:
+        by_category[rt.fault_category] = by_category.get(rt.fault_category, 0) + 1
+
+    print(f"Induced {len(repair_tasks)} T2 tasks from {len(tasks)} T1 tasks -> {args.out}")
+    for cat in sorted(by_category):
+        print(f"  {cat} ({FAULT_CATEGORIES[cat]}): {by_category[cat]}")
+    return 0
+
+
+def cmd_repair(args: argparse.Namespace) -> int:
+    t1_tasks = Task.load_jsonl(args.tasks)
+    tasks_by_id = {t.id: t for t in t1_tasks}
+    repair_tasks = RepairTask.load_jsonl(args.repair_tasks)
+
+    unknown = [rt.id for rt in repair_tasks if rt.base_task_id not in tasks_by_id]
+    if unknown:
+        print(
+            f"[warning] {len(unknown)} repair tasks reference unknown base task ids: "
+            f"{unknown[:3]}",
+            file=sys.stderr,
+        )
+        repair_tasks = [rt for rt in repair_tasks if rt.base_task_id in tasks_by_id]
+
+    model_kw: dict = {}
+    if args.model not in ("oracle", "broken"):
+        model_kw = {
+            "load_in_4bit": args.load_in_4bit,
+            "max_new_tokens": args.max_new_tokens,
+            "temperature": args.temperature,
+        }
+    model = build_repair_model(
+        args.model, reference_path_for(args.tasks), t1_tasks, **model_kw
+    )
+    repair_tasks_sha = _file_sha(args.repair_tasks)
+
+    healthy, why = slurm_healthy()
+    if not healthy:
+        print(
+            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
+            file=sys.stderr,
+        )
+
+    results = []
+    generations: list[dict] = []
+    t0 = time.time()
+    for rt in repair_tasks:
+        base_task = tasks_by_id[rt.base_task_id]
+        prompt = build_repair_prompt(base_task, rt.broken_script)
+        raw_outputs = model.generate(prompt, n=args.n, seed=args.seed)
+        for sample_idx, raw in enumerate(raw_outputs):
+            script = extract_script(raw)
+            generations.append({
+                "repair_task_id": rt.id,
+                "base_task_id": rt.base_task_id,
+                "fault_category": rt.fault_category,
+                "sample": sample_idx,
+                "model": model.name,
+                "seed": args.seed,
+                "repair_tasks_sha": repair_tasks_sha,
+                "script": script,
+            })
+            results.append(
+                verify_repair(script, rt, base_task, run_functional=not args.no_exec)
+            )
+        if args.verbose:
+            _print_repair_detail(rt, results[-1])
+    elapsed = time.time() - t0
+
+    if args.save_generations:
+        with open(args.save_generations, "w", encoding="utf-8") as fh:
+            for g in generations:
+                fh.write(json.dumps(g, ensure_ascii=False) + "\n")
+        print(
+            f"Generations written to {args.save_generations} ({len(generations)} scripts) "
+            "— verify them elsewhere with `anvil verify-repair`."
+        )
+
+    _report(model.name, args.repair_tasks, repair_tasks, results, args, elapsed)
+    return 0
+
+
+def cmd_verify_repair(args: argparse.Namespace) -> int:
+    """Verify previously generated repairs. No model, no GPU."""
+    t1_tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
+    repair_tasks = {rt.id: rt for rt in RepairTask.load_jsonl(args.repair_tasks)}
+
+    healthy, why = slurm_healthy()
+    if not healthy:
+        print(
+            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
+            file=sys.stderr,
+        )
+
+    expected_sha = _file_sha(args.repair_tasks)
+
+    results = []
+    models = set()
+    unknown: set[str] = set()
+    shas: set[str] = set()
+    t0 = time.time()
+    with open(args.generations, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            g = json.loads(line)
+            rt = repair_tasks.get(g.get("repair_task_id"))
+            base_task = t1_tasks.get(g.get("base_task_id"))
+            if rt is None or base_task is None:
+                unknown.add(g.get("repair_task_id", "?"))
+                continue
+            models.add(g.get("model", "?"))
+            shas.add(g.get("repair_tasks_sha", "unknown"))
+            results.append(
+                verify_repair(g["script"], rt, base_task, run_functional=not args.no_exec)
+            )
+            if args.verbose:
+                _print_repair_detail(rt, results[-1])
+    elapsed = time.time() - t0
+
+    if unknown:
+        print(
+            f"[warning] {len(unknown)} generations reference unknown repair task ids: "
+            f"{sorted(unknown)[:3]}",
+            file=sys.stderr,
+        )
+
+    stale = shas - {expected_sha}
+    if stale:
+        print(
+            f"[ERROR] these generations were produced against a different repair task file "
+            f"(theirs: {sorted(stale)}, current: {expected_sha}).\n"
+            f"        Re-run `anvil induce` / `anvil repair`.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if not results:
+        print("No generations verified.", file=sys.stderr)
+        return 1
+
+    name = models.pop() if len(models) == 1 else f"{len(models)} models"
+    _report(name, args.repair_tasks, list(repair_tasks.values()), results, args, elapsed)
+    return 0
+
+
+def _print_repair_detail(rt: RepairTask, res) -> None:
+    status = "PASS" if res.all_passed else "FAIL"
+    print(f"  {_fmt(rt.id, 30)} [{rt.fault_category}] {status}")
+    if not res.all_passed:
+        for lr in res.levels:
+            if not lr.passed and not lr.skipped:
+                print(f"      - {lr.level.value}: {lr.detail}")
+
+
 def _print_task_detail(task: Task, res) -> None:
     status = "PASS" if res.all_passed else "FAIL"
     print(f"  {_fmt(task.id, 26)} {status}")
@@ -281,6 +465,53 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--out", help="write full results to JSON")
     v.add_argument("--verbose", "-v", action="store_true")
     v.set_defaults(func=cmd_verify)
+
+    i = sub.add_parser(
+        "induce",
+        help="build tasks/t2_repair.jsonl from the T1 references",
+        description="Mechanically break T1 reference solutions (F1-F7), keep only variants "
+        "that actually fail verification.",
+    )
+    i.add_argument("--tasks", default="tasks/t1_slurm.jsonl")
+    i.add_argument("--reference", default="tasks/t1_reference.jsonl")
+    i.add_argument("--out", default="tasks/t2_repair.jsonl")
+    i.add_argument("--no-exec", action="store_true",
+                    help="skip the functional level when filtering induced variants")
+    i.set_defaults(func=cmd_induce)
+
+    rp = sub.add_parser("repair", help="generate a diagnose-and-repair with a model and verify")
+    rp.add_argument("--model", required=True, help="'oracle' | 'broken' | a HF model_id")
+    rp.add_argument("--repair-tasks", default="tasks/t2_repair.jsonl")
+    rp.add_argument("--tasks", default="tasks/t1_slurm.jsonl", help="the T1 tasks the repair "
+                     "tasks were induced from")
+    rp.add_argument("-n", type=int, default=1, help="samples per repair task")
+    rp.add_argument("-k", type=int, default=1, help="budget for pass@k")
+    rp.add_argument("--seed", type=int, default=0)
+    rp.add_argument("--no-exec", action="store_true", help="skip the functional level")
+    rp.add_argument("--load-in-4bit", action="store_true",
+                     help="4-bit quantization (requires CUDA + bitsandbytes)")
+    rp.add_argument("--max-new-tokens", type=int, default=512)
+    rp.add_argument("--temperature", type=float, default=0.2)
+    rp.add_argument("--save-generations", metavar="PATH",
+                     help="write the generated repairs to JSONL for later `anvil verify-repair`")
+    rp.add_argument("--out", help="write full results to JSON")
+    rp.add_argument("--verbose", "-v", action="store_true")
+    rp.set_defaults(func=cmd_repair)
+
+    vr = sub.add_parser(
+        "verify-repair",
+        help="verify previously generated repairs (no model, no GPU)",
+        description="Generate where the accelerator is, verify where the scheduler is.",
+    )
+    vr.add_argument("--generations", required=True, metavar="PATH",
+                     help="JSONL produced by `anvil repair --save-generations`")
+    vr.add_argument("--repair-tasks", default="tasks/t2_repair.jsonl")
+    vr.add_argument("--tasks", default="tasks/t1_slurm.jsonl")
+    vr.add_argument("-k", type=int, default=1, help="budget for pass@k")
+    vr.add_argument("--no-exec", action="store_true", help="skip the functional level")
+    vr.add_argument("--out", help="write full results to JSON")
+    vr.add_argument("--verbose", "-v", action="store_true")
+    vr.set_defaults(func=cmd_verify_repair)
 
     args = p.parse_args(argv)
     return args.func(args)
