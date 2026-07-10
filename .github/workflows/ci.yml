@@ -33,6 +33,12 @@ jobs:
       - name: Guards
         run: make guards
 
+      # T2: the oracle repair (T1 canonical solution) must pass every induced
+      # fault; a no-op repair must pass none. If either fails, t2_repair.jsonl
+      # or the repair verifier is broken - not a model.
+      - name: Guards (T2 repair)
+        run: make guards-t2
+
   container:
     runs-on: ubuntu-latest
     steps:
@@ -48,3 +54,6 @@ jobs:
 
       - name: Oracle against a real scheduler
         run: make docker-run
+
+      - name: Oracle repair against a real scheduler
+        run: make docker-repair
