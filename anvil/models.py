@@ -203,12 +203,16 @@ class HFModel(Model):
         return outs
 
 
+def reference_path_for(tasks_path: str | Path) -> Path:
+    """tasks/t1_slurm.jsonl -> tasks/t1_reference.jsonl"""
+    stem = Path(tasks_path).stem.replace("_slurm", "_reference")
+    return Path(tasks_path).with_name(stem + ".jsonl")
+
+
 def build_model(spec: str, tasks_path: str | Path, **kw) -> Model:
     """spec: 'oracle' | 'broken' | a Hugging Face model_id."""
     if spec == "oracle":
-        stem = Path(tasks_path).stem.replace("_slurm", "_reference")
-        ref = Path(tasks_path).with_name(stem + ".jsonl")
-        return OracleModel(ref, tasks_path)
+        return OracleModel(reference_path_for(tasks_path), tasks_path)
     if spec == "broken":
         return BrokenModel()
     return HFModel(spec, **kw)

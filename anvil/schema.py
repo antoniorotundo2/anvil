@@ -48,6 +48,34 @@ class Task:
 
 
 @dataclass
+class RepairTask:
+    """A T2 task: repair a broken script back to correctness.
+
+    `base_task_id` points at the T1 task whose prompt, constraints and
+    verifier apply unchanged. Repair is deliberately not a softer notion of
+    correctness: a repaired script is graded by the exact same verifier that
+    grades a from-scratch solution to `base_task_id`.
+    """
+
+    id: str
+    base_task_id: str
+    fault_category: str
+    fault_detail: str
+    broken_script: str
+
+    @staticmethod
+    def load_jsonl(path: str | Path) -> list[RepairTask]:
+        items: list[RepairTask] = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("//"):
+                    continue
+                items.append(RepairTask(**json.loads(line)))
+        return items
+
+
+@dataclass
 class LevelResult:
     level: Level
     passed: bool
