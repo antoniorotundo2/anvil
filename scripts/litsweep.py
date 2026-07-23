@@ -13,10 +13,10 @@ Why not scrape Google Scholar / ACM DL / IEEE Xplore:
   and their ToS forbid it. The APIs above are designed for this, are citable, and
   make the review REPRODUCIBLE - which the paper needs.
 
-Uso:
-    python scripts/litsweep.py --email tua@email.it
-    python scripts/litsweep.py --email tua@email.it --queries queries.txt --out sweep/
-    python scripts/litsweep.py --email tua@email.it --since 2023
+Usage:
+    python scripts/litsweep.py --email you@example.com
+    python scripts/litsweep.py --email you@example.com --queries queries.txt --out sweep/
+    python scripts/litsweep.py --email you@example.com --since 2023
 
 The email joins OpenAlex/Crossref's polite pool: higher rate limits. Use your own.
 

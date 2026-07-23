@@ -9,12 +9,12 @@ description = "Executable benchmarking of LLM-generated and LLM-repaired HPC ope
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dependencies = []                     # il core non ha dipendenze: gira ovunque
+dependencies = []                     # the core has no dependencies: runs anywhere
 
 [project.optional-dependencies]
 models = ["transformers>=4.40", "torch>=2.2", "accelerate>=0.30"]
-quant = ["bitsandbytes>=0.43"]        # richiede GPU NVIDIA
-ssm = ["mamba-ssm", "causal-conv1d"]  # per Mamba-Codestral (può essere ostico)
+quant = ["bitsandbytes>=0.43"]        # requires an NVIDIA GPU
+ssm = ["mamba-ssm", "causal-conv1d"]  # for Mamba-Codestral (can be finicky to build)
 dev = ["pytest>=8", "ruff>=0.5"]
 
 [project.scripts]
