@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from anvil.inducer import FAULT_CATEGORIES, INDUCERS, induce
+from anvil.metrics import aggregate_by_category
 from anvil.parse import extract_script, misplaced_directives, parse_time_to_minutes
 from anvil.repair import (
     RepairBrokenModel,
@@ -168,6 +169,47 @@ def test_repair_broken_identity_fails_every_induced_task():
         assert extract_script(raw) == rt.broken_script.strip("\n")
         res = verify_repair(extract_script(raw), rt, base_task)
         assert not res.all_passed, f"no-op repair unexpectedly passed on {rt.id}"
+
+
+# ---------------------------------------------------------------- category breakdown
+def test_aggregate_by_category_partitions_by_fault_category():
+    tasks = _t1_tasks()
+    by_base = {t.id: t for t in tasks}
+    repair_tasks, _ = induce_t2_tasks(tasks, _reference())
+    categories = {rt.id: rt.fault_category for rt in repair_tasks}
+    oracle = RepairOracleModel(REFS, tasks)
+
+    results = []
+    for rt in repair_tasks:
+        base_task = by_base[rt.base_task_id]
+        prompt = build_repair_prompt(base_task, rt.broken_script)
+        raw = oracle.generate(prompt, n=1)[0]
+        results.append(verify_repair(extract_script(raw), rt, base_task))
+
+    by_category = aggregate_by_category(results, categories)
+
+    # every category actually exercised must appear, and no result is dropped
+    assert set(by_category) == set(categories.values())
+    n_tasks_total = sum(v["strict_all_levels"]["n_tasks"] for v in by_category.values())
+    assert n_tasks_total == len(repair_tasks)
+
+    # the oracle repair passes every task: strict pass@1 must be 1.0 in EVERY
+    # category, not just on average — a category-blind aggregate could hide a
+    # category the oracle fails.
+    for cat, summary in by_category.items():
+        assert summary["strict_all_levels"]["pass@1"] == 1.0, f"oracle fails category {cat}"
+
+
+def test_aggregate_by_category_unknown_task_id_is_bucketed_separately():
+    tasks = _t1_tasks()
+    by_base = {t.id: t for t in tasks}
+    repair_tasks, _ = induce_t2_tasks(tasks, _reference())
+    rt = repair_tasks[0]
+    base_task = by_base[rt.base_task_id]
+    res = verify_repair(rt.broken_script, rt, base_task)
+
+    by_category = aggregate_by_category([res], categories={})
+    assert set(by_category) == {"unknown"}
 
 
 # ---------------------------------------------------------------- committed t2 file

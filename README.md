@@ -152,6 +152,10 @@ anvil repair --model <hf-model-id> --repair-tasks tasks/t2_repair.jsonl --save-g
 anvil verify-repair --generations results/repair_generations.jsonl --repair-tasks tasks/t2_repair.jsonl -v
 ```
 
+Both commands break the summary down **per fault category** (F1–F7) in addition to the overall
+one, on screen and under `"by_category"` in `--out`'s JSON: an aggregate pass@k can hide a category
+a model never manages to repair.
+
 ### Guards
 
 The oracle repair (returns the T1 canonical solution, ignoring the diagnosis) must pass every

@@ -17,7 +17,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .inducer import FAULT_CATEGORIES
-from .metrics import aggregate
+from .metrics import aggregate, aggregate_by_category
 from .models import build_model, reference_path_for
 from .parse import extract_script
 from .repair import (
@@ -304,7 +304,8 @@ def cmd_repair(args: argparse.Namespace) -> int:
             "— verify them elsewhere with `anvil verify-repair`."
         )
 
-    _report(model.name, args.repair_tasks, repair_tasks, results, args, elapsed)
+    categories = {rt.id: rt.fault_category for rt in repair_tasks}
+    _report(model.name, args.repair_tasks, repair_tasks, results, args, elapsed, categories)
     return 0
 
 
@@ -368,7 +369,10 @@ def cmd_verify_repair(args: argparse.Namespace) -> int:
         return 1
 
     name = models.pop() if len(models) == 1 else f"{len(models)} models"
-    _report(name, args.repair_tasks, list(repair_tasks.values()), results, args, elapsed)
+    categories = {rid: rt.fault_category for rid, rt in repair_tasks.items()}
+    _report(
+        name, args.repair_tasks, list(repair_tasks.values()), results, args, elapsed, categories
+    )
     return 0
 
 
@@ -390,23 +394,42 @@ def _print_task_detail(task: Task, res) -> None:
                 print(f"      - {lr.level.value}: {lr.detail}")
 
 
-def _report(model_name, tasks_file, tasks, results, args, elapsed) -> None:
-    summary = aggregate(results, k=args.k)
-
-    n_per_task = len(results) / max(len(tasks), 1)
-    print(f"\nModel: {model_name}   tasks: {len(tasks)}   samples/task: {n_per_task:g}   "
-          f"time: {elapsed:.2f}s")
+def _print_summary_table(summary: dict, k: int) -> None:
     print("-" * 62)
-    print(f"{_fmt('level', 22)}{_fmt(f'pass@{args.k}', 12)}{_fmt('skipped', 10)}")
+    print(f"{_fmt('level', 22)}{_fmt(f'pass@{k}', 12)}{_fmt('skipped', 10)}")
     print("-" * 62)
     for level in [*[lv.value for lv in Level], "strict_all_levels"]:
         row = summary[level]
         print(
             f"{_fmt(level, 22)}"
-            f"{_fmt(row[f'pass@{args.k}'], 12)}"
+            f"{_fmt(row[f'pass@{k}'], 12)}"
             f"{_fmt(row['n_skipped_samples'], 10)}"
         )
     print("-" * 62)
+
+
+def _report(
+    model_name, tasks_file, tasks, results, args, elapsed, categories: dict[str, str] | None = None
+) -> None:
+    """categories: {repair_task_id: fault_category}, only for T2 (repair/verify-repair).
+    When given, breaks the summary down per fault category (F1-F7) in addition
+    to the overall one — a category is invisible to pass@k otherwise, and the
+    whole point of inducing faults by class is to see which classes a model
+    actually repairs."""
+    summary = aggregate(results, k=args.k)
+
+    n_per_task = len(results) / max(len(tasks), 1)
+    print(f"\nModel: {model_name}   tasks: {len(tasks)}   samples/task: {n_per_task:g}   "
+          f"time: {elapsed:.2f}s")
+    _print_summary_table(summary, args.k)
+
+    by_category = None
+    if categories:
+        by_category = aggregate_by_category(results, categories, k=args.k)
+        for cat, cat_summary in by_category.items():
+            desc = FAULT_CATEGORIES.get(cat, "")
+            print(f"\n[{cat}] {desc}")
+            _print_summary_table(cat_summary, args.k)
 
     if args.out:
         from .device import environment_report
@@ -421,6 +444,8 @@ def _report(model_name, tasks_file, tasks, results, args, elapsed) -> None:
             "summary": summary,
             "results": [r.to_dict() for r in results],
         }
+        if by_category is not None:
+            payload["by_category"] = by_category
         Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Full results written to {args.out}")
 

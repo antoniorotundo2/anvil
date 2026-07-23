@@ -64,3 +64,19 @@ def aggregate(
         "n_skipped_samples": 0,
     }
     return out
+
+
+def aggregate_by_category(
+    results: list[VerificationResult], categories: dict[str, str], k: int = 1
+) -> dict[str, dict[str, dict[str, float | int]]]:
+    """Partition T2 results by fault category (F1-F7) and compute the same
+    pass@k summary as `aggregate()` within each partition.
+
+    `categories` maps a repair task id to its fault category (see
+    `RepairTask.fault_category`). Reuses `aggregate()` per partition instead of
+    duplicating the pass@k logic: a category is just a task subset.
+    """
+    by_cat: dict[str, list[VerificationResult]] = defaultdict(list)
+    for r in results:
+        by_cat[categories.get(r.task_id, "unknown")].append(r)
+    return {cat: aggregate(rs, k=k) for cat, rs in sorted(by_cat.items())}
