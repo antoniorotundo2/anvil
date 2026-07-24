@@ -19,6 +19,11 @@ cd "$(dirname "$0")/.."
 # model in fp16 weighs ~15GB).
 export HF_HOME="${HF_HOME:-$PWD/.hf_cache}"
 
+# Silences a known-harmless bitsandbytes FutureWarning (an internal, deprecated
+# torch API call, not a project or user-facing issue) that repeats on every
+# 4-bit generate() call and drowns the actual matrix progress output.
+export PYTHONWARNINGS="${PYTHONWARNINGS:-ignore::FutureWarning:bitsandbytes.backends.cuda.ops}"
+
 TASKS="${TASKS:-tasks/t1_slurm.jsonl}"
 REPAIR_TASKS="${REPAIR_TASKS:-tasks/t2_repair.jsonl}"
 RUN_T2="${RUN_T2:-1}"     # 1 = also run the T2 diagnose-and-repair matrix
