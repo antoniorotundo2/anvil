@@ -1,0 +1,3 @@
+{"id": "t3_hello", "recipe": "Bootstrap: docker\nFrom: alpine:latest\n\n%runscript\n    echo ANVIL_OK\n"}
+{"id": "t3_env_var", "recipe": "Bootstrap: docker\nFrom: alpine:latest\n\n%environment\n    export GREETING=hello\n\n%runscript\n    echo \"GREETING=${GREETING}\"\n    echo ANVIL_OK\n"}
+{"id": "t3_post_setup", "recipe": "Bootstrap: docker\nFrom: alpine:latest\n\n%post\n    echo ready > /etc/anvil_flag\n\n%runscript\n    cat /etc/anvil_flag\n    echo ANVIL_OK\n"}
