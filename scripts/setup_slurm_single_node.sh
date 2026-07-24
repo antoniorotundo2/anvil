@@ -74,5 +74,5 @@ sleep 2
 echo "==> Check"
 sinfo || true
 echo
-echo "`anvil run` will now enable the submittability level."
+echo "anvil run will now enable the submittability level."
 echo "If the node shows as 'drain':  scontrol update nodename=${HOSTNAME_SHORT} state=resume"
