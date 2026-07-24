@@ -23,6 +23,12 @@ SYSTEM_PROMPT = (
     "Output only the script inside one ```bash code block. No explanation."
 )
 
+RECIPE_SYSTEM_PROMPT = (
+    "You are an expert HPC user support engineer. "
+    "Write a single Apptainer definition file (.def) that satisfies the request. "
+    "Output only the recipe inside one ```singularity code block. No explanation."
+)
+
 
 class Model(ABC):
     name: str
@@ -109,11 +115,13 @@ class HFModel(Model):
         max_new_tokens: int = 512,
         temperature: float = 0.2,
         load_in_4bit: bool = False,
+        system_prompt: str = SYSTEM_PROMPT,
     ):
         self.name = model_id
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.load_in_4bit = load_in_4bit
+        self.system_prompt = system_prompt
         self._model = None      # sentinel: the model is loaded lazily, ONCE
 
     def _ensure_loaded(self) -> None:
@@ -174,7 +182,7 @@ class HFModel(Model):
             torch.manual_seed(seed)
 
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": prompt},
         ]
         try:
@@ -182,7 +190,7 @@ class HFModel(Model):
                 messages, tokenize=False, add_generation_prompt=True
             )
         except Exception:  # base models without a chat template
-            text = f"{SYSTEM_PROMPT}\n\n{prompt}\n\n```bash\n"
+            text = f"{self.system_prompt}\n\n{prompt}\n\n```bash\n"
 
         enc = self._tok(text, return_tensors="pt")
         enc = {k: v.to(self._device) for k, v in enc.items()}
@@ -204,9 +212,10 @@ class HFModel(Model):
 
 
 def reference_path_for(tasks_path: str | Path) -> Path:
-    """tasks/t1_slurm.jsonl -> tasks/t1_reference.jsonl"""
-    stem = Path(tasks_path).stem.replace("_slurm", "_reference")
-    return Path(tasks_path).with_name(stem + ".jsonl")
+    """tasks/t1_slurm.jsonl -> tasks/t1_reference.jsonl; tasks/t3_apptainer.jsonl
+    -> tasks/t3_reference.jsonl. The "tN" prefix is the only part that matters."""
+    prefix = Path(tasks_path).stem.split("_", 1)[0]
+    return Path(tasks_path).with_name(f"{prefix}_reference.jsonl")
 
 
 def build_model(spec: str, tasks_path: str | Path, **kw) -> Model:
@@ -215,4 +224,67 @@ def build_model(spec: str, tasks_path: str | Path, **kw) -> Model:
         return OracleModel(reference_path_for(tasks_path), tasks_path)
     if spec == "broken":
         return BrokenModel()
+    return HFModel(spec, **kw)
+
+
+class RecipeOracleModel(Model):
+    """Canonical Apptainer recipes: the T3 benchmark's upper bound."""
+
+    name = "oracle"
+
+    def __init__(self, reference_path: str | Path, tasks_path: str | Path):
+        self._by_id: dict[str, str] = {}
+        with open(reference_path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    rec = json.loads(line)
+                    self._by_id[rec["id"]] = rec["recipe"]
+        self._prompt_to_id: dict[str, str] = {}
+        with open(tasks_path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    rec = json.loads(line)
+                    self._prompt_to_id[rec["prompt"]] = rec["id"]
+
+    def generate(self, prompt: str, n: int = 1, seed: int | None = None) -> list[str]:
+        tid = self._prompt_to_id.get(prompt)
+        recipe = self._by_id.get(tid, "") if tid else ""
+        return [f"```singularity\n{recipe}```" for _ in range(n)]
+
+
+class RecipeBrokenModel(Model):
+    """Deliberately faulty Apptainer recipes: negative tests for the T3 verifier."""
+
+    name = "broken"
+
+    FLAVOURS = [
+        # no Bootstrap/From header at all
+        "%post\n    echo hi\n%runscript\n    echo ANVIL_OK\n",
+        # no %runscript or %startscript: nothing to execute
+        "Bootstrap: docker\nFrom: alpine:latest\n%post\n    echo hi\n",
+        # dangerous command in %post
+        "Bootstrap: docker\nFrom: alpine:latest\n%post\n    rm -rf /\n%runscript\n"
+        "    echo ANVIL_OK\n",
+        # wrong base image (a resource_fit failure against most task specs)
+        "Bootstrap: docker\nFrom: busybox:latest\n%runscript\n    echo ANVIL_OK\n",
+        # runscript exits non-zero
+        "Bootstrap: docker\nFrom: alpine:latest\n%runscript\n    exit 3\n",
+    ]
+
+    def generate(self, prompt: str, n: int = 1, seed: int | None = None) -> list[str]:
+        base = (seed or 0) + zlib.crc32(prompt.encode("utf-8"))
+        start = random.Random(base).randrange(len(self.FLAVOURS))
+        return [
+            f"```singularity\n{self.FLAVOURS[(start + i) % len(self.FLAVOURS)]}```"
+            for i in range(n)
+        ]
+
+
+def build_recipe_model(spec: str, tasks_path: str | Path, **kw) -> Model:
+    """spec: 'oracle' | 'broken' | a Hugging Face model_id."""
+    if spec == "oracle":
+        return RecipeOracleModel(reference_path_for(tasks_path), tasks_path)
+    if spec == "broken":
+        return RecipeBrokenModel()
+    kw.setdefault("system_prompt", RECIPE_SYSTEM_PROMPT)
     return HFModel(spec, **kw)

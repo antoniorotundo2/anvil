@@ -75,6 +75,46 @@ class RepairTask:
         return items
 
 
+class RecipeLevel(str, Enum):
+    """Verification levels for T3 (Apptainer recipes), mirroring Level's shape
+    for a different artifact: a `.def` recipe, not a SLURM script. There is no
+    scheduler to submit to, so `buildable` (does `apptainer build` succeed)
+    plays the role `submittability` plays for Level."""
+
+    SYNTAX = "syntax"                # L1: a minimally well-formed recipe
+    BUILDABLE = "buildable"          # L2: does `apptainer build` succeed?
+    FUNCTIONAL = "functional"        # L3: does it run and produce the expected output?
+    RESOURCE_FIT = "resource_fit"    # L4a: does it match the header/sections asked for?
+    SAFETY = "safety"                # L4b: does it contain dangerous commands?
+
+
+@dataclass
+class RecipeTask:
+    """A T3 task: write an Apptainer definition file (`.def`).
+
+    Mirrors Task's shape. `constraints` supports "bootstrap" (exact match on
+    the Bootstrap: header) and "from_contains" (substring match on From:).
+    """
+
+    id: str
+    prompt: str
+    constraints: dict[str, Any] = field(default_factory=dict)
+    required_sections: list[str] = field(default_factory=list)
+    expects_in_body: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+
+    @staticmethod
+    def load_jsonl(path: str | Path) -> list[RecipeTask]:
+        tasks: list[RecipeTask] = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("//"):
+                    continue
+                tasks.append(RecipeTask(**json.loads(line)))
+        return tasks
+
+
 @dataclass
 class LevelResult:
     level: Level
@@ -110,6 +150,36 @@ class VerificationResult:
         return {
             "task_id": self.task_id,
             "script": self.script,
+            "levels": [lr.to_dict() for lr in self.levels],
+            "all_passed": self.all_passed,
+        }
+
+
+@dataclass
+class RecipeVerificationResult:
+    """Same shape as VerificationResult, for a RecipeLevel/RecipeTask instead
+    of a Level/Task: an Apptainer recipe is not a "script", so the field is
+    named accordingly."""
+
+    task_id: str
+    recipe: str
+    levels: list[LevelResult] = field(default_factory=list)
+
+    def get(self, level: RecipeLevel) -> LevelResult | None:
+        return next((lr for lr in self.levels if lr.level is level), None)
+
+    def passed(self, level: RecipeLevel) -> bool:
+        r = self.get(level)
+        return bool(r and r.passed and not r.skipped)
+
+    @property
+    def all_passed(self) -> bool:
+        return all(lr.passed or lr.skipped for lr in self.levels)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "recipe": self.recipe,
             "levels": [lr.to_dict() for lr in self.levels],
             "all_passed": self.all_passed,
         }

@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from statistics import mean
 
-from .schema import Level, VerificationResult
+from .schema import Level, RecipeLevel, RecipeVerificationResult, VerificationResult
 
 
 def pass_at_k(n: int, c: int, k: int) -> float:
@@ -80,3 +80,41 @@ def aggregate_by_category(
     for r in results:
         by_cat[categories.get(r.task_id, "unknown")].append(r)
     return {cat: aggregate(rs, k=k) for cat, rs in sorted(by_cat.items())}
+
+
+def aggregate_recipes(
+    results: list[RecipeVerificationResult], k: int = 1
+) -> dict[str, dict[str, float | int]]:
+    """Same as aggregate(), for T3 RecipeVerificationResult/RecipeLevel: a
+    recipe is not a Task, so it cannot share aggregate()'s type, but the
+    pass@k logic is identical."""
+    by_task: dict[str, list[RecipeVerificationResult]] = defaultdict(list)
+    for r in results:
+        by_task[r.task_id].append(r)
+
+    out: dict[str, dict[str, float | int]] = {}
+    for level in RecipeLevel:
+        scores: list[float] = []
+        n_skipped = 0
+        for _, rs in by_task.items():
+            n = len(rs)
+            c = sum(1 for r in rs if r.passed(level))
+            n_skipped += sum(1 for r in rs if (lr := r.get(level)) and lr.skipped)
+            scores.append(pass_at_k(n, c, min(k, n)))
+        out[level.value] = {
+            f"pass@{k}": round(mean(scores), 4) if scores else 0.0,
+            "n_tasks": len(by_task),
+            "n_skipped_samples": n_skipped,
+        }
+
+    strict: list[float] = []
+    for _, rs in by_task.items():
+        n = len(rs)
+        c = sum(1 for r in rs if r.all_passed)
+        strict.append(pass_at_k(n, c, min(k, n)))
+    out["strict_all_levels"] = {
+        f"pass@{k}": round(mean(strict), 4) if strict else 0.0,
+        "n_tasks": len(by_task),
+        "n_skipped_samples": 0,
+    }
+    return out
