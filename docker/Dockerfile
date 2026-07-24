@@ -32,6 +32,15 @@
 # Other bases (for the Phase 2 cross-distribution portability ablation):
 #   docker build -t anvil:2604  --build-arg BASE_IMAGE=ubuntu:26.04 docker/
 #   docker build -t anvil:rocky --build-arg BASE_IMAGE=rockylinux:9  docker/   # needs apt -> dnf
+#
+# T3 (Apptainer recipes) needs its own opt-in build:
+#   docker build -t anvil:apptainer --build-arg WITH_APPTAINER=1 docker/
+#   docker run --rm --security-opt seccomp=unconfined --device /dev/fuse \
+#       -v "$PWD":/work -w /work anvil:apptainer python -m anvil.cli ...
+# The two extra flags are required for apptainer's unprivileged build/run
+# (user namespaces + squashfuse), not for anything else this image does.
+# Observed to fail on Docker Desktop for Mac (nested linuxkit VM); works on
+# Docker Desktop for Windows and is expected to work on a native Linux host.
 # ─────────────────────────────────────────────────────────────────────────────
 ARG BASE_IMAGE=ubuntu:24.04
 FROM ${BASE_IMAGE}
@@ -54,6 +63,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         slurm-wlm slurmd slurmctld munge \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Apptainer is opt-in: most anvil work (T1, T2) never touches it, and its PPA
+# install adds real build time. Only images built with WITH_APPTAINER=1 (the
+# T3 recipe verifier) pay for it.
+#   docker build -t anvil:apptainer --build-arg WITH_APPTAINER=1 docker/
+ARG WITH_APPTAINER=0
+RUN if [ "$WITH_APPTAINER" = "1" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            software-properties-common \
+        && add-apt-repository -y ppa:apptainer/ppa \
+        && apt-get update && apt-get install -y --no-install-recommends apptainer \
+        && rm -rf /var/lib/apt/lists/* ; \
+    fi
 
 # venv to work around the PEP 668 lock on Ubuntu >= 24.04
 RUN python3 -m venv /opt/venv
