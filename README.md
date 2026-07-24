@@ -1,10 +1,11 @@
 # Anvil
 
 The project aims to measure whether the operational artifacts an LLM writes for a supercomputer —
-SLURM job scripts, and later container recipes — are actually correct: verified by submission,
+SLURM job scripts and Apptainer container recipes — are actually correct: verified by submission,
 execution and resource fit, not by textual similarity. Beyond writing scripts from scratch (T1),
-Anvil also measures whether a model can **diagnose and repair** a broken one (T2): see
-[Diagnose-and-repair (T2)](#diagnose-and-repair-t2) below.
+Anvil also measures whether a model can **diagnose and repair** a broken one (T2, see
+[Diagnose-and-repair (T2)](#diagnose-and-repair-t2)) and whether it can write a correct
+[Apptainer recipe (T3)](#apptainer-recipes-t3).
 
 ## Requirements
 
@@ -164,6 +165,58 @@ fails, `t2_repair.jsonl` or the repair verifier is broken — not a model.
 
 ```
 make guards-t2
+```
+
+## Apptainer recipes (T3)
+
+A third artifact type: a model writes an Apptainer definition file (`.def`) instead of a SLURM
+script. Same shape as T1, different vocabulary: `syntax`, `buildable` (does `apptainer build`
+succeed), `functional`, `resource_fit` (header and section set against the spec), `safety`.
+
+Apptainer is opt-in and not part of the default image, since most anvil work never touches it:
+
+```
+make docker-build-apptainer
+```
+
+Run a model against `tasks/t3_apptainer.jsonl` and verify:
+
+```
+make recipe MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct
+```
+
+```
+anvil recipe --model oracle --tasks tasks/t3_apptainer.jsonl -v
+anvil recipe --model <hf-model-id> --tasks tasks/t3_apptainer.jsonl --save-generations results/recipe_generations.jsonl
+anvil verify-recipe --generations results/recipe_generations.jsonl --tasks tasks/t3_apptainer.jsonl -v
+```
+
+Apptainer's unprivileged build needs a user namespace (blocked by Docker's default seccomp
+profile) and running the built image needs `/dev/fuse`:
+
+```
+docker run --rm --security-opt seccomp=unconfined --device /dev/fuse \
+    -v "$PWD":/work -w /work anvil:apptainer ...
+```
+
+`--privileged` also works but grants far more than these two actually need. This was observed to
+work fully on Docker Desktop for Windows; on Docker Desktop for Mac, `build` succeeds but `run`
+fails (`exec ... failed: invalid argument`), a limit of that nested virtualization stack.
+
+### Guards
+
+`buildable` and `functional` both need a real `apptainer` binary, much less commonly available
+than the `bash` that T1/T2's `functional` relies on. Without it, both are skipped, not failed:
+
+```
+make guards-t3
+```
+
+checks only what `syntax`/`resource_fit`/`safety` can prove. The full oracle-1.0/broken-0.0
+bracket needs the opt-in image:
+
+```
+make docker-guards-t3
 ```
 
 ## Documentation

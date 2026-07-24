@@ -118,6 +118,33 @@ bracket as T1's oracle/broken guard applies here: the oracle repair (the T1 cano
 returned regardless of the diagnosis) must score 1.0, and a no-op repair (the broken script,
 unchanged) must score 0.0. `make guards-t2` checks both.
 
+## Apptainer recipes (T3)
+
+A third artifact type: a model writes an Apptainer definition file (`.def`), not a SLURM script.
+The verifier keeps T1's shape but with a different vocabulary: `syntax` (a well-formed header and
+at least a `%runscript`), `buildable` (does `apptainer build` succeed, playing the role
+`submittability` plays for SLURM), `functional` (does the built container run and produce the
+expected output), `resource_fit` (does the header and section set match the spec) and `safety`
+(the same dangerous-pattern probe used for shell scripts, since `%post`/`%runscript` are shell
+too).
+
+**A harder dependency than T1's.** `submittability` needs SLURM; `functional` for SLURM scripts
+only needs `bash`, which is essentially always present. For recipes, both `buildable` and
+`functional` need a real `apptainer` binary, which is far less commonly installed than `bash`.
+Without it, both are `skipped`, not failed, same discipline as `submittability` without a
+scheduler, but a strictly larger fraction of the bracket depends on the missing tool. `make
+guards-t3` therefore only asserts what `syntax`/`resource_fit`/`safety` can prove; the full
+oracle-1.0/broken-0.0 bracket is `make docker-guards-t3`, which needs the opt-in
+`docker-build-apptainer` image.
+
+**Unprivileged build and run, not `--privileged`.** Apptainer's unprivileged build needs a user
+namespace, which Docker's default seccomp profile blocks; running the built `.sif` needs
+`/dev/fuse`. `--security-opt seccomp=unconfined --device /dev/fuse` grants exactly these two and
+nothing else. `--privileged` also works but grants far more. Observed: both flags together work
+fully on Docker Desktop for Windows; on Docker Desktop for Mac (a nested `linuxkit` VM), `build`
+succeeds but `run` fails with `exec ... failed: invalid argument`, a limit of that specific nested
+virtualization stack, not of Linux or Docker in general.
+
 ## Cross-distribution ablation
 
 Generation and verification are decoupled by design (`--save-generations`, then `anvil verify`
@@ -167,7 +194,12 @@ say so plainly.
   - [x] cross-distribution ablation — `BASE_IMAGE` build arg, first run (24.04 vs 26.04) found
         no divergence on the current T1 task suite, see [Cross-distribution
         ablation](#cross-distribution-ablation)
-  - [ ] Apptainer recipes
+  - [ ] Apptainer recipes — implemented (`RecipeTask`, `RecipeLevel`, `anvil recipe` /
+        `anvil verify-recipe`, `tasks/t3_apptainer.jsonl`), see [Apptainer
+        recipes (T3)](#apptainer-recipes-t3). The lenient guard (`make guards-t3`) passes; the
+        strict oracle-1.0/broken-0.0 bracket (`make docker-guards-t3`) needs confirming on a
+        machine where `apptainer run` actually works (confirmed: Docker Desktop for Windows: not
+        yet run there through anvil itself; ruled out: Docker Desktop for Mac)
   - [ ] retrieval ablation (zero-shot / vector / vectorless)
 - [ ] **Phase 3** — QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
