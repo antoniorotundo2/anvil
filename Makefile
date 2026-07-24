@@ -173,13 +173,14 @@ docker-recipe: docker-build-apptainer
 # linuxkit VM): `apptainer run` fails there even with these flags. Confirmed
 # on Docker Desktop for Windows.
 docker-guards-t3: docker-build-apptainer
+	@mkdir -p results
 	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model oracle --tasks $(RECIPE_TASKS) \
-		--out /tmp/anvil_recipe_oracle.json
+		--out results/anvil_recipe_oracle.json
 	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model broken --tasks $(RECIPE_TASKS) -n 5 \
-		--out /tmp/anvil_recipe_broken.json
+		--out results/anvil_recipe_broken.json
 	@$(PYTHON) -c "import json,sys; \
-o=json.load(open('/tmp/anvil_recipe_oracle.json'))['summary']; \
-b=json.load(open('/tmp/anvil_recipe_broken.json'))['summary']; \
+o=json.load(open('results/anvil_recipe_oracle.json'))['summary']; \
+b=json.load(open('results/anvil_recipe_broken.json'))['summary']; \
 bad=[l for l in ('syntax','buildable','functional','resource_fit','safety') if o[l]['pass@1']!=1.0]; \
 sys.exit('FAIL: oracle not at 1.0 on %s' % bad) if bad else None; \
 sys.exit('FAIL: verifier promotes defective recipes') if b['strict_all_levels']['pass@1']!=0.0 else None; \
