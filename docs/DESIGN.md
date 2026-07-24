@@ -194,12 +194,11 @@ say so plainly.
   - [x] cross-distribution ablation — `BASE_IMAGE` build arg, first run (24.04 vs 26.04) found
         no divergence on the current T1 task suite, see [Cross-distribution
         ablation](#cross-distribution-ablation)
-  - [ ] Apptainer recipes — implemented (`RecipeTask`, `RecipeLevel`, `anvil recipe` /
-        `anvil verify-recipe`, `tasks/t3_apptainer.jsonl`), see [Apptainer
-        recipes (T3)](#apptainer-recipes-t3). The lenient guard (`make guards-t3`) passes; the
-        strict oracle-1.0/broken-0.0 bracket (`make docker-guards-t3`) needs confirming on a
-        machine where `apptainer run` actually works (confirmed: Docker Desktop for Windows: not
-        yet run there through anvil itself; ruled out: Docker Desktop for Mac)
+  - [x] Apptainer recipes — `RecipeTask`, `RecipeLevel`, `anvil recipe` / `anvil verify-recipe`,
+        `tasks/t3_apptainer.jsonl`, see [Apptainer recipes (T3)](#apptainer-recipes-t3). Both
+        guards confirmed: `make guards-t3` (lenient) and `make docker-guards-t3` (strict,
+        oracle 1.0 / broken 0.0, `apptainer` active) on Docker Desktop for Windows; ruled out on
+        Docker Desktop for Mac (`apptainer run` fails there, see the section above)
   - [ ] retrieval ablation (zero-shot / vector / vectorless)
 - [ ] **Phase 3** — QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
