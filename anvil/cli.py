@@ -17,16 +17,18 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .inducer import FAULT_CATEGORIES
-from .metrics import aggregate, aggregate_by_category
-from .models import build_model, reference_path_for
+from .metrics import aggregate, aggregate_by_category, aggregate_recipes
+from .models import build_model, build_recipe_model, reference_path_for
 from .parse import extract_script
+from .recipe_parse import extract_recipe
+from .recipe_verifier import apptainer_available, verify_recipe
 from .repair import (
     build_repair_model,
     build_repair_prompt,
     induce_t2_tasks,
     verify_repair,
 )
-from .schema import Level, RepairTask, Task
+from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task
 from .verifier import slurm_healthy, verify
 
 
@@ -376,6 +378,115 @@ def cmd_verify_repair(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_recipe(args: argparse.Namespace) -> int:
+    """T3: write an Apptainer definition file from scratch."""
+    tasks = RecipeTask.load_jsonl(args.tasks)
+    model_kw: dict = {}
+    if args.model not in ("oracle", "broken"):
+        model_kw = {
+            "load_in_4bit": args.load_in_4bit,
+            "max_new_tokens": args.max_new_tokens,
+            "temperature": args.temperature,
+        }
+    model = build_recipe_model(args.model, args.tasks, **model_kw)
+    tasks_sha = _file_sha(args.tasks)
+
+    if not apptainer_available():
+        print(
+            "[warning] levels 'buildable'/'functional' SKIPPED (not counted as passed): "
+            "apptainer not available\n",
+            file=sys.stderr,
+        )
+
+    results = []
+    generations: list[dict] = []
+    t0 = time.time()
+    for task in tasks:
+        raw_outputs = model.generate(task.prompt, n=args.n, seed=args.seed)
+        for sample_idx, raw in enumerate(raw_outputs):
+            recipe = extract_recipe(raw)
+            generations.append({
+                "task_id": task.id,
+                "sample": sample_idx,
+                "model": model.name,
+                "seed": args.seed,
+                "tasks_sha": tasks_sha,
+                "recipe": recipe,
+            })
+            results.append(verify_recipe(recipe, task, run_functional=not args.no_exec))
+        if args.verbose:
+            _print_recipe_detail(task, results[-1])
+    elapsed = time.time() - t0
+
+    if args.save_generations:
+        with open(args.save_generations, "w", encoding="utf-8") as fh:
+            for g in generations:
+                fh.write(json.dumps(g, ensure_ascii=False) + "\n")
+        print(f"Generations written to {args.save_generations} "
+              f"({len(generations)} recipes) — verify them elsewhere with `anvil verify-recipe`.")
+
+    _report_recipe(model.name, args.tasks, tasks, results, args, elapsed)
+    return 0
+
+
+def cmd_verify_recipe(args: argparse.Namespace) -> int:
+    """Verify previously generated recipes. No model, no GPU, no apptainer
+    needed unless you want the 'buildable'/'functional' levels active."""
+    tasks = {t.id: t for t in RecipeTask.load_jsonl(args.tasks)}
+
+    if not apptainer_available():
+        print(
+            "[warning] levels 'buildable'/'functional' SKIPPED (not counted as passed): "
+            "apptainer not available\n",
+            file=sys.stderr,
+        )
+
+    expected_sha = _file_sha(args.tasks)
+
+    results = []
+    models = set()
+    unknown: set[str] = set()
+    shas: set[str] = set()
+    t0 = time.time()
+    with open(args.generations, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            g = json.loads(line)
+            task = tasks.get(g["task_id"])
+            if task is None:
+                unknown.add(g["task_id"])
+                continue
+            models.add(g.get("model", "?"))
+            shas.add(g.get("tasks_sha", "unknown"))
+            results.append(verify_recipe(g["recipe"], task, run_functional=not args.no_exec))
+            if args.verbose:
+                _print_recipe_detail(task, results[-1])
+    elapsed = time.time() - t0
+
+    if unknown:
+        print(f"[warning] {len(unknown)} generations reference unknown task ids: "
+              f"{sorted(unknown)[:3]}", file=sys.stderr)
+
+    stale = shas - {expected_sha}
+    if stale:
+        print(
+            f"[ERROR] these generations were produced against a different task file "
+            f"(theirs: {sorted(stale)}, current: {expected_sha}).\n"
+            f"        Re-run `anvil recipe`.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if not results:
+        print("No generations verified.", file=sys.stderr)
+        return 1
+
+    name = models.pop() if len(models) == 1 else f"{len(models)} models"
+    _report_recipe(name, args.tasks, list(tasks.values()), results, args, elapsed)
+    return 0
+
+
 def _print_repair_detail(rt: RepairTask, res) -> None:
     status = "PASS" if res.all_passed else "FAIL"
     print(f"  {_fmt(rt.id, 30)} [{rt.fault_category}] {status}")
@@ -394,11 +505,20 @@ def _print_task_detail(task: Task, res) -> None:
                 print(f"      - {lr.level.value}: {lr.detail}")
 
 
-def _print_summary_table(summary: dict, k: int) -> None:
+def _print_recipe_detail(task: RecipeTask, res) -> None:
+    status = "PASS" if res.all_passed else "FAIL"
+    print(f"  {_fmt(task.id, 26)} {status}")
+    if not res.all_passed:
+        for lr in res.levels:
+            if not lr.passed and not lr.skipped:
+                print(f"      - {lr.level.value}: {lr.detail}")
+
+
+def _print_summary_table(summary: dict, k: int, levels=Level) -> None:
     print("-" * 62)
     print(f"{_fmt('level', 22)}{_fmt(f'pass@{k}', 12)}{_fmt('skipped', 10)}")
     print("-" * 62)
-    for level in [*[lv.value for lv in Level], "strict_all_levels"]:
+    for level in [*[lv.value for lv in levels], "strict_all_levels"]:
         row = summary[level]
         print(
             f"{_fmt(level, 22)}"
@@ -446,6 +566,31 @@ def _report(
         }
         if by_category is not None:
             payload["by_category"] = by_category
+        Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"Full results written to {args.out}")
+
+
+def _report_recipe(model_name, tasks_file, tasks, results, args, elapsed) -> None:
+    summary = aggregate_recipes(results, k=args.k)
+
+    n_per_task = len(results) / max(len(tasks), 1)
+    print(f"\nModel: {model_name}   tasks: {len(tasks)}   samples/task: {n_per_task:g}   "
+          f"time: {elapsed:.2f}s")
+    _print_summary_table(summary, args.k, levels=RecipeLevel)
+
+    if args.out:
+        from .device import environment_report
+
+        env = environment_report()
+        payload = {
+            "model": model_name,
+            "tasks_file": str(tasks_file),
+            "k": args.k,
+            "environment": env,
+            "elapsed_s": round(elapsed, 2),
+            "summary": summary,
+            "results": [r.to_dict() for r in results],
+        }
         Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Full results written to {args.out}")
 
@@ -537,6 +682,38 @@ def main(argv: list[str] | None = None) -> int:
     vr.add_argument("--out", help="write full results to JSON")
     vr.add_argument("--verbose", "-v", action="store_true")
     vr.set_defaults(func=cmd_verify_repair)
+
+    rc = sub.add_parser("recipe", help="T3: write an Apptainer recipe with a model and verify")
+    rc.add_argument("--model", required=True, help="'oracle' | 'broken' | a HF model_id")
+    rc.add_argument("--tasks", default="tasks/t3_apptainer.jsonl")
+    rc.add_argument("-n", type=int, default=1, help="samples per task")
+    rc.add_argument("-k", type=int, default=1, help="budget for pass@k")
+    rc.add_argument("--seed", type=int, default=0)
+    rc.add_argument("--no-exec", action="store_true", help="skip the functional level")
+    rc.add_argument("--load-in-4bit", action="store_true",
+                     help="4-bit quantization (requires CUDA + bitsandbytes)")
+    rc.add_argument("--max-new-tokens", type=int, default=512)
+    rc.add_argument("--temperature", type=float, default=0.2)
+    rc.add_argument("--save-generations", metavar="PATH",
+                     help="write the generated recipes to JSONL for later `anvil verify-recipe`")
+    rc.add_argument("--out", help="write full results to JSON")
+    rc.add_argument("--verbose", "-v", action="store_true")
+    rc.set_defaults(func=cmd_recipe)
+
+    vc = sub.add_parser(
+        "verify-recipe",
+        help="verify previously generated Apptainer recipes (no model, no GPU)",
+        description="Generate where the accelerator is, verify where apptainer is installed "
+        "(docker/Dockerfile, WITH_APPTAINER=1).",
+    )
+    vc.add_argument("--generations", required=True, metavar="PATH",
+                     help="JSONL produced by `anvil recipe --save-generations`")
+    vc.add_argument("--tasks", default="tasks/t3_apptainer.jsonl")
+    vc.add_argument("-k", type=int, default=1, help="budget for pass@k")
+    vc.add_argument("--no-exec", action="store_true", help="skip the functional level")
+    vc.add_argument("--out", help="write full results to JSON")
+    vc.add_argument("--verbose", "-v", action="store_true")
+    vc.set_defaults(func=cmd_verify_recipe)
 
     args = p.parse_args(argv)
     return args.func(args)
