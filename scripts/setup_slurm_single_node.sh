@@ -42,8 +42,16 @@ chown slurm:slurm /var/spool/slurmctld /var/log/slurm 2>/dev/null || true
 # real machine (WSL2 or bare metal) where systemd is actually present, and the
 # apt-installed slurm-wlm rejects that key outright ("unrecognized key"),
 # making both slurmctld and slurmd fail to start.
+#
+# CgroupPlugin=disabled, not autodetect: the apt-packaged slurm-wlm on WSL2 has
+# been observed without a working cgroup/v2 plugin ("cannot find cgroup plugin
+# for cgroup/v2"), which crashes slurmd on startup. TaskPlugin=task/none and
+# ProctrackType=proctrack/linuxproc below already avoid cgroup-based task
+# confinement, so there is nothing here that actually needs cgroups: this
+# script only has to unlock submittability and real execution, not enforce
+# per-job resource isolation.
 cat >/etc/slurm/cgroup.conf <<EOF
-CgroupPlugin=autodetect
+CgroupPlugin=disabled
 EOF
 
 cat >/etc/slurm/slurm.conf <<EOF
