@@ -43,15 +43,17 @@ chown slurm:slurm /var/spool/slurmctld /var/log/slurm 2>/dev/null || true
 # apt-installed slurm-wlm rejects that key outright ("unrecognized key"),
 # making both slurmctld and slurmd fail to start.
 #
-# CgroupPlugin=disabled, not autodetect: the apt-packaged slurm-wlm on WSL2 has
-# been observed without a working cgroup/v2 plugin ("cannot find cgroup plugin
-# for cgroup/v2"), which crashes slurmd on startup. TaskPlugin=task/none and
-# ProctrackType=proctrack/linuxproc below already avoid cgroup-based task
-# confinement, so there is nothing here that actually needs cgroups: this
-# script only has to unlock submittability and real execution, not enforce
-# per-job resource isolation.
+# CgroupPlugin=autodetect works on Ubuntu 24.04 (slurm-wlm 23.11.4): the
+# packaged cgroup/v2 plugin is present and slurmd loads it correctly.
+#
+# On Ubuntu 22.04 (slurm-wlm 21.08.5), the apt package is missing the
+# cgroup/v2 plugin file outright ("cannot find cgroup plugin for cgroup/v2"),
+# and `CgroupPlugin=disabled` does NOT work around it despite being documented
+# as a valid value: this SLURM build treats "disabled" as a plugin name to
+# search for too, and fails the same way. There is no cgroup.conf value that
+# fixes this on 22.04; use a WSL2 distro on Ubuntu 24.04 or newer instead.
 cat >/etc/slurm/cgroup.conf <<EOF
-CgroupPlugin=disabled
+CgroupPlugin=autodetect
 EOF
 
 cat >/etc/slurm/slurm.conf <<EOF
