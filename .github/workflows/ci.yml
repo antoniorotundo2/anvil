@@ -39,6 +39,13 @@ jobs:
       - name: Guards (T2 repair)
         run: make guards-t2
 
+      # T3 lenient: apptainer is not installed here, so this only checks what
+      # syntax/resource_fit/safety can prove without it. The strict bracket
+      # (docker-guards-t3) runs in the container job below, where apptainer
+      # is actually active.
+      - name: Guards (T3 recipes, lenient)
+        run: make guards-t3
+
   container:
     runs-on: ubuntu-latest
     steps:
@@ -57,3 +64,13 @@ jobs:
 
       - name: Oracle repair against a real scheduler
         run: make docker-repair
+
+      # T3: apptainer's unprivileged build/run needs seccomp=unconfined and
+      # /dev/fuse, not --privileged (see docs/DESIGN.md, Apptainer recipes).
+      # Confirmed on Docker Desktop for Windows; ruled out on Docker Desktop
+      # for Mac (nested linuxkit VM). GitHub-hosted runners are bare Linux
+      # VMs, not nested, so this is expected to work the same way, but this
+      # is the first time it runs here: if it fails, that is a new finding
+      # about this specific environment, not a regression to paper over.
+      - name: Guards (T3 recipes, strict, apptainer active)
+        run: make docker-guards-t3
