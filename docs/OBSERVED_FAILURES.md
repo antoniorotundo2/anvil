@@ -111,8 +111,49 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
    presence and reported `found None` — which would have hidden F1 entirely behind a generic
    "missing directive". The bug fix *produced* the finding.
 
+## Multi-seed validation (T1 and T2)
+
+The single-seed pilot above named three gaps before its numbers could be quoted as a rate.
+This run closes all three: 3 seeds (0/1/2), n=5, two model sizes, on a real machine with GNU
+coreutils and a live `slurmctld` (WSL2, Ubuntu 24.04, RTX 3060, 4-bit quantization). Full
+per-category results are in `results/20260724_124032/` on the experiment machine.
+
+**T1 (from scratch), pass@1, mean ± half-range across seeds:**
+
+| model | syntax | submittability | functional | resource_fit | strict_all_levels |
+|---|---|---|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct | 0.58±0.02 | 0.68±0.05 | 0.53±0.04 | 0.44±0.01 | 0.18±0.03 |
+| Qwen2.5-Coder-7B-Instruct   | 1.00±0.00 | 0.62±0.00 | 0.88±0.00 | 1.00±0.00 | 0.50±0.00 |
+
+**T2 (diagnose-and-repair), same protocol:**
+
+| model | syntax | submittability | functional | resource_fit | strict_all_levels |
+|---|---|---|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct | 0.79±0.02 | 0.57±0.00 | 0.66±0.00 | 0.41±0.01 | 0.20±0.00 |
+| Qwen2.5-Coder-7B-Instruct   | 0.98±0.00 | 0.61±0.00 | 0.87±0.00 | 0.97±0.01 | 0.46±0.00 |
+
+Two findings hold across both models and all three seeds.
+
+**`submittability` does not scale with model size.** Every other level improves sharply from
+1.5B to 7B. `submittability` stays roughly flat (0.68 to 0.62 in T1, 0.57 to 0.61 in T2). These
+failures look like scheduler-facing syntactic edge cases rather than semantic misunderstanding,
+and a bigger model does not fix them on its own.
+
+**F1 is the hardest repair category, now with numbers behind it.** At 1.5B, `resource_fit` for
+F1 repairs is 0.0 on all three seeds: the small model never restores the missing directive. At
+7B, `resource_fit` reaches 1.0, but `strict_all_levels` still caps at 0.33, because the
+bottleneck moves to `submittability` (also 0.33): the model now understands what was missing,
+but the resulting script still often fails `sbatch --test-only`. F6 (payload/spec mismatch), by
+contrast, reaches `strict_all_levels` = 1.0 for both models on almost every seed: it is the easy
+category of the taxonomy.
+
 ## Next measurements needed
 
-- multiple seeds and n > 1 before any of this is quoted as a rate;
-- inside the container, so `submittability` is active and `functional` runs on GNU coreutils;
-- a larger model, to separate "small-model degeneracy" (F3) from "genuine semantic error" (F1).
+The three gaps named above (multiple seeds, a scheduler-faithful environment, a larger model)
+are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). What remains open:
+
+- more than two model sizes and families, to see where the `submittability` plateau breaks, if
+  it breaks;
+- a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
+  error as model scale keeps increasing;
+- the retrieval and cross-distribution ablations from the Phase 2 roadmap, still unstarted.
