@@ -38,9 +38,12 @@ echo "==> slurm.conf for ${HOSTNAME_SHORT} (${CPUS} cpus, ${MEM_MB} MB)"
 mkdir -p /etc/slurm /var/spool/slurmd /var/spool/slurmctld /var/log/slurm
 chown slurm:slurm /var/spool/slurmctld /var/log/slurm 2>/dev/null || true
 
+# Unlike docker/entrypoint.sh, no IgnoreSystemd=yes here: this script targets a
+# real machine (WSL2 or bare metal) where systemd is actually present, and the
+# apt-installed slurm-wlm rejects that key outright ("unrecognized key"),
+# making both slurmctld and slurmd fail to start.
 cat >/etc/slurm/cgroup.conf <<EOF
 CgroupPlugin=autodetect
-IgnoreSystemd=yes
 EOF
 
 cat >/etc/slurm/slurm.conf <<EOF
