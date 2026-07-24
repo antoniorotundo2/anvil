@@ -10,7 +10,11 @@
 #   RUN_T2=0 ./scripts/run_experiments.sh     # T1 only
 #
 # Results land in results/<timestamp>/ alongside the environment report: hardware
-# must always be recorded, it feeds the paper's "setup" section.
+# must always be recorded, it feeds the paper's "setup" section. Each run also
+# writes a companion *.generations.jsonl with the raw scripts, so the same
+# generations can be re-verified against another base image later with
+# `anvil verify` / `anvil verify-repair` (the cross-distribution ablation)
+# without spending GPU time twice.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -98,10 +102,14 @@ for model in $MODELS; do
       continue      # idempotent restart: if the session dies, resume
     fi
     echo "  [run ] ${safe} seed=${seed}"
+    # --save-generations alongside --out: the raw scripts, not just the scores,
+    # so the same generations can be re-verified against another base image
+    # later (the cross-distribution ablation) without spending GPU time twice.
     python -m anvil.cli run \
       --model "$model" --tasks "$TASKS" \
       -n "$N" -k "$K" --seed "$seed" \
-      $FLAGS --out "$dest" || echo "  [FAIL] ${safe} seed=${seed}"
+      $FLAGS --out "$dest" --save-generations "${dest%.json}.generations.jsonl" \
+      || echo "  [FAIL] ${safe} seed=${seed}"
   done
 done
 
@@ -120,7 +128,8 @@ if [[ "$RUN_T2" == "1" ]]; then
       python -m anvil.cli repair \
         --model "$model" --repair-tasks "$REPAIR_TASKS" --tasks "$TASKS" \
         -n "$N" -k "$K" --seed "$seed" \
-        $FLAGS --out "$dest" || echo "  [FAIL] repair ${safe} seed=${seed}"
+        $FLAGS --out "$dest" --save-generations "${dest%.json}.generations.jsonl" \
+        || echo "  [FAIL] repair ${safe} seed=${seed}"
     done
   done
 fi
