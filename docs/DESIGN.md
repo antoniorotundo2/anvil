@@ -118,6 +118,32 @@ bracket as T1's oracle/broken guard applies here: the oracle repair (the T1 cano
 returned regardless of the diagnosis) must score 1.0, and a no-op repair (the broken script,
 unchanged) must score 0.0. `make guards-t2` checks both.
 
+## Cross-distribution ablation
+
+Generation and verification are decoupled by design (`--save-generations`, then `anvil verify`
+elsewhere): the same generated scripts can be verified again inside a different base image
+without spending accelerator time twice. This is what makes the ablation possible at all.
+
+`docker/Dockerfile` accepts `BASE_IMAGE` as a build argument for exactly this purpose:
+
+```
+docker build -t anvil:2604 --build-arg BASE_IMAGE=ubuntu:26.04 docker/
+```
+
+A first run (Qwen2.5-Coder-1.5B-Instruct, 8 T1 tasks, n=3, no seed variation) verified the same
+24 generations inside `ubuntu:24.04` (GNU coreutils 9.4) and `ubuntu:26.04` (`uutils`, the Rust
+reimplementation, `gnu_faithful: false`). Every level, on every sample, agreed exactly: same
+pass/fail, same skip decisions, zero divergence.
+
+This is a real result, not a shortcut past the fidelity concern that motivates pinning
+`ubuntu:24.04` as the default. The T1 task suite's shell payloads are dominated by bash builtins
+and `mkdir -p`, operations where `uutils`'s GNU compatibility is presumably solid; they do not
+exercise the coreutils corners (`stat`, `sort`, `date` formatting, flag-level differences) where
+`uutils` and GNU coreutils are known to diverge. The ablation did not find a difference here
+because the current tasks are not shaped to surface one, not because the difference does not
+exist. A meaningful negative result would need a task that specifically depends on one of those
+corners; none of the eight T1 tasks currently do.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox; it does not submit it to `sbatch`. This is
@@ -136,10 +162,13 @@ say so plainly.
 - [ ] **Phase 2**
   - [x] T2 diagnose-and-repair — mechanical fault induction (F1–F7), `tasks/t2_repair.jsonl`,
         `anvil repair` / `anvil verify-repair`, oracle-repair/no-op-repair guards
+  - [x] failure-category breakdown — `aggregate_by_category`, per-category tables in
+        `anvil repair` / `anvil verify-repair` output
+  - [x] cross-distribution ablation — `BASE_IMAGE` build arg, first run (24.04 vs 26.04) found
+        no divergence on the current T1 task suite, see [Cross-distribution
+        ablation](#cross-distribution-ablation)
   - [ ] Apptainer recipes
   - [ ] retrieval ablation (zero-shot / vector / vectorless)
-  - [ ] cross-distribution ablation
-  - [ ] failure-category breakdown
 - [ ] **Phase 3** — QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
 
