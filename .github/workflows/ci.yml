@@ -74,3 +74,14 @@ jobs:
       # about this specific environment, not a regression to paper over.
       - name: Guards (T3 recipes, strict, apptainer active)
         run: make docker-guards-t3
+
+      # The guard prints which levels dropped and, with -v, the per-task reason. These
+      # files carry the rest: every level of every sample. Without them a failure here
+      # can only be reproduced by someone who has a machine that reproduces it.
+      - name: Keep the T3 result files when the guard fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-recipe-results
+          path: results/anvil_recipe_*.json
+          if-no-files-found: warn

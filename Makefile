@@ -134,8 +134,8 @@ recipe:
 # lenient check only asserts what syntax/resource_fit/safety can prove without
 # it; the strict oracle-1.0/broken-0.0 bracket is `docker-guards-t3`.
 guards-t3:
-	$(PYTHON) -m anvil.cli recipe --model oracle --tasks $(RECIPE_TASKS) --out /tmp/anvil_recipe_oracle.json
-	$(PYTHON) -m anvil.cli recipe --model broken --tasks $(RECIPE_TASKS) -n 5 --out /tmp/anvil_recipe_broken.json
+	$(PYTHON) -m anvil.cli recipe --model oracle --tasks $(RECIPE_TASKS) -v --out /tmp/anvil_recipe_oracle.json
+	$(PYTHON) -m anvil.cli recipe --model broken --tasks $(RECIPE_TASKS) -n 5 -v --out /tmp/anvil_recipe_broken.json
 	@$(PYTHON) -c "import json,sys; \
 o=json.load(open('/tmp/anvil_recipe_oracle.json'))['summary']; \
 b=json.load(open('/tmp/anvil_recipe_broken.json'))['summary']; \
@@ -174,9 +174,9 @@ docker-recipe: docker-build-apptainer
 # on Docker Desktop for Windows.
 docker-guards-t3: docker-build-apptainer
 	@mkdir -p results
-	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model oracle --tasks $(RECIPE_TASKS) \
+	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model oracle --tasks $(RECIPE_TASKS) -v \
 		--out results/anvil_recipe_oracle.json
-	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model broken --tasks $(RECIPE_TASKS) -n 5 \
+	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model broken --tasks $(RECIPE_TASKS) -n 5 -v \
 		--out results/anvil_recipe_broken.json
 	@$(PYTHON) -c "import json,sys; \
 o=json.load(open('results/anvil_recipe_oracle.json'))['summary']; \
