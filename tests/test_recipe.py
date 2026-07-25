@@ -230,3 +230,77 @@ def test_reference_file_is_valid_json_and_matches_tasks():
         ids = {json.loads(line)["id"] for line in fh if line.strip()}
     task_ids = {t.id for t in RecipeTask.load_jsonl(TASKS)}
     assert ids == task_ids
+
+
+def test_build_failure_keeps_more_than_the_summary_line():
+    """apptainer names the section that failed, not the command inside it.
+
+    A CI run reported `while running %post section: exit status 1` for a %post holding a
+    single echo. The line above it, which says what went wrong, had been discarded.
+    """
+    from anvil.cli import _one_line
+
+    tail = (
+        "ERROR: unable to write /etc/anvil_flag: read-only file system\n"
+        "FATAL:   While performing build: while running %post section: exit status 1"
+    )
+    shown = _one_line(tail, limit=60)
+    assert "\n" not in shown, "a multi-line detail must not break one-line-per-level"
+    assert shown.startswith("ERROR: unable to write"), "the cause leads, not the summary"
+    assert len(shown) == 60
+
+
+def test_short_details_are_left_alone():
+    from anvil.cli import _one_line
+
+    for detail in ("required section missing: %post", "ok", ""):
+        assert _one_line(detail) == detail
+
+
+def test_check_buildable_records_the_tail_of_the_builder_output(tmp_path, monkeypatch):
+    """The stored detail must reach past apptainer's closing summary.
+
+    Simulated rather than skipped: apptainer is absent on most development machines, and
+    this is precisely the path whose output only a machine with apptainer ever sees.
+    """
+    import subprocess
+
+    from anvil import recipe_verifier as rv
+
+    stderr = (
+        "INFO:    Starting build...\n"
+        "INFO:    Running post scriptlet\n"
+        "+ echo ready\n"
+        "sh: can't create /etc/anvil_flag: Read-only file system\n"
+        "FATAL:   While performing build: while running %post section: exit status 1\n"
+    )
+    monkeypatch.setattr(rv, "apptainer_available", lambda: True)
+    monkeypatch.setattr(rv, "_apptainer_bin", lambda: "/bin/false")
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *a, **k: subprocess.CompletedProcess(a[0], 1, stdout="", stderr=stderr),
+    )
+
+    result, sif = rv.check_buildable("Bootstrap: docker\nFrom: alpine:latest\n", str(tmp_path))
+
+    assert not result.passed and sif is None
+    assert "Read-only file system" in result.detail, (
+        "the line naming the cause was dropped; only the summary survived"
+    )
+    assert "%post section" in result.detail, "the summary should still be there too"
+
+
+def test_the_printed_line_is_flattened_end_to_end():
+    """Guards the wiring, not only the helper: a helper nobody calls is not a fix."""
+    from anvil.cli import _failed_level_lines
+    from anvil.schema import Level, LevelResult
+
+    class _Sample:
+        levels = [LevelResult(Level.FUNCTIONAL, False, "cause first\n" + "x" * 400)]
+
+    lines = _failed_level_lines([_Sample()])
+
+    assert len(lines) == 1
+    assert "\n" not in lines[0], "a multi-line detail reached the report unflattened"
+    assert lines[0].endswith("..."), "an oversized detail reached the report untruncated"
+    assert "cause first" in lines[0]

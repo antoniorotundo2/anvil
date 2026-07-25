@@ -512,6 +512,17 @@ def _sample_status(samples: Sequence) -> str:
     return f"{passed}/{len(samples)} PASS"
 
 
+def _one_line(detail: str, limit: int = 200) -> str:
+    """Flatten a detail onto the single line this report gives it.
+
+    A build failure carries the tail of the builder's output, several lines of it. The
+    file written by `--out` keeps all of them; here only the head is shown, which is where
+    the command that actually failed reports itself, ahead of the tool's own summary.
+    """
+    flat = " ".join(detail.split())
+    return flat if len(flat) <= limit else flat[: limit - 3] + "..."
+
+
 def _failed_level_lines(samples: Sequence) -> list[str]:
     """One line per level that failed in at least one sample, and in how many of them."""
     counts: dict[str, int] = {}
@@ -524,7 +535,7 @@ def _failed_level_lines(samples: Sequence) -> list[str]:
     lines = []
     for level, count in counts.items():
         scope = "" if len(samples) == 1 else f" ({count}/{len(samples)} samples)"
-        lines.append(f"      - {level}: {details[level]}{scope}")
+        lines.append(f"      - {level}: {_one_line(details[level])}{scope}")
     return lines
 
 

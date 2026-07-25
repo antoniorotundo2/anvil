@@ -86,8 +86,14 @@ def check_buildable(
         return LevelResult(RecipeLevel.BUILDABLE, False, f"build timed out after {timeout}s"), None
 
     if proc.returncode != 0 or not sif_path.exists():
-        lines = (proc.stderr or proc.stdout).strip().splitlines()
-        detail = lines[-1][:300] if lines else "build failed, no output"
+        # Keep the tail, not only the final line. apptainer signs off with a summary that
+        # names the section that failed but never the command that failed inside it; that
+        # sits in the lines just above. Keeping one line cost a CI run: it reported
+        # "while running %post section: exit status 1" for a %post holding a single echo,
+        # which says nothing about why. `--out` receives all of this; the terminal shows
+        # its head, where the failing command reports itself ahead of the summary.
+        lines = [ln for ln in (proc.stderr or proc.stdout).strip().splitlines() if ln.strip()]
+        detail = "\n".join(lines[-12:])[:1500] if lines else "build failed, no output"
         return LevelResult(RecipeLevel.BUILDABLE, False, detail), None
 
     return LevelResult(RecipeLevel.BUILDABLE, True, "ok"), str(sif_path)
