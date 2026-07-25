@@ -171,6 +171,39 @@ because the current tasks are not shaped to surface one, not because the differe
 exist. A meaningful negative result would need a task that specifically depends on one of those
 corners; none of the eight T1 tasks currently do.
 
+## Retrieval ablation
+
+Does giving a model reference material about SLURM semantics change how correctly it writes a
+script? Three conditions, compared on the same model, seeds and tasks:
+
+* **zero-shot** — the task prompt alone. This is what T1/T2/T3 have always done; introducing the
+  other two arms changes nothing about the default behaviour.
+* **vector** — TF-IDF cosine similarity between the task prompt and a small corpus of reference
+  documents (`tasks/retrieval_corpus.jsonl`), implemented in pure Python (stdlib only): the corpus
+  is small enough that a neural embedding model would be a dependency this ablation does not need.
+* **vectorless** — exact tag overlap between the task and a document, no similarity scoring.
+  Structure-based, not similarity-based: a document is retrieved because it is declared to be
+  *about* the task's topic, not because its text happens to resemble the prompt.
+
+The corpus is anchored to the same F1–F7 taxonomy as T2: the two most-referenced documents state
+SLURM's silent resource defaults (F1) and the directive-placement rule (F2) directly, so the
+hypothesis is not "does retrieval help in general" but "does surfacing the exact fact a model
+tends to get wrong change whether it gets it wrong."
+
+**`--retrieval` never changes the oracle/broken baseline.** `OracleModel` matches on
+`prompt.startswith(task.prompt)`, not exact equality, because `build_prompt_with_context` always
+appends retrieved material after the original prompt, never before it. `make guards` therefore
+stays valid regardless of which retrieval arm is active.
+
+A first pilot (Qwen2.5-Coder-1.5B-Instruct, n=3, single seed) found `strict_all_levels` at
+0.38 (zero-shot), 0.29 (vector) and 0.21 (vectorless): retrieval made this small model *worse*,
+not better. Single seed, single small model: an observation, not a result. Plausible reading, not
+yet tested: appending reference text after the prompt pushes the actual instructions further from
+the point where a small, weakly instruction-following model pays the most attention, independent
+of whether the appended text is relevant. Multiple seeds, a larger model, and a variant that
+prepends context instead of appending it are the next measurements, not a conclusion to draw from
+one run.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox; it does not submit it to `sbatch`. This is
@@ -186,7 +219,7 @@ say so plainly.
 
 - [x] **Phase 1** — verifier (5 levels), 8 T1 tasks, oracle + broken, `pass@k`, reference cluster,
       preflight, generate/verify decoupling
-- [ ] **Phase 2**
+- [x] **Phase 2**
   - [x] T2 diagnose-and-repair — mechanical fault induction (F1–F7), `tasks/t2_repair.jsonl`,
         `anvil repair` / `anvil verify-repair`, oracle-repair/no-op-repair guards
   - [x] failure-category breakdown — `aggregate_by_category`, per-category tables in
@@ -199,7 +232,9 @@ say so plainly.
         guards confirmed: `make guards-t3` (lenient) and `make docker-guards-t3` (strict,
         oracle 1.0 / broken 0.0, `apptainer` active) on Docker Desktop for Windows; ruled out on
         Docker Desktop for Mac (`apptainer run` fails there, see the section above)
-  - [ ] retrieval ablation (zero-shot / vector / vectorless)
+  - [x] retrieval ablation — `anvil/retrieval.py` (TF-IDF vector / tag-based vectorless),
+        `--retrieval` on `anvil run`, `scripts/retrieval_ablation.sh`, see [Retrieval
+        ablation](#retrieval-ablation). First pilot run, not yet a multi-seed result.
 - [ ] **Phase 3** — QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
 

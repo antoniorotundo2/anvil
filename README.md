@@ -219,6 +219,28 @@ bracket needs the opt-in image:
 make docker-guards-t3
 ```
 
+## Retrieval ablation
+
+Three ways to prompt a model for T1: `zero-shot` (the default, no change from the rest of this
+README), `vector` (TF-IDF similarity against `tasks/retrieval_corpus.jsonl`), `vectorless` (exact
+tag match, no scoring). `anvil run --retrieval` selects the arm:
+
+```
+anvil run --model oracle --tasks tasks/t1_slurm.jsonl --retrieval vector -v
+anvil run --model <hf-model-id> --tasks tasks/t1_slurm.jsonl --retrieval vectorless
+```
+
+`OracleModel` still recognises the task regardless of which arm is active (it matches on
+`prompt.startswith(task.prompt)`, since retrieved context is always appended after the original
+prompt, never before it), so `make guards` stays valid for any `--retrieval` value.
+
+Compare all three arms on the same model, seeds and tasks:
+
+```
+./scripts/retrieval_ablation.sh
+MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_ablation.sh
+```
+
 ## Documentation
 
 - [`docs/DESIGN.md`](docs/DESIGN.md) — why execution-based verification, the five levels, the preflight
