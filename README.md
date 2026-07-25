@@ -1,4 +1,4 @@
-# Anvil
+<h1 align="center"><a id="anvil"></a><img src="docs/assets/logo.svg" alt="Anvil" width="420"></h1>
 
 The project aims to measure whether the operational artifacts an LLM writes for a supercomputer —
 SLURM job scripts and Apptainer container recipes — are actually correct: verified by submission,

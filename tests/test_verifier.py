@@ -619,3 +619,43 @@ def test_legacy_generations_without_a_digest_are_refused(tmp_path, capsys):
     rc = main(["verify", "--generations", str(gen), "--tasks", str(TASKS)])
     assert rc == 2
     assert "different task file" in capsys.readouterr().err
+
+
+def test_verbose_line_reports_every_sample_not_just_the_last(capsys):
+    """A task's verbose line must account for all n samples.
+
+    It used to print `results[-1]`, so a task whose final draw happened to pass showed as
+    clean while the earlier draws that failed went unmentioned. pass@k is computed over
+    every sample, and the line people watch mid-run has to agree with it.
+    """
+    from anvil.cli import main
+
+    main(["run", "--model", "broken", "--tasks", str(TASKS), "-n", "3", "-v"])
+    out = capsys.readouterr().out
+
+    task_lines = [ln for ln in out.splitlines() if ln.startswith("  t1_")]
+    assert task_lines, "no per-task verbose lines were printed"
+    for ln in task_lines:
+        assert "/3 " in ln, f"line hides how many of the 3 samples passed: {ln!r}"
+
+
+def test_verbose_line_keeps_its_single_sample_wording(capsys):
+    """With one sample there is nothing to count, so the original wording stands."""
+    from anvil.cli import main
+
+    main(["run", "--model", "oracle", "--tasks", str(TASKS), "-n", "1", "-v"])
+    out = capsys.readouterr().out
+
+    assert "t1_hello_serial            PASS" in out
+    assert "1/1 PASS" not in out
+
+
+def test_failed_levels_carry_how_many_samples_they_failed_in(capsys):
+    """Separates a systematic failure from one that only some draws hit."""
+    from anvil.cli import main
+
+    main(["run", "--model", "broken", "--tasks", str(TASKS), "-n", "3", "-v"])
+    out = capsys.readouterr().out
+
+    assert "(3/3 samples)" in out, "a level failing every sample should say so"
+    assert "resource_fit" in out

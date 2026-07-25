@@ -13,6 +13,7 @@ import hashlib
 import json
 import sys
 import time
+from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 
@@ -123,6 +124,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         docs = retrieve(task, corpus, k=args.retrieval_k)
         prompt = build_prompt_with_context(task.prompt, docs)
         raw_outputs = model.generate(prompt, n=args.n, seed=args.seed)
+        first = len(results)
         for sample_idx, raw in enumerate(raw_outputs):
             script = extract_script(raw)
             generations.append({
@@ -137,7 +139,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             })
             results.append(verify(script, task, run_functional=not args.no_exec))
         if args.verbose:
-            _print_task_detail(task, results[-1])
+            _print_task_detail(task, results[first:])
     elapsed = time.time() - t0
 
     if args.save_generations:
@@ -187,8 +189,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
             models.add(g.get("model", "?"))
             shas.add(g.get("tasks_sha", "unknown"))
             results.append(verify(g["script"], task, run_functional=not args.no_exec))
-            if args.verbose and (len(results) % 1 == 0):
-                _print_task_detail(task, results[-1])
+            if args.verbose:
+                _print_task_detail(task, results[-1:])
     elapsed = time.time() - t0
 
     if unknown:
@@ -286,6 +288,7 @@ def cmd_repair(args: argparse.Namespace) -> int:
         base_task = tasks_by_id[rt.base_task_id]
         prompt = build_repair_prompt(base_task, rt.broken_script)
         raw_outputs = model.generate(prompt, n=args.n, seed=args.seed)
+        first = len(results)
         for sample_idx, raw in enumerate(raw_outputs):
             script = extract_script(raw)
             generations.append({
@@ -302,7 +305,7 @@ def cmd_repair(args: argparse.Namespace) -> int:
                 verify_repair(script, rt, base_task, run_functional=not args.no_exec)
             )
         if args.verbose:
-            _print_repair_detail(rt, results[-1])
+            _print_repair_detail(rt, results[first:])
     elapsed = time.time() - t0
 
     if args.save_generations:
@@ -354,7 +357,7 @@ def cmd_verify_repair(args: argparse.Namespace) -> int:
                 verify_repair(g["script"], rt, base_task, run_functional=not args.no_exec)
             )
             if args.verbose:
-                _print_repair_detail(rt, results[-1])
+                _print_repair_detail(rt, results[-1:])
     elapsed = time.time() - t0
 
     if unknown:
@@ -411,6 +414,7 @@ def cmd_recipe(args: argparse.Namespace) -> int:
     t0 = time.time()
     for task in tasks:
         raw_outputs = model.generate(task.prompt, n=args.n, seed=args.seed)
+        first = len(results)
         for sample_idx, raw in enumerate(raw_outputs):
             recipe = extract_recipe(raw)
             generations.append({
@@ -423,7 +427,7 @@ def cmd_recipe(args: argparse.Namespace) -> int:
             })
             results.append(verify_recipe(recipe, task, run_functional=not args.no_exec))
         if args.verbose:
-            _print_recipe_detail(task, results[-1])
+            _print_recipe_detail(task, results[first:])
     elapsed = time.time() - t0
 
     if args.save_generations:
@@ -469,7 +473,7 @@ def cmd_verify_recipe(args: argparse.Namespace) -> int:
             shas.add(g.get("tasks_sha", "unknown"))
             results.append(verify_recipe(g["recipe"], task, run_functional=not args.no_exec))
             if args.verbose:
-                _print_recipe_detail(task, results[-1])
+                _print_recipe_detail(task, results[-1:])
     elapsed = time.time() - t0
 
     if unknown:
@@ -495,31 +499,51 @@ def cmd_verify_recipe(args: argparse.Namespace) -> int:
     return 0
 
 
-def _print_repair_detail(rt: RepairTask, res) -> None:
-    status = "PASS" if res.all_passed else "FAIL"
-    print(f"  {_fmt(rt.id, 30)} [{rt.fault_category}] {status}")
-    if not res.all_passed:
+def _sample_status(samples: Sequence) -> str:
+    """Outcome across every sample drawn for one task.
+
+    These lines used to report only the last sample, so a task whose final draw happened to
+    pass read as clean even when the earlier draws had failed. pass@k is computed over all n
+    samples, so the line watched while a run is in flight has to be too.
+    """
+    passed = sum(1 for res in samples if res.all_passed)
+    if len(samples) == 1:
+        return "PASS" if passed else "FAIL"
+    return f"{passed}/{len(samples)} PASS"
+
+
+def _failed_level_lines(samples: Sequence) -> list[str]:
+    """One line per level that failed in at least one sample, and in how many of them."""
+    counts: dict[str, int] = {}
+    details: dict[str, str] = {}
+    for res in samples:
         for lr in res.levels:
             if not lr.passed and not lr.skipped:
-                print(f"      - {lr.level.value}: {lr.detail}")
+                counts[lr.level.value] = counts.get(lr.level.value, 0) + 1
+                details.setdefault(lr.level.value, lr.detail)
+    lines = []
+    for level, count in counts.items():
+        scope = "" if len(samples) == 1 else f" ({count}/{len(samples)} samples)"
+        lines.append(f"      - {level}: {details[level]}{scope}")
+    return lines
 
 
-def _print_task_detail(task: Task, res) -> None:
-    status = "PASS" if res.all_passed else "FAIL"
-    print(f"  {_fmt(task.id, 26)} {status}")
-    if not res.all_passed:
-        for lr in res.levels:
-            if not lr.passed and not lr.skipped:
-                print(f"      - {lr.level.value}: {lr.detail}")
+def _print_repair_detail(rt: RepairTask, samples: Sequence) -> None:
+    print(f"  {_fmt(rt.id, 30)} [{rt.fault_category}] {_sample_status(samples)}")
+    for line in _failed_level_lines(samples):
+        print(line)
 
 
-def _print_recipe_detail(task: RecipeTask, res) -> None:
-    status = "PASS" if res.all_passed else "FAIL"
-    print(f"  {_fmt(task.id, 26)} {status}")
-    if not res.all_passed:
-        for lr in res.levels:
-            if not lr.passed and not lr.skipped:
-                print(f"      - {lr.level.value}: {lr.detail}")
+def _print_task_detail(task: Task, samples: Sequence) -> None:
+    print(f"  {_fmt(task.id, 26)} {_sample_status(samples)}")
+    for line in _failed_level_lines(samples):
+        print(line)
+
+
+def _print_recipe_detail(task: RecipeTask, samples: Sequence) -> None:
+    print(f"  {_fmt(task.id, 26)} {_sample_status(samples)}")
+    for line in _failed_level_lines(samples):
+        print(line)
 
 
 def _print_summary_table(summary: dict, k: int, levels=Level) -> None:
