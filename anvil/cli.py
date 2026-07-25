@@ -69,7 +69,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     # NB: check_functional ALWAYS executes with bash in a temporary sandbox; it
     # never submits to sbatch. Stating this precisely is not pedantry: the string
     # ends up in environment.json and therefore in the paper's setup section.
-    # Real execution via sbatch is planned for Phase 2.
+    # Real execution via sbatch is Phase 3 work; it did not ship with Phase 2.
     print("  functional      active (bash sandbox; NOT via sbatch)")
     print("  resource_fit    always active")
     print("  safety          always active")

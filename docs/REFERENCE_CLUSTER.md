@@ -52,7 +52,7 @@ terrible model**. It happened during development: the canonical solutions were c
 harness was broken. A benchmark that executes code must be able to tell a failure of its subject
 from a failure of itself.
 
-## Known limitation (Phase 2)
+## Known limitation (Phase 3)
 
 The `functional` level executes the script with **bash in a temporary sandbox**; it does not
 submit it to `sbatch`. This is declared in the environment report as `functional_executor: "bash"`.
@@ -63,5 +63,6 @@ Consequences not to be hidden in the paper:
 - the execution environment lacks the runtime variables SLURM injects beyond those simulated from
   the task constraints.
 
-Phase 2: real `functional` via `sbatch`, waiting for completion and reading the exit code from
+Phase 3: real `functional` via `sbatch`, waiting for completion and reading the exit code from
 `sacct`. This unlocks the induced-failure taxonomy (OOM, walltime) on the reference cluster.
+It was described as Phase 2 work while Phase 2 was open, and did not ship with it.

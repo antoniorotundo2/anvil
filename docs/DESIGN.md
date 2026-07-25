@@ -225,7 +225,7 @@ say so plainly.
   - [x] failure-category breakdown — `aggregate_by_category`, per-category tables in
         `anvil repair` / `anvil verify-repair` output
   - [x] cross-distribution ablation — `BASE_IMAGE` build arg, first run (24.04 vs 26.04) found
-        no divergence on the current T1 task suite, see [Cross-distribution
+        no divergence on the current T1 task suite, at one seed, see [Cross-distribution
         ablation](#cross-distribution-ablation)
   - [x] Apptainer recipes — `RecipeTask`, `RecipeLevel`, `anvil recipe` / `anvil verify-recipe`,
         `tasks/t3_apptainer.jsonl`, see [Apptainer recipes (T3)](#apptainer-recipes-t3). Both
@@ -234,9 +234,25 @@ say so plainly.
         Docker Desktop for Mac (`apptainer run` fails there, see the section above)
   - [x] retrieval ablation — `anvil/retrieval.py` (TF-IDF vector / tag-based vectorless),
         `--retrieval` on `anvil run`, `scripts/retrieval_ablation.sh`, see [Retrieval
-        ablation](#retrieval-ablation). First pilot run, not yet a multi-seed result.
-- [ ] **Phase 3** — QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
+        ablation](#retrieval-ablation). The tooling is what this box covers. The measurement is
+        still a pilot: one seed of three, so 3 of the 9 cells. It belongs on the experiment
+        machine, since a development machine skips `submittability` and is not `gnu_faithful`.
+- [ ] **Phase 3** — real submission via `sbatch` (see below); QLoRA reference model; state-space
+      arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
+
+### Real submission is not in Phase 2
+
+`functional` executes the payload with `bash` in a sandbox, never through `sbatch`, so no level
+observes what only a scheduler produces: OOM kills, walltime overruns, the allocation a job
+actually receives. `submittability` runs `sbatch --test-only`, which decides whether a script
+would be accepted, not whether it runs.
+
+`anvil/cli.py` and `anvil/verifier.py` both used to call real submission Phase 2 work. It was
+never a listed Phase 2 deliverable and it did not ship with the five that were, so it is recorded
+here as Phase 3 rather than left as a promise inside a closed phase. Until it lands, every result
+carries `functional_executor: "bash"` in its environment report, and the gap between submittable
+and runnable stays open.
 
 Evaluated models will include a **state-space** model alongside transformers, to test whether
 architecture matters for operational artifacts.

@@ -156,4 +156,7 @@ are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). Wha
   it breaks;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- the retrieval and cross-distribution ablations from the Phase 2 roadmap, still unstarted.
+- the retrieval ablation, whose tooling is in place but whose measurement is still one seed
+  of three, so 3 of the 9 cells;
+- a second seed for the cross-distribution ablation, which so far agreed level by level on a
+  single one.

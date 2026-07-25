@@ -166,7 +166,7 @@ def check_functional(script: str, task: Task, timeout: int = 60) -> LevelResult:
 
     Current executor is `bash` in an isolated temporary directory, never `sbatch`.
     Reported as `functional_executor: "bash"` in the environment report. Real
-    submission (and therefore OOM kills and walltime overruns) is Phase 2 work.
+    submission (and therefore OOM kills and walltime overruns) is Phase 3 work.
     """
     workdir = tempfile.mkdtemp(prefix="anvil_run_")
     script_path = Path(workdir) / "job.sh"
