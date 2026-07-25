@@ -58,7 +58,11 @@ class OracleModel(Model):
                     self._prompt_to_id[rec["prompt"]] = rec["id"]
 
     def generate(self, prompt: str, n: int = 1, seed: int | None = None) -> list[str]:
-        tid = self._prompt_to_id.get(prompt)
+        # startswith, not exact equality: the retrieval ablation appends
+        # reference material after the task prompt (see
+        # retrieval.build_prompt_with_context), so the prompt the oracle
+        # actually receives may be longer than the one it was indexed under.
+        tid = next((i for p, i in self._prompt_to_id.items() if prompt.startswith(p)), None)
         script = self._by_id.get(tid, "") if tid else ""
         return [f"```bash\n{script}```" for _ in range(n)]
 
