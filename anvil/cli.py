@@ -28,6 +28,7 @@ from .repair import (
     induce_t2_tasks,
     verify_repair,
 )
+from .retrieval import STRATEGIES, Document, build_prompt_with_context
 from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task
 from .verifier import slurm_healthy, verify
 
@@ -105,6 +106,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     model = build_model(args.model, args.tasks, **model_kw)
     tasks_sha = _file_sha(args.tasks)
 
+    corpus = Document.load_jsonl(args.retrieval_corpus) if args.retrieval != "zero-shot" else []
+    retrieve = STRATEGIES[args.retrieval]
+
     healthy, why = slurm_healthy()
     if not healthy:
         print(
@@ -116,7 +120,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     generations: list[dict] = []
     t0 = time.time()
     for task in tasks:
-        raw_outputs = model.generate(task.prompt, n=args.n, seed=args.seed)
+        docs = retrieve(task, corpus, k=args.retrieval_k)
+        prompt = build_prompt_with_context(task.prompt, docs)
+        raw_outputs = model.generate(prompt, n=args.n, seed=args.seed)
         for sample_idx, raw in enumerate(raw_outputs):
             script = extract_script(raw)
             generations.append({
@@ -125,6 +131,8 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "model": model.name,
                 "seed": args.seed,
                 "tasks_sha": tasks_sha,
+                "retrieval": args.retrieval,
+                "retrieved_docs": [d.id for d in docs],
                 "script": script,
             })
             results.append(verify(script, task, run_functional=not args.no_exec))
@@ -566,6 +574,8 @@ def _report(
         }
         if by_category is not None:
             payload["by_category"] = by_category
+        if getattr(args, "retrieval", None):
+            payload["retrieval"] = args.retrieval
         Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Full results written to {args.out}")
 
@@ -620,6 +630,12 @@ def main(argv: list[str] | None = None) -> int:
                    help="write the generated scripts to JSONL for later `anvil verify`")
     r.add_argument("--out", help="write full results to JSON")
     r.add_argument("--verbose", "-v", action="store_true")
+    r.add_argument("--retrieval", choices=list(STRATEGIES), default="zero-shot",
+                   help="retrieval ablation: zero-shot (default, no change) | vector "
+                   "(TF-IDF similarity) | vectorless (tag match)")
+    r.add_argument("--retrieval-corpus", default="tasks/retrieval_corpus.jsonl")
+    r.add_argument("--retrieval-k", type=int, default=2,
+                   help="max documents retrieved per task (ignored for zero-shot)")
     r.set_defaults(func=cmd_run)
 
     v = sub.add_parser(
