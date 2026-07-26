@@ -191,17 +191,22 @@ anvil recipe --model <hf-model-id> --tasks tasks/t3_apptainer.jsonl --save-gener
 anvil verify-recipe --generations results/recipe_generations.jsonl --tasks tasks/t3_apptainer.jsonl -v
 ```
 
-Apptainer's unprivileged build needs a user namespace (blocked by Docker's default seccomp
-profile) and running the built image needs `/dev/fuse`:
+Apptainer runs unprivileged inside the container, so no capability is granted: what it
+needs is exemptions from Docker's confinement. On Docker Desktop for Windows two are
+enough; a native Ubuntu 24.04 host also confines AppArmor-side, and `make
+docker-guards-t3 APPTAINER_UNPRIVILEGED=1` needs the full set (see the Makefile's
+`DOCKER_RUN_APPTAINER` and `docs/DESIGN.md` for what each one unlocks):
 
 ```
-docker run --rm --security-opt seccomp=unconfined --device /dev/fuse \
+docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
+    --security-opt systempaths=unconfined --device /dev/fuse \
     -v "$PWD":/work -w /work anvil:apptainer ...
 ```
 
-`--privileged` also works but grants far more than these two actually need. This was observed to
-work fully on Docker Desktop for Windows; on Docker Desktop for Mac, `build` succeeds but `run`
-fails (`exec ... failed: invalid argument`), a limit of that nested virtualization stack.
+`--privileged` also works but grants far more than these actually need. The full set is
+verified in CI on GitHub-hosted runners; the two-flag form works on Docker Desktop for
+Windows. On Docker Desktop for Mac, `build` succeeds but `run` fails
+(`exec ... failed: invalid argument`), untested since the AppArmor findings.
 
 ### Guards
 

@@ -65,13 +65,9 @@ jobs:
       - name: Oracle repair against a real scheduler
         run: make docker-repair
 
-      # T3: apptainer's unprivileged build/run needs seccomp=unconfined and
-      # /dev/fuse, not --privileged (see docs/DESIGN.md, Apptainer recipes).
-      # Confirmed on Docker Desktop for Windows; ruled out on Docker Desktop
-      # for Mac (nested linuxkit VM). GitHub-hosted runners are bare Linux
-      # VMs, not nested, so this is expected to work the same way, but this
-      # is the first time it runs here: if it fails, that is a new finding
-      # about this specific environment, not a regression to paper over.
+      # T3 on this runner needs more than the seccomp+fuse pair that suffices on
+      # WSL2: docs/DESIGN.md lists the full exemption set and the failure that
+      # forced each one, established here one run at a time.
       # Ubuntu 24.04 pairs AppArmor with apparmor_restrict_unprivileged_userns: an
       # unconfined process may still create a user namespace, but the kernel moves it to
       # a stripped profile with no capabilities inside it, so the fakeroot build dies on
@@ -96,11 +92,8 @@ jobs:
         run: make docker-apptainer-probe
         continue-on-error: true
 
-      # Attempting the unprivileged route: as root without CAP_SYS_ADMIN, apptainer mounts
-      # directly and dies on `Failed to set mount propagation`, during %post and again at
-      # run time. A user namespace supplies that capability inside itself, which asks
-      # nothing of Docker. The alternative is --cap-add SYS_ADMIN, the broadest capability
-      # the kernel has, and this is the attempt to avoid needing it.
+      # The unprivileged route, confirmed: with the exemptions above, the strict
+      # oracle-1.0/broken-0.0 bracket passes here with no capability granted.
       - name: Guards (T3 recipes, strict, apptainer active)
         run: make docker-guards-t3 APPTAINER_UNPRIVILEGED=1
 

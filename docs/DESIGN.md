@@ -137,13 +137,30 @@ guards-t3` therefore only asserts what `syntax`/`resource_fit`/`safety` can prov
 oracle-1.0/broken-0.0 bracket is `make docker-guards-t3`, which needs the opt-in
 `docker-build-apptainer` image.
 
-**Unprivileged build and run, not `--privileged`.** Apptainer's unprivileged build needs a user
-namespace, which Docker's default seccomp profile blocks; running the built `.sif` needs
-`/dev/fuse`. `--security-opt seccomp=unconfined --device /dev/fuse` grants exactly these two and
-nothing else. `--privileged` also works but grants far more. Observed: both flags together work
-fully on Docker Desktop for Windows; on Docker Desktop for Mac (a nested `linuxkit` VM), `build`
-succeeds but `run` fails with `exec ... failed: invalid argument`, a limit of that specific nested
-virtualization stack, not of Linux or Docker in general.
+**Unprivileged build and run, not `--privileged`.** No capability is granted; what the
+container needs is exemptions from Docker's confinement, and how many depends on the host.
+On Docker Desktop for Windows (WSL2, no AppArmor) two suffice: `--security-opt
+seccomp=unconfined --device /dev/fuse`. On a native Ubuntu 24.04 host, established one CI
+run at a time on GitHub's runners, the full set is:
+
+* `--security-opt seccomp=unconfined` — the user namespace the unprivileged build lives in;
+* `--security-opt apparmor=unconfined` — `docker-default` denies the `mount` syscall
+  outright (`failed to mount ...: permission denied`);
+* `kernel.apparmor_restrict_unprivileged_userns=0` on the host — otherwise an unconfined
+  process that creates a user namespace is moved to a stripped profile with no
+  capabilities inside it (`mount namespace requires privileges`);
+* `--security-opt systempaths=unconfined` — a fresh procfs cannot be mounted in a user
+  namespace while Docker's masked `/proc` entries cover the original (`failed to mount
+  proc filesystem`);
+* `--device /dev/fuse` plus, in the image, a subuid/subgid range for root and
+  `APPTAINER_UNPRIVILEGED=1`, since the PPA package has no setuid starter and every build
+  goes through `--fakeroot`.
+
+`--privileged` also works and collapses the list, but grants every capability besides.
+With the full set, the strict oracle-1.0/broken-0.0 bracket passes on GitHub-hosted
+runners. On Docker Desktop for Mac, `build` succeeds but `run` fails with `exec ...
+failed: invalid argument`; this was once attributed to the nested `linuxkit` VM, an
+explanation the AppArmor findings above weaken, and it has not been retested since.
 
 ## Cross-distribution ablation
 
