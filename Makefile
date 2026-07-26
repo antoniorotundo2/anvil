@@ -26,7 +26,11 @@ DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 # seccomp=unconfined for the build's user namespace, /dev/fuse to mount the
 # built .sif at run time. See docker/Dockerfile for what was tried and ruled
 # out (a plain run needs neither; --privileged works but grants much more).
+# 1 pushes apptainer through its own user namespace instead of relying on host
+# privileges the container does not have. See _unprivileged() in recipe_verifier.py.
+APPTAINER_UNPRIVILEGED ?= 0
 DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined --device /dev/fuse \
+	-e ANVIL_APPTAINER_UNPRIVILEGED=$(APPTAINER_UNPRIVILEGED) \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
 .PHONY: help install install-models test lint doctor run verify guards \
@@ -172,6 +176,24 @@ docker-recipe: docker-build-apptainer
 # T1's and T2's. Not observed to work on Docker Desktop for Mac (nested
 # linuxkit VM): `apptainer run` fails there even with these flags. Confirmed
 # on Docker Desktop for Windows.
+docker-apptainer-probe: docker-build-apptainer
+	@$(DOCKER_RUN_APPTAINER) sh -c 'set -e; \
+		echo "user            : $$(id -un) uid=$$(id -u)"; \
+		apptainer --version; \
+		if test -u /usr/libexec/apptainer/bin/starter-suid; then \
+			echo "starter-suid    : present and setuid"; \
+		else \
+			echo "starter-suid    : absent or not setuid (unprivileged path only)"; \
+		fi; \
+		if unshare -U true 2>/dev/null; then \
+			echo "user namespaces : can be created"; \
+		else \
+			echo "user namespaces : REFUSED ($$(unshare -U true 2>&1))"; \
+		fi; \
+		echo "max_user_ns     : $$(cat /proc/sys/user/max_user_namespaces 2>&1)"; \
+		echo "requested mode  : ANVIL_APPTAINER_UNPRIVILEGED=$$ANVIL_APPTAINER_UNPRIVILEGED"; \
+		grep -E "^CapEff|^CapBnd" /proc/self/status'
+
 docker-guards-t3: docker-build-apptainer
 	@mkdir -p results
 	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model oracle --tasks $(RECIPE_TASKS) -v \

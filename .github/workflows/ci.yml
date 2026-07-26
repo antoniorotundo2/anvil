@@ -72,8 +72,20 @@ jobs:
       # VMs, not nested, so this is expected to work the same way, but this
       # is the first time it runs here: if it fails, that is a new finding
       # about this specific environment, not a regression to paper over.
+      # Reports the facts the choice of mode depends on: whether the setuid starter is
+      # there, whether a user namespace can be created at all, and which capabilities the
+      # container was given. Runs before the guard so a failure below is explained by the
+      # lines above it rather than by a later run.
+      - name: What apptainer can do on this runner
+        run: make docker-apptainer-probe
+
+      # Attempting the unprivileged route: as root without CAP_SYS_ADMIN, apptainer mounts
+      # directly and dies on `Failed to set mount propagation`, during %post and again at
+      # run time. A user namespace supplies that capability inside itself, which asks
+      # nothing of Docker. The alternative is --cap-add SYS_ADMIN, the broadest capability
+      # the kernel has, and this is the attempt to avoid needing it.
       - name: Guards (T3 recipes, strict, apptainer active)
-        run: make docker-guards-t3
+        run: make docker-guards-t3 APPTAINER_UNPRIVILEGED=1
 
       # The guard prints which levels dropped and, with -v, the per-task reason. These
       # files carry the rest: every level of every sample. Without them a failure here

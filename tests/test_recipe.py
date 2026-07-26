@@ -304,3 +304,60 @@ def test_the_printed_line_is_flattened_end_to_end():
     assert "\n" not in lines[0], "a multi-line detail reached the report unflattened"
     assert lines[0].endswith("..."), "an oversized detail reached the report untruncated"
     assert "cause first" in lines[0]
+
+
+def test_unprivileged_mode_is_off_unless_asked_for(monkeypatch):
+    from anvil import recipe_verifier as rv
+
+    monkeypatch.delenv("ANVIL_APPTAINER_UNPRIVILEGED", raising=False)
+    assert rv._unprivileged() is False
+    for off in ("", "0"):
+        monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", off)
+        assert rv._unprivileged() is False, f"{off!r} must not enable it"
+    monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", "1")
+    assert rv._unprivileged() is True
+
+
+def _argv_of(monkeypatch, fn, *args):
+    """Capture the command a check would hand to apptainer, without running it."""
+    import subprocess
+
+    from anvil import recipe_verifier as rv
+
+    seen: list[list[str]] = []
+
+    def fake_run(cmd, *a, **k):
+        seen.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="stopped here")
+
+    monkeypatch.setattr(rv, "apptainer_available", lambda: True)
+    monkeypatch.setattr(rv, "_apptainer_bin", lambda: "apptainer")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    fn(*args)
+    return seen[0]
+
+
+def test_unprivileged_mode_reaches_the_apptainer_command(tmp_path, monkeypatch):
+    """The flags are the whole point of the switch: assert they arrive.
+
+    A boolean nobody threads into the command line would read as configurable while
+    changing nothing, which is worse than having no switch.
+    """
+    from anvil import recipe_verifier as rv
+    from anvil.schema import RecipeTask
+
+    recipe = "Bootstrap: docker\nFrom: alpine:latest\n"
+    task = RecipeTask(id="t", prompt="p", constraints={}, required_sections=[],
+                      expects_in_body=[], tags=[])
+
+    monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", "0")
+    assert "--fakeroot" not in _argv_of(monkeypatch, rv.check_buildable, recipe, str(tmp_path))
+    assert "--userns" not in _argv_of(
+        monkeypatch, rv.check_recipe_functional, str(tmp_path / "x.sif"), task
+    )
+
+    monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", "1")
+    assert "--fakeroot" in _argv_of(monkeypatch, rv.check_buildable, recipe, str(tmp_path))
+    assert "--userns" in _argv_of(
+        monkeypatch, rv.check_recipe_functional, str(tmp_path / "x.sif"), task
+    )

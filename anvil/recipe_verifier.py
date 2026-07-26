@@ -10,6 +10,14 @@ far more than these two actually need; it was observed to be the only option
 that worked on Docker Desktop for Mac (nested `linuxkit` VM), while the two
 narrower flags were sufficient on Docker Desktop for Windows.
 
+Those two are not sufficient everywhere. On GitHub-hosted runners both `%post`
+and `apptainer run` fail with `Failed to set mount propagation: Permission
+denied`: the container is root but Docker withholds CAP_SYS_ADMIN, so the direct
+mount apptainer attempts as root is refused. That also weakens the nested-VM
+explanation offered for the Mac, which may have been the same cause all along.
+`_unprivileged()` below is the attempt to route around it without granting that
+capability.
+
 Degrades gracefully: when no `apptainer` binary is reachable, `buildable` is
 marked `skipped` (never "passed"), same discipline as `submittability` in
 verifier.py when no scheduler is reachable.
@@ -17,6 +25,7 @@ verifier.py when no scheduler is reachable.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -33,6 +42,22 @@ def apptainer_available() -> bool:
 
 def _apptainer_bin() -> str:
     return shutil.which("apptainer") or shutil.which("singularity") or "apptainer"
+
+
+def _unprivileged() -> bool:
+    """Whether to push apptainer through a user namespace of its own.
+
+    The container runs as root, so apptainer takes the privileged path and mounts directly.
+    Docker withholds CAP_SYS_ADMIN, so that mount fails with `Failed to set mount
+    propagation: Permission denied`, during the %post scriptlet and again when running the
+    image. A user namespace supplies that capability inside itself, so nothing has to be
+    granted from outside the container.
+
+    Off by default. The machine where T3 is verified today succeeds on the privileged path,
+    and this route is not confirmed there; enabling it everywhere would trade a working
+    configuration for an unproven one.
+    """
+    return os.environ.get("ANVIL_APPTAINER_UNPRIVILEGED", "0") not in ("", "0")
 
 
 # --------------------------------------------------------------------------
@@ -78,9 +103,12 @@ def check_buildable(
     def_path.write_text(recipe, encoding="utf-8")
     sif_path = Path(workdir) / "image.sif"
     try:
+        cmd = [_apptainer_bin(), "build"]
+        if _unprivileged():
+            cmd.append("--fakeroot")   # root only inside the namespace, not on the host
+        cmd += [str(sif_path), str(def_path)]
         proc = subprocess.run(
-            [_apptainer_bin(), "build", str(sif_path), str(def_path)],
-            capture_output=True, text=True, timeout=timeout, cwd=workdir,
+            cmd, capture_output=True, text=True, timeout=timeout, cwd=workdir,
         )
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.BUILDABLE, False, f"build timed out after {timeout}s"), None
@@ -104,10 +132,11 @@ def check_buildable(
 # --------------------------------------------------------------------------
 def check_recipe_functional(sif_path: str, task: RecipeTask, timeout: int = 60) -> LevelResult:
     try:
-        proc = subprocess.run(
-            [_apptainer_bin(), "run", sif_path],
-            capture_output=True, text=True, timeout=timeout,
-        )
+        cmd = [_apptainer_bin(), "run"]
+        if _unprivileged():
+            cmd.append("--userns")
+        cmd.append(sif_path)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.FUNCTIONAL, False, f"run timed out after {timeout}s")
 
