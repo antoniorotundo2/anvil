@@ -16,11 +16,13 @@ denied`: the container is root but Docker withholds CAP_SYS_ADMIN, so the direct
 mount apptainer attempts as root is refused. That also weakens the nested-VM
 explanation offered for the Mac, which may have been the same cause all along.
 `_unprivileged()` below is the attempt to route around it without granting that
-capability. Getting there took four CI runs, each surfacing the next layer: the
-missing CAP_SYS_ADMIN, then a missing /etc/subuid mapping for root, then the bind
-of the real /root that the namespace cannot map. The last two are settled in
-`docker/Dockerfile`, being properties of the installation rather than of a single
-invocation.
+capability. The --debug trace finally pinned the layer underneath: the bind of
+/root fails inside a user namespace that maps root to root and holds its own
+CAP_SYS_ADMIN, so the denial comes from an LSM, not from capabilities. Docker's
+default AppArmor profile forbids mount regardless of namespaces, which is why
+seccomp=unconfined was never enough and why WSL2, where AppArmor is not applied,
+never saw any of this. The runner therefore adds apparmor=unconfined; the subuid
+mapping lives in `docker/Dockerfile`, a property of the installation.
 
 Degrades gracefully: when no `apptainer` binary is reachable, `buildable` is
 marked `skipped` (never "passed"), same discipline as `submittability` in
@@ -63,26 +65,6 @@ def _unprivileged() -> bool:
     """
     return os.environ.get("ANVIL_APPTAINER_UNPRIVILEGED", "0") not in ("", "0")
 
-
-def _apptainer_env(workdir: str) -> dict[str, str] | None:
-    """Environment for the apptainer subprocess, or None to inherit unchanged.
-
-    Under --fakeroot the namespace maps root to an unprivileged host id, so the bind of the
-    real /root that apptainer performs is refused: `failed to mount /root to /root:
-    permission denied`. Pointing HOME at a directory the namespace can reach gives that
-    bind a harmless destination instead of forbidding it.
-
-    Two narrower routes were tried first and are ruled out by evidence, not by argument:
-    `APPTAINER_NO_MOUNT` never reaches `build`, and `mount home = no` in apptainer.conf is
-    applied by the image yet leaves this mount in place. The CI probe also reports zero
-    occurrences of `--no-mount` in `apptainer build --help`, so the flag does not exist
-    there either.
-    """
-    if not _unprivileged():
-        return None
-    home = Path(workdir) / "apptainer_home"
-    home.mkdir(parents=True, exist_ok=True)
-    return {**os.environ, "HOME": str(home)}
 
 
 # --------------------------------------------------------------------------
@@ -134,7 +116,6 @@ def check_buildable(
         cmd += [str(sif_path), str(def_path)]
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=timeout, cwd=workdir,
-            env=_apptainer_env(workdir),
         )
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.BUILDABLE, False, f"build timed out after {timeout}s"), None
@@ -162,10 +143,7 @@ def check_recipe_functional(sif_path: str, task: RecipeTask, timeout: int = 60) 
         if _unprivileged():
             cmd.append("--userns")
         cmd.append(sif_path)
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout,
-            env=_apptainer_env(str(Path(sif_path).parent)),
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.FUNCTIONAL, False, f"run timed out after {timeout}s")
 

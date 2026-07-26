@@ -88,12 +88,12 @@ RUN if [ "$WITH_APPTAINER" = "1" ]; then \
 # `uidmap` provides the newuidmap/newgidmap helpers that apply it. Neither grants any
 # privilege on the host: the ids are unprivileged and belong to nobody.
 #
-# `mount home = no` then stops the next failure, `failed to mount /root to /root:
-# permission denied`: /root belongs to the real root, which that namespace does not map.
-# It is set in apptainer.conf rather than through APPTAINER_NO_MOUNT because `build`
-# manages its own mounts and ignores that variable, which cost a CI run to establish.
-# The grep is not decoration: without it a changed key name would leave an image that
-# still binds the home and fails the same way, with nothing pointing at the cause.
+# `mount home = no` was expected to stop the `failed to mount /root to /root` failure
+# and, per the CI probe, is applied yet does not: the fakeroot build engine performs that
+# bind regardless. The denial itself came from Docker's AppArmor profile (see the
+# Makefile's apparmor=unconfined). The setting stays because this image has no use for
+# host homes inside containers, and the grep still fails the build if a renamed config
+# key ever makes the sed silently miss.
 
 # venv to work around the PEP 668 lock on Ubuntu >= 24.04
 RUN python3 -m venv /opt/venv

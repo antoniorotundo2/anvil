@@ -29,7 +29,8 @@ DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 # 1 pushes apptainer through its own user namespace instead of relying on host
 # privileges the container does not have. See _unprivileged() in recipe_verifier.py.
 APPTAINER_UNPRIVILEGED ?= 0
-DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined --device /dev/fuse \
+DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
+	--security-opt apparmor=unconfined --device /dev/fuse \
 	-e ANVIL_APPTAINER_UNPRIVILEGED=$(APPTAINER_UNPRIVILEGED) \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
@@ -196,6 +197,7 @@ docker-apptainer-probe: docker-build-apptainer
 		echo "conf mount home : $$(grep -E ^[[:space:]]*mount[[:space:]]+home /etc/apptainer/apptainer.conf 2>&1)"; \
 		echo "build --no-mount: $$(apptainer build --help 2>&1 | grep -c no-mount) occurrences in help"; \
 		echo "requested mode  : ANVIL_APPTAINER_UNPRIVILEGED=$$ANVIL_APPTAINER_UNPRIVILEGED"; \
+		echo "apparmor profile: $$(cat /proc/self/attr/current 2>&1)"; \
 		grep -E "^CapEff|^CapBnd" /proc/self/status; \
 		echo "HOME            : $$HOME"; \
 		echo "passwd uid 0    : $$(getent passwd 0)"; \
