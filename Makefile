@@ -198,6 +198,7 @@ docker-apptainer-probe: docker-build-apptainer
 		echo "build --no-mount: $$(apptainer build --help 2>&1 | grep -c no-mount) occurrences in help"; \
 		echo "requested mode  : ANVIL_APPTAINER_UNPRIVILEGED=$$ANVIL_APPTAINER_UNPRIVILEGED"; \
 		echo "apparmor profile: $$(cat /proc/self/attr/current 2>&1)"; \
+		echo "userns restrict : $$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>&1)"; \
 		grep -E "^CapEff|^CapBnd" /proc/self/status; \
 		echo "HOME            : $$HOME"; \
 		echo "passwd uid 0    : $$(getent passwd 0)"; \

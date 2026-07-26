@@ -72,6 +72,19 @@ jobs:
       # VMs, not nested, so this is expected to work the same way, but this
       # is the first time it runs here: if it fails, that is a new finding
       # about this specific environment, not a regression to paper over.
+      # Ubuntu 24.04 pairs AppArmor with apparmor_restrict_unprivileged_userns: an
+      # unconfined process may still create a user namespace, but the kernel moves it to
+      # a stripped profile with no capabilities inside it, so the fakeroot build dies on
+      # `mount namespace requires privileges`. docker-default is no way out either: it
+      # keeps capabilities in the namespace but denies the mount syscall itself, which
+      # was the previous failure. The runner is an ephemeral VM, so the knob is dropped
+      # host-wide for this job only.
+      - name: Allow unprivileged user namespaces on this runner
+        run: |
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
       # Reports the facts the choice of mode depends on: whether the setuid starter is
       # there, whether a user namespace can be created at all, and which capabilities the
       # container was given. Runs before the guard so a failure below is explained by the
