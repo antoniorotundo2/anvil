@@ -196,7 +196,16 @@ docker-apptainer-probe: docker-build-apptainer
 		echo "conf mount home : $$(grep -E ^[[:space:]]*mount[[:space:]]+home /etc/apptainer/apptainer.conf 2>&1)"; \
 		echo "build --no-mount: $$(apptainer build --help 2>&1 | grep -c no-mount) occurrences in help"; \
 		echo "requested mode  : ANVIL_APPTAINER_UNPRIVILEGED=$$ANVIL_APPTAINER_UNPRIVILEGED"; \
-		grep -E "^CapEff|^CapBnd" /proc/self/status'
+		grep -E "^CapEff|^CapBnd" /proc/self/status; \
+		echo "HOME            : $$HOME"; \
+		echo "passwd uid 0    : $$(getent passwd 0)"; \
+		echo "--- minimal fakeroot build, mount lines from --debug ---"; \
+		echo "Bootstrap: docker" > /tmp/p.def; \
+		echo "From: alpine:latest" >> /tmp/p.def; \
+		echo "%runscript" >> /tmp/p.def; \
+		echo "    echo ANVIL_OK" >> /tmp/p.def; \
+		apptainer build --fakeroot --debug /tmp/p.sif /tmp/p.def 2>&1 \
+			| grep -iE "mount|fatal|fakeroot|namespace" | tail -30 || true'
 
 docker-guards-t3: docker-build-apptainer
 	@mkdir -p results
