@@ -30,7 +30,8 @@ DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 # privileges the container does not have. See _unprivileged() in recipe_verifier.py.
 APPTAINER_UNPRIVILEGED ?= 0
 DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
-	--security-opt apparmor=unconfined --device /dev/fuse \
+	--security-opt apparmor=unconfined --security-opt systempaths=unconfined \
+	--device /dev/fuse \
 	-e ANVIL_APPTAINER_UNPRIVILEGED=$(APPTAINER_UNPRIVILEGED) \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
@@ -199,6 +200,7 @@ docker-apptainer-probe: docker-build-apptainer
 		echo "requested mode  : ANVIL_APPTAINER_UNPRIVILEGED=$$ANVIL_APPTAINER_UNPRIVILEGED"; \
 		echo "apparmor profile: $$(cat /proc/self/attr/current 2>&1)"; \
 		echo "userns restrict : $$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>&1)"; \
+		echo "masked proc     : $$(grep -c " /proc/" /proc/mounts) submounts"; \
 		grep -E "^CapEff|^CapBnd" /proc/self/status; \
 		echo "HOME            : $$HOME"; \
 		echo "passwd uid 0    : $$(getent passwd 0)"; \
