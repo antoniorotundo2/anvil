@@ -71,11 +71,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG WITH_APPTAINER=0
 RUN if [ "$WITH_APPTAINER" = "1" ]; then \
         apt-get update && apt-get install -y --no-install-recommends \
-            software-properties-common \
+            software-properties-common uidmap \
         && add-apt-repository -y ppa:apptainer/ppa \
         && apt-get update && apt-get install -y --no-install-recommends apptainer \
-        && rm -rf /var/lib/apt/lists/* ; \
+        && rm -rf /var/lib/apt/lists/* \
+        && echo "root:100000:65536" >> /etc/subuid \
+        && echo "root:100000:65536" >> /etc/subgid ; \
     fi
+# The PPA ships apptainer without its setuid starter, so every build and run takes the
+# unprivileged path through a user namespace. That path maps root inside the namespace to
+# a range of unused host ids, and refuses to start without one: `could not use fakeroot:
+# no mapping entry found in /etc/subuid for root`. The range above is the mapping, and
+# `uidmap` provides the newuidmap/newgidmap helpers that apply it. Neither grants any
+# privilege on the host: the ids are unprivileged and belong to nobody.
 
 # venv to work around the PEP 668 lock on Ubuntu >= 24.04
 RUN python3 -m venv /opt/venv
