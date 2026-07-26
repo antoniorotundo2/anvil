@@ -76,8 +76,12 @@ jobs:
       # there, whether a user namespace can be created at all, and which capabilities the
       # container was given. Runs before the guard so a failure below is explained by the
       # lines above it rather than by a later run.
+      # Never allowed to fail the job. A broken probe once blocked the guard it exists to
+      # explain, which is the worst thing a diagnostic can do: it cost a whole run and
+      # taught nothing about the failure under investigation.
       - name: What apptainer can do on this runner
         run: make docker-apptainer-probe
+        continue-on-error: true
 
       # Attempting the unprivileged route: as root without CAP_SYS_ADMIN, apptainer mounts
       # directly and dies on `Failed to set mount propagation`, during %post and again at

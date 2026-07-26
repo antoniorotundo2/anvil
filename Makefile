@@ -193,7 +193,7 @@ docker-apptainer-probe: docker-build-apptainer
 		echo "max_user_ns     : $$(cat /proc/sys/user/max_user_namespaces 2>&1)"; \
 		echo "subuid for root : $$(grep ^root: /etc/subuid 2>&1 || echo MISSING)"; \
 		echo "newuidmap       : $$(command -v newuidmap || echo absent)"; \
-		echo "conf mount home : $$(grep -E '^[[:space:]]*mount home' /etc/apptainer/apptainer.conf 2>&1)"; \
+		echo "conf mount home : $$(grep -E \"^[[:space:]]*mount home\" /etc/apptainer/apptainer.conf 2>&1)"; \
 		echo "build --no-mount: $$(apptainer build --help 2>&1 | grep -c no-mount) occurrences in help"; \
 		echo "requested mode  : ANVIL_APPTAINER_UNPRIVILEGED=$$ANVIL_APPTAINER_UNPRIVILEGED"; \
 		grep -E "^CapEff|^CapBnd" /proc/self/status'
