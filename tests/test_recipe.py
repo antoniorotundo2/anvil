@@ -361,3 +361,23 @@ def test_unprivileged_mode_reaches_the_apptainer_command(tmp_path, monkeypatch):
     assert "--userns" in _argv_of(
         monkeypatch, rv.check_recipe_functional, str(tmp_path / "x.sif"), task
     )
+
+
+def test_home_is_redirected_only_in_unprivileged_mode(tmp_path, monkeypatch):
+    """`failed to mount /root to /root` outlived two narrower fixes.
+
+    APPTAINER_NO_MOUNT never reaches `build`, and `mount home = no` is applied by the image
+    yet leaves the mount in place. Giving the bind a reachable destination is the third
+    attempt, so assert the destination exists and that the default path is untouched.
+    """
+    from anvil import recipe_verifier as rv
+
+    monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", "0")
+    assert rv._apptainer_env(str(tmp_path)) is None
+
+    monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", "1")
+    env = rv._apptainer_env(str(tmp_path))
+    home = Path(env["HOME"])
+    assert home.is_dir(), "the bind destination must exist before apptainer looks for it"
+    assert home.is_relative_to(tmp_path), "it belongs beside the build, not in the real home"
+    assert "PATH" in env, "extending the environment, not replacing it"

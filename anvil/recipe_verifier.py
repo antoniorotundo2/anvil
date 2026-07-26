@@ -64,6 +64,26 @@ def _unprivileged() -> bool:
     return os.environ.get("ANVIL_APPTAINER_UNPRIVILEGED", "0") not in ("", "0")
 
 
+def _apptainer_env(workdir: str) -> dict[str, str] | None:
+    """Environment for the apptainer subprocess, or None to inherit unchanged.
+
+    Under --fakeroot the namespace maps root to an unprivileged host id, so the bind of the
+    real /root that apptainer performs is refused: `failed to mount /root to /root:
+    permission denied`. Pointing HOME at a directory the namespace can reach gives that
+    bind a harmless destination instead of forbidding it.
+
+    Two narrower routes were tried first and are ruled out by evidence, not by argument:
+    `APPTAINER_NO_MOUNT` never reaches `build`, and `mount home = no` in apptainer.conf is
+    applied by the image yet leaves this mount in place. The CI probe also reports zero
+    occurrences of `--no-mount` in `apptainer build --help`, so the flag does not exist
+    there either.
+    """
+    if not _unprivileged():
+        return None
+    home = Path(workdir) / "apptainer_home"
+    home.mkdir(parents=True, exist_ok=True)
+    return {**os.environ, "HOME": str(home)}
+
 
 # --------------------------------------------------------------------------
 # L1 - syntax: a minimally well-formed recipe
@@ -114,6 +134,7 @@ def check_buildable(
         cmd += [str(sif_path), str(def_path)]
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=timeout, cwd=workdir,
+            env=_apptainer_env(workdir),
         )
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.BUILDABLE, False, f"build timed out after {timeout}s"), None
@@ -141,7 +162,10 @@ def check_recipe_functional(sif_path: str, task: RecipeTask, timeout: int = 60) 
         if _unprivileged():
             cmd.append("--userns")
         cmd.append(sif_path)
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+            env=_apptainer_env(str(Path(sif_path).parent)),
+        )
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.FUNCTIONAL, False, f"run timed out after {timeout}s")
 
