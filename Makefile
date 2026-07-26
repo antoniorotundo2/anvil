@@ -204,8 +204,8 @@ docker-apptainer-probe: docker-build-apptainer
 		echo "From: alpine:latest" >> /tmp/p.def; \
 		echo "%runscript" >> /tmp/p.def; \
 		echo "    echo ANVIL_OK" >> /tmp/p.def; \
-		apptainer build --fakeroot --debug /tmp/p.sif /tmp/p.def 2>&1 \
-			| grep -iE "mount|fatal|fakeroot|namespace" | tail -30 || true'
+		apptainer --debug build --fakeroot /tmp/p.sif /tmp/p.def 2>&1 \
+			| grep -iE "mount|fatal|error|fakeroot|namespace" | tail -30 || true'
 
 docker-guards-t3: docker-build-apptainer
 	@mkdir -p results
