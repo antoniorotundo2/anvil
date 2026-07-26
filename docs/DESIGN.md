@@ -143,13 +143,13 @@ On Docker Desktop for Windows (WSL2, no AppArmor) two suffice: `--security-opt
 seccomp=unconfined --device /dev/fuse`. On a native Ubuntu 24.04 host, established one CI
 run at a time on GitHub's runners, the full set is:
 
-* `--security-opt seccomp=unconfined` — the user namespace the unprivileged build lives in;
-* `--security-opt apparmor=unconfined` — `docker-default` denies the `mount` syscall
+* `--security-opt seccomp=unconfined`: the user namespace the unprivileged build lives in;
+* `--security-opt apparmor=unconfined`: `docker-default` denies the `mount` syscall
   outright (`failed to mount ...: permission denied`);
-* `kernel.apparmor_restrict_unprivileged_userns=0` on the host — otherwise an unconfined
+* `kernel.apparmor_restrict_unprivileged_userns=0` on the host: otherwise an unconfined
   process that creates a user namespace is moved to a stripped profile with no
   capabilities inside it (`mount namespace requires privileges`);
-* `--security-opt systempaths=unconfined` — a fresh procfs cannot be mounted in a user
+* `--security-opt systempaths=unconfined`: a fresh procfs cannot be mounted in a user
   namespace while Docker's masked `/proc` entries cover the original (`failed to mount
   proc filesystem`);
 * `--device /dev/fuse` plus, in the image, a subuid/subgid range for root and
