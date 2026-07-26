@@ -16,7 +16,11 @@ denied`: the container is root but Docker withholds CAP_SYS_ADMIN, so the direct
 mount apptainer attempts as root is refused. That also weakens the nested-VM
 explanation offered for the Mac, which may have been the same cause all along.
 `_unprivileged()` below is the attempt to route around it without granting that
-capability.
+capability. Getting there took four CI runs, each surfacing the next layer: the
+missing CAP_SYS_ADMIN, then a missing /etc/subuid mapping for root, then the bind
+of the real /root that the namespace cannot map. The last two are settled in
+`docker/Dockerfile`, being properties of the installation rather than of a single
+invocation.
 
 Degrades gracefully: when no `apptainer` binary is reachable, `buildable` is
 marked `skipped` (never "passed"), same discipline as `submittability` in
@@ -59,20 +63,6 @@ def _unprivileged() -> bool:
     """
     return os.environ.get("ANVIL_APPTAINER_UNPRIVILEGED", "0") not in ("", "0")
 
-
-def _apptainer_env() -> dict[str, str] | None:
-    """Environment for the apptainer subprocess, or None to inherit unchanged.
-
-    In the fakeroot namespace, root maps to an unprivileged host id, so the bind of the
-    real /root that apptainer performs by default is refused: `failed to mount /root to
-    /root: permission denied`. Nothing in a recipe build or in a runscript needs the host
-    home or the host working directory, so both binds are declined. Set through the
-    environment rather than as a flag because `APPTAINER_NO_MOUNT` is honoured by every
-    apptainer subcommand, while `--no-mount` is not accepted by all of them.
-    """
-    if not _unprivileged():
-        return None
-    return {**os.environ, "APPTAINER_NO_MOUNT": "home,cwd"}
 
 
 # --------------------------------------------------------------------------
@@ -124,7 +114,6 @@ def check_buildable(
         cmd += [str(sif_path), str(def_path)]
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=timeout, cwd=workdir,
-            env=_apptainer_env(),
         )
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.BUILDABLE, False, f"build timed out after {timeout}s"), None
@@ -152,9 +141,7 @@ def check_recipe_functional(sif_path: str, task: RecipeTask, timeout: int = 60) 
         if _unprivileged():
             cmd.append("--userns")
         cmd.append(sif_path)
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, env=_apptainer_env()
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return LevelResult(RecipeLevel.FUNCTIONAL, False, f"run timed out after {timeout}s")
 

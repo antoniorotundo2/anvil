@@ -361,20 +361,3 @@ def test_unprivileged_mode_reaches_the_apptainer_command(tmp_path, monkeypatch):
     assert "--userns" in _argv_of(
         monkeypatch, rv.check_recipe_functional, str(tmp_path / "x.sif"), task
     )
-
-
-def test_host_home_and_cwd_binds_are_declined_only_in_unprivileged_mode(monkeypatch):
-    """A third CI run was spent on `failed to mount /root to /root: permission denied`.
-
-    Set through the environment because APPTAINER_NO_MOUNT is honoured by every apptainer
-    subcommand, while --no-mount is not accepted by all of them.
-    """
-    from anvil import recipe_verifier as rv
-
-    monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", "0")
-    assert rv._apptainer_env() is None, "the default path must inherit the environment as is"
-
-    monkeypatch.setenv("ANVIL_APPTAINER_UNPRIVILEGED", "1")
-    env = rv._apptainer_env()
-    assert env["APPTAINER_NO_MOUNT"] == "home,cwd"
-    assert "PATH" in env, "replacing rather than extending the environment would lose PATH"

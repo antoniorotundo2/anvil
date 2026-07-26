@@ -76,7 +76,10 @@ RUN if [ "$WITH_APPTAINER" = "1" ]; then \
         && apt-get update && apt-get install -y --no-install-recommends apptainer \
         && rm -rf /var/lib/apt/lists/* \
         && echo "root:100000:65536" >> /etc/subuid \
-        && echo "root:100000:65536" >> /etc/subgid ; \
+        && echo "root:100000:65536" >> /etc/subgid \
+        && sed -i -E 's/^[[:space:]]*mount home[[:space:]]*=[[:space:]]*yes/mount home = no/' \
+            /etc/apptainer/apptainer.conf \
+        && grep -qE '^mount home = no' /etc/apptainer/apptainer.conf ; \
     fi
 # The PPA ships apptainer without its setuid starter, so every build and run takes the
 # unprivileged path through a user namespace. That path maps root inside the namespace to
@@ -84,6 +87,13 @@ RUN if [ "$WITH_APPTAINER" = "1" ]; then \
 # no mapping entry found in /etc/subuid for root`. The range above is the mapping, and
 # `uidmap` provides the newuidmap/newgidmap helpers that apply it. Neither grants any
 # privilege on the host: the ids are unprivileged and belong to nobody.
+#
+# `mount home = no` then stops the next failure, `failed to mount /root to /root:
+# permission denied`: /root belongs to the real root, which that namespace does not map.
+# It is set in apptainer.conf rather than through APPTAINER_NO_MOUNT because `build`
+# manages its own mounts and ignores that variable, which cost a CI run to establish.
+# The grep is not decoration: without it a changed key name would leave an image that
+# still binds the home and fails the same way, with nothing pointing at the cause.
 
 # venv to work around the PEP 668 lock on Ubuntu >= 24.04
 RUN python3 -m venv /opt/venv
