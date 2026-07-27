@@ -70,6 +70,31 @@ def load_tasks() -> dict[str, dict]:
     }
 
 
+# `check_resource_fit` collects problems and passes only when the list is empty, so a
+# single omission sinks the whole sample. That makes the level's fall much larger than
+# the fall in directive count, and it also means the two causes can be told apart: a
+# problem either says a directive is absent or says its value is wrong.
+OMISSION = re.compile(r"missing|not requested|not declared")
+
+
+def resource_fit_problems(run: Path) -> dict[str, dict[str, int]]:
+    """Per arm, how many resource_fit problems were omissions and how many wrong values."""
+    per_arm: dict[str, dict[str, int]] = defaultdict(lambda: {"omitted": 0, "wrong value": 0})
+    for f in sorted(run.glob("*.json")):
+        if f.name.endswith(".generations.jsonl"):
+            continue
+        data = json.loads(f.read_text(encoding="utf-8"))
+        arm = data.get("retrieval", "zero-shot")
+        for result in data.get("results", []):
+            for level in result["levels"]:
+                if level["level"] != "resource_fit" or level["passed"] or level["skipped"]:
+                    continue
+                for problem in level["detail"].split("; "):
+                    key = "omitted" if OMISSION.search(problem) else "wrong value"
+                    per_arm[arm][key] += 1
+    return per_arm
+
+
 def main(run_dir: str) -> int:
     run = Path(run_dir)
     gens = sorted(run.glob("*.generations.jsonl"))
@@ -161,6 +186,21 @@ def main(run_dir: str) -> int:
         mean = sum(per_arm_directives[a]) / n if n else 0.0
         empty = sum(1 for c in per_arm_directives[a] if c == 0)
         print(f"  {a:<12} mean {mean:5.2f} directives   {empty:>3} of {n} scripts had none")
+
+    problems = resource_fit_problems(run)
+    if problems:
+        print("\nWhy resource_fit failed, problem by problem.")
+        print("The level passes only with an empty problem list, so one omission sinks a")
+        print("whole sample: that is how a modest drop in directives becomes a large drop here.\n")
+        for a in arms:
+            counts = problems.get(a)
+            if not counts:
+                continue
+            total = sum(counts.values())
+            share = (counts["omitted"] / total * 100) if total else 0.0
+            print(f"  {a:<12} {counts['omitted']:>3} omitted, "
+                  f"{counts['wrong value']:>3} wrong value   "
+                  f"({share:.0f}% of problems are omissions)")
 
     print(
         "\nReading this: a literal is evidence of copying when its count under an arm that\n"
