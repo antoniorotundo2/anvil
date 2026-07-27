@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
-"""Did the model copy directive values out of the documents it was shown?
+"""Why does retrieved context cost `resource_fit`, and nothing else?
 
-The retrieval ablation found one clean effect: `resource_fit` falls from 0.49
-zero-shot to 0.19 vectorless, while the other four levels barely move. A uniform
-penalty, such as reference text crowding out the instructions, does not predict that
-shape. Copying does: the corpus states concrete values (`--nodes=2`, `--array=1-5`,
-`--output=logs/out_%j`), and a model that reproduces them instead of deriving the
-ones the task asks for would fail exactly the level that scores the effective
-request against the spec, and no other.
+The ablation found one clean effect: `resource_fit` falls from 0.49 zero-shot to 0.19
+vectorless while the other four levels barely move. This script tests the mechanisms
+that could produce that shape. Two have been tested and both are refuted; the outcome
+is recorded in `docs/DESIGN.md` under Retrieval ablation.
 
-This script measures that, and its whole design rests on one point. Finding
-`--nodes=2` in vectorless scripts proves nothing on its own: the value may simply be
-a common prior for a small code model. What carries the argument is the **zero-shot
-arm as a control**, where the same model saw no documents at all. Only a literal that
-appears far more often once it has been retrieved is evidence of copying.
+**Copying.** The corpus states concrete values, so the model might reproduce them
+instead of deriving the ones the task asks for. Refuted: the arm that collapses
+reproduces them least, and no sample used a retrieved value where it was wrong.
+
+**Omission.** Retrieval does suppress directives, and `check_resource_fit` passes only
+on an empty problem list, so one absent directive sinks a sample. Refuted as the
+mechanism: the share of failures that are omissions does not rise with the damage.
+
+The design point that makes any of this readable is the **zero-shot arm as a control**.
+A value the model would have written anyway is evidence of nothing, and a count that
+moves must be compared against the arm that saw no documents at all.
 
     ./scripts/retrieval_copying.py results/retrieval_20260727_160402
 
-Reads the generations that `retrieval_ablation.sh` saves beside every cell. Nothing
-here touches the verifier: this is analysis of a finding, not part of the bracket.
+Reads the generations and the per-cell results that `retrieval_ablation.sh` saves.
+Nothing here touches the verifier: this is analysis of a finding, not part of the
+bracket.
 """
 
 from __future__ import annotations

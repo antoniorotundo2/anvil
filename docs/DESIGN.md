@@ -264,15 +264,33 @@ touching. Nothing else separates. `strict_all_levels` puts vector nominally ahea
 survive three seeds, and that pilot's headline numbers (0.38/0.29/0.21) do not reproduce at
 all: they came from one draw of a quantity whose spread is now visible.
 
-The pilot's explanation, that appended text pushes the instructions away from where a small
-model attends, is not what the data shows either. It predicts a uniform penalty, and instead
-four of five levels are flat while `resource_fit` collapses. A hypothesis that fits the shape
-better: the retrieved documents carry concrete directive values, and the model copies them
-instead of deriving the values the task asks for. That is surface-form imitation, the exact
-failure mode this benchmark exists to detect, and it would explain why the level scoring
-*effective requests against the spec* is the only one that moves. Testing it means reading
-the generations for copied constants, which the saved `--save-generations` files support and
-this run did not do.
+### Two explanations, both tested, both refuted
+
+`scripts/retrieval_copying.py` reads the saved generations and measures each candidate
+mechanism against the zero-shot arm as a control, since a value the model would have written
+anyway is evidence of nothing.
+
+**Copying is refuted.** The corpus states concrete values, so the model might have reproduced
+them instead of deriving the ones the task asks for. It does not. `--array=1-5` appears 9
+times in all three arms, unchanged by whether it was retrieved. `--nodes=2` falls from 3 to 0
+as retrieval strengthens, and `--output=logs/out_%j` from 9 to 3 under vectorless. Not one
+sample used a retrieved value where that value was wrong for its task. The arm whose
+`resource_fit` collapses is the arm that reproduces corpus values *least*.
+
+**Omission is refuted too, as a mechanism.** Retrieval does suppress directives, monotonically
+and in the same order as the damage: 4.43 written per script zero-shot, 4.24 vector, 3.49
+vectorless. Since `check_resource_fit` passes only on an empty problem list, one missing
+directive sinks a whole sample, which would let a 21% drop in directives produce a 61% drop in
+the level. But the prediction that follows, that failures shift toward omissions, does not
+hold: omissions are 81% of problems zero-shot, 78% vector, 75% vectorless. Both kinds grow in
+absolute terms and wrong values grow faster (times 2.4 against times 1.7).
+
+**What stands.** The effect is real, monotone across three arms, and confined to one level.
+Under retrieved context the model writes fewer directives *and* gets more of the ones it
+writes wrong. Which is to say its resource-fitting competence degrades broadly rather than
+failing in one identifiable way. No mechanism is established, and two plausible ones are ruled
+out by measurement rather than by argument. A third story invented to fit these numbers would
+be worth exactly as much as the first two were.
 
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
 half-ranges are spread, not confidence intervals; one model at one size; `functional` is
