@@ -17,6 +17,11 @@ cd "$(dirname "$0")/.."
 export HF_HOME="${HF_HOME:-$PWD/.hf_cache}"
 export PYTHONWARNINGS="${PYTHONWARNINGS:-ignore::FutureWarning:bitsandbytes.backends.cuda.ops}"
 
+# Prefer the project venv, same rule as the Makefile. Ubuntu ships only `python3`, so a
+# bare `python` is not merely the wrong interpreter, it does not exist: nine cells once
+# failed in a row on `python: command not found`. Overridable for a different venv.
+PYTHON="${PYTHON:-$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)}"
+
 TASKS="${TASKS:-tasks/t1_slurm.jsonl}"
 MODEL="${MODEL:-Qwen/Qwen2.5-Coder-1.5B-Instruct}"
 N="${N:-5}"
@@ -43,7 +48,7 @@ for strategy in $STRATEGIES; do
       continue      # idempotent restart: if the session dies, resume
     fi
     echo "  [run ] ${strategy} seed=${seed}"
-    python -m anvil.cli run --model "$MODEL" --tasks "$TASKS" \
+    "$PYTHON" -m anvil.cli run --model "$MODEL" --tasks "$TASKS" \
       --retrieval "$strategy" -n "$N" -k "$K" --seed "$seed" \
       $FLAGS --out "$dest" || echo "  [FAIL] ${strategy} seed=${seed}"
   done
@@ -51,7 +56,7 @@ done
 
 echo
 echo "==> Aggregation"
-python - "$OUT" <<'PY'
+"$PYTHON" - "$OUT" <<'PY'
 import json
 import sys
 from pathlib import Path

@@ -28,6 +28,11 @@ export HF_HOME="${HF_HOME:-$PWD/.hf_cache}"
 # 4-bit generate() call and drowns the actual matrix progress output.
 export PYTHONWARNINGS="${PYTHONWARNINGS:-ignore::FutureWarning:bitsandbytes.backends.cuda.ops}"
 
+# Prefer the project venv, same rule as the Makefile. Ubuntu ships only `python3`, so a
+# bare `python` is not merely the wrong interpreter, it does not exist: nine cells once
+# failed in a row on `python: command not found`. Overridable for a different venv.
+PYTHON="${PYTHON:-$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)}"
+
 TASKS="${TASKS:-tasks/t1_slurm.jsonl}"
 REPAIR_TASKS="${REPAIR_TASKS:-tasks/t2_repair.jsonl}"
 RUN_T2="${RUN_T2:-1}"     # 1 = also run the T2 diagnose-and-repair matrix
@@ -47,13 +52,13 @@ OUT="${OUT:-results/${STAMP}}"
 mkdir -p "$OUT"
 
 echo "==> Environment"
-python -m anvil.cli doctor --json | tee "${OUT}/environment.json" | head -20
+"$PYTHON" -m anvil.cli doctor --json | tee "${OUT}/environment.json" | head -20
 
 echo
 echo "==> Regression guards (before spending GPU time)"
-python -m anvil.cli run --model oracle --tasks "$TASKS" --out "${OUT}/oracle.json" >/dev/null
-python -m anvil.cli run --model broken --tasks "$TASKS" -n 3 --out "${OUT}/broken.json" >/dev/null
-python - <<'PY'
+"$PYTHON" -m anvil.cli run --model oracle --tasks "$TASKS" --out "${OUT}/oracle.json" >/dev/null
+"$PYTHON" -m anvil.cli run --model broken --tasks "$TASKS" -n 3 --out "${OUT}/broken.json" >/dev/null
+"$PYTHON" - <<'PY'
 import json, sys, glob, os
 out = sorted(glob.glob("results/*/"))[-1]
 o = json.load(open(os.path.join(out, "oracle.json")))["summary"]
@@ -69,11 +74,11 @@ PY
 if [[ "$RUN_T2" == "1" ]]; then
   echo
   echo "==> T2 regression guards (before spending GPU time)"
-  python -m anvil.cli repair --model oracle --repair-tasks "$REPAIR_TASKS" --tasks "$TASKS" \
+  "$PYTHON" -m anvil.cli repair --model oracle --repair-tasks "$REPAIR_TASKS" --tasks "$TASKS" \
     --out "${OUT}/repair_oracle.json" >/dev/null
-  python -m anvil.cli repair --model broken --repair-tasks "$REPAIR_TASKS" --tasks "$TASKS" \
+  "$PYTHON" -m anvil.cli repair --model broken --repair-tasks "$REPAIR_TASKS" --tasks "$TASKS" \
     --out "${OUT}/repair_broken.json" >/dev/null
-  python - "$OUT" <<'PY'
+  "$PYTHON" - "$OUT" <<'PY'
 import json, sys, os
 out = sys.argv[1]
 o = json.load(open(os.path.join(out, "repair_oracle.json")))["summary"]
@@ -108,7 +113,7 @@ for model in $MODELS; do
     # --save-generations alongside --out: the raw scripts, not just the scores,
     # so the same generations can be re-verified against another base image
     # later (the cross-distribution ablation) without spending GPU time twice.
-    python -m anvil.cli run \
+    "$PYTHON" -m anvil.cli run \
       --model "$model" --tasks "$TASKS" \
       -n "$N" -k "$K" --seed "$seed" \
       $FLAGS --out "$dest" --save-generations "${dest%.json}.generations.jsonl" \
@@ -128,7 +133,7 @@ if [[ "$RUN_T2" == "1" ]]; then
         continue      # idempotent restart: if the session dies, resume
       fi
       echo "  [run ] repair ${safe} seed=${seed}"
-      python -m anvil.cli repair \
+      "$PYTHON" -m anvil.cli repair \
         --model "$model" --repair-tasks "$REPAIR_TASKS" --tasks "$TASKS" \
         -n "$N" -k "$K" --seed "$seed" \
         $FLAGS --out "$dest" --save-generations "${dest%.json}.generations.jsonl" \
@@ -139,7 +144,7 @@ fi
 
 echo
 echo "==> T1 aggregation"
-python - "$OUT" <<'PY'
+"$PYTHON" - "$OUT" <<'PY'
 import json, sys, glob, os
 from pathlib import Path
 out = Path(sys.argv[1])
@@ -173,7 +178,7 @@ PY
 if [[ "$RUN_T2" == "1" ]]; then
   echo
   echo "==> T2 aggregation"
-  python - "$OUT" <<'PY'
+  "$PYTHON" - "$OUT" <<'PY'
 import json, sys
 from pathlib import Path
 out = Path(sys.argv[1])
