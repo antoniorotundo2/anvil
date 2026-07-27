@@ -87,6 +87,7 @@ def main(run_dir: str) -> int:
     # arm -> literal -> [times it appears, times it appears when that doc was retrieved]
     seen: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0]))
     scripts_per_arm: dict[str, int] = defaultdict(int)
+    per_arm_directives: dict[str, list[int]] = defaultdict(list)
     wrong_and_copied = []
 
     for path in gens:
@@ -110,6 +111,7 @@ def main(run_dir: str) -> int:
             task = tasks.get(g["task_id"], {})
             constraints = task.get("constraints", {})
             directives = parse_directives(script)
+            per_arm_directives[arm].append(len(directives))
             for key, expected in (("nodes", "nodes"), ("ntasks", "ntasks")):
                 want = constraints.get(expected)
                 got = directives.get(key)
@@ -129,21 +131,20 @@ def main(run_dir: str) -> int:
     print("\nHow often each corpus literal appears in a generated script.")
     print("'retrieved' counts only the scripts whose own prompt carried that document.\n")
     width = max(len(x) for x in every_literal)
-    header = f"{'literal':<{width}}" + "".join(f"{a:>22}" for a in arms)
+    header = f"{'literal':<{width}}" + "".join(f"{a:>24}" for a in arms)
     print(header)
     print("-" * len(header))
+    base_arm = "zero-shot" if "zero-shot" in arms else None
     for lit in sorted(every_literal):
         cells = []
         for a in arms:
             total, retrieved = seen[a][lit]
-            cells.append(f"{total:>3} ({retrieved} retrieved)".rjust(22))
-        base = seen["zero-shot"][lit][0] if "zero-shot" in arms else None
-        flag = ""
-        if base is not None:
-            worst = max(seen[a][lit][0] for a in arms if a != "zero-shot")
-            if worst > base:
-                flag = "   <-- more common once retrieved"
-        print(f"{lit:<{width}}" + "".join(cells) + flag)
+            mark = ""
+            if base_arm and a != base_arm:
+                delta = total - seen[base_arm][lit][0]
+                mark = " up" if delta > 0 else (" down" if delta < 0 else " same")
+            cells.append(f"{total:>3} ({retrieved} retr){mark}".rjust(24))
+        print(f"{lit:<{width}}" + "".join(cells))
 
     print("\nValues that were both copied from a retrieved document and wrong for the task:")
     if not wrong_and_copied:
@@ -151,6 +152,15 @@ def main(run_dir: str) -> int:
     else:
         for arm, task_id, lit, why in sorted(set(wrong_and_copied)):
             print(f"  {arm:<12} {task_id:<24} {lit:<16} {why}")
+
+    print("\nDirectives written per script, by arm.")
+    print("A resource never requested fails resource_fit exactly as a wrong value does,")
+    print("so omission is the other way retrieval could move that level.\n")
+    for a in arms:
+        n = len(per_arm_directives[a])
+        mean = sum(per_arm_directives[a]) / n if n else 0.0
+        empty = sum(1 for c in per_arm_directives[a] if c == 0)
+        print(f"  {a:<12} mean {mean:5.2f} directives   {empty:>3} of {n} scripts had none")
 
     print(
         "\nReading this: a literal is evidence of copying when its count under an arm that\n"
