@@ -158,8 +158,9 @@ are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). Wha
   error as model scale keeps increasing;
 - whether the `vectorless` `resource_fit` collapse (0.19 against 0.49 zero-shot, see
   [DESIGN.md](DESIGN.md#retrieval-ablation)) is the model copying directive values out of the
-  retrieved documents. The saved generations can be read for copied constants; this run did
-  not do it;
+  retrieved documents. `scripts/retrieval_copying.py` measures it against the zero-shot arm
+  as a control, since a value the model would have written anyway is not evidence of
+  anything; it needs a sweep whose cells saved their generations;
 - the same ablation on a larger model, and a variant that prepends context instead of
   appending it;
 - a T1 task that depends on a coreutils corner where `uutils` and GNU are known to differ
