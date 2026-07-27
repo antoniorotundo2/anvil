@@ -193,10 +193,23 @@ for evidence when every image reports the same one: comparing an image against i
 otherwise "confirm portability" while testing nothing, the same trap the scheduler canary guards
 against on `submittability`.
 
-A first run (Qwen2.5-Coder-1.5B-Instruct, 8 T1 tasks, n=3, no seed variation) verified the same
-24 generations inside `ubuntu:24.04` (GNU coreutils 9.4) and `ubuntu:26.04` (`uutils`, the Rust
-reimplementation, `gnu_faithful: false`). Every level, on every sample, agreed exactly: same
-pass/fail, same skip decisions, zero divergence.
+### Result
+
+Qwen2.5-Coder-1.5B-Instruct, 8 T1 tasks, n=3, seeds 0/1/2, so 72 generated scripts, each
+verified in both images on the experiment machine with a working scheduler, so
+`submittability` took part in the comparison rather than being skipped on both sides. The
+two environments differ in two ways at once, which the script reports before comparing
+anything:
+
+| image | coreutils | `gnu_faithful` | bash |
+|---|---|---|---|
+| `ubuntu:24.04` | GNU coreutils 9.4 | true | 5.2 |
+| `ubuntu:26.04` | `uutils` (Rust), not GNU | false | 5.3 |
+
+**72 sample comparisons, 360 level comparisons, zero divergence.** Same pass, same fail,
+same skip decisions, everywhere. The earlier single-seed run reached the same conclusion
+from 24 samples; three seeds of real-model output triple the material and, unlike that run,
+put `submittability` inside the comparison.
 
 This is a real result, not a shortcut past the fidelity concern that motivates pinning
 `ubuntu:24.04` as the default. The T1 task suite's shell payloads are dominated by bash builtins
@@ -205,7 +218,9 @@ exercise the coreutils corners (`stat`, `sort`, `date` formatting, flag-level di
 `uutils` and GNU coreutils are known to diverge. The ablation did not find a difference here
 because the current tasks are not shaped to surface one, not because the difference does not
 exist. A meaningful negative result would need a task that specifically depends on one of those
-corners; none of the eight T1 tasks currently do.
+corners; none of the eight T1 tasks currently do. Tripling the samples does not change that
+argument: 72 scripts drawn from the same eight prompts probe the same operations more times,
+not more operations.
 
 ## Retrieval ablation
 
@@ -286,8 +301,9 @@ say so plainly.
         `anvil repair` / `anvil verify-repair`, oracle-repair/no-op-repair guards
   - [x] failure-category breakdown — `aggregate_by_category`, per-category tables in
         `anvil repair` / `anvil verify-repair` output
-  - [x] cross-distribution ablation — `BASE_IMAGE` build arg, first run (24.04 vs 26.04) found
-        no divergence on the current T1 task suite, at one seed, see [Cross-distribution
+  - [x] cross-distribution ablation — `BASE_IMAGE` build arg plus
+        `scripts/crossdist_ablation.sh`, comparing per sample and per level. 24.04 against
+        26.04 across 3 seeds: 360 level comparisons, zero divergence, see [Cross-distribution
         ablation](#cross-distribution-ablation)
   - [x] Apptainer recipes — `RecipeTask`, `RecipeLevel`, `anvil recipe` / `anvil verify-recipe`,
         `tasks/t3_apptainer.jsonl`, see [Apptainer recipes (T3)](#apptainer-recipes-t3). Both

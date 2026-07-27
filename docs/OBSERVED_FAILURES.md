@@ -162,5 +162,7 @@ are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). Wha
   not do it;
 - the same ablation on a larger model, and a variant that prepends context instead of
   appending it;
-- a second seed for the cross-distribution ablation, which so far agreed level by level on a
-  single one.
+- a T1 task that depends on a coreutils corner where `uutils` and GNU are known to differ
+  (`stat`, `sort`, `date` formatting, flag-level behaviour). The cross-distribution ablation
+  now agrees across 3 seeds and 360 level comparisons, but none of the eight current tasks
+  reaches those corners, so the agreement measures the tasks as much as the toolchains.
