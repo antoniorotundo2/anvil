@@ -31,6 +31,14 @@ if [[ -z "$RUN_DIR" || ! -d "$RUN_DIR" ]]; then
   exit 2
 fi
 
+case "$(cd "$RUN_DIR" && pwd -P)" in
+  "$(pwd -P)"/*) ;;
+  *) echo "${RUN_DIR} is outside $(pwd -P)." >&2
+     echo "Only the repository is mounted into the verification containers, so a path" >&2
+     echo "outside it cannot be read there. Move or copy the run under results/." >&2
+     exit 2 ;;
+esac
+
 shopt -s nullglob
 GENERATIONS=("$RUN_DIR"/*.generations.jsonl)
 if [[ ${#GENERATIONS[@]} -eq 0 ]]; then

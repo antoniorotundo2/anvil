@@ -5,6 +5,9 @@
 #   ./scripts/retrieval_ablation.sh
 #   MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_ablation.sh
 #
+# Every cell also writes its generated scripts beside its scores, so a finished sweep can
+# be handed to crossdist_ablation.sh without spending inference time again.
+#
 # To resume an interrupted sweep, point OUT at the directory it was writing to:
 #   OUT=results/retrieval_20260726_101500 ./scripts/retrieval_ablation.sh
 # Cells already on disk are skipped. Without OUT each invocation starts a fresh
@@ -50,7 +53,8 @@ for strategy in $STRATEGIES; do
     echo "  [run ] ${strategy} seed=${seed}"
     "$PYTHON" -m anvil.cli run --model "$MODEL" --tasks "$TASKS" \
       --retrieval "$strategy" -n "$N" -k "$K" --seed "$seed" \
-      $FLAGS --out "$dest" || echo "  [FAIL] ${strategy} seed=${seed}"
+      $FLAGS --out "$dest" --save-generations "${dest%.json}.generations.jsonl" \
+      || echo "  [FAIL] ${strategy} seed=${seed}"
   done
 done
 
