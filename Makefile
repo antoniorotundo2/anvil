@@ -26,9 +26,11 @@ DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 # seccomp=unconfined for the build's user namespace, /dev/fuse to mount the
 # built .sif at run time. See docker/Dockerfile for what was tried and ruled
 # out (a plain run needs neither; --privileged works but grants much more).
-# 1 pushes apptainer through its own user namespace instead of relying on host
-# privileges the container does not have. See _unprivileged() in recipe_verifier.py.
-APPTAINER_UNPRIVILEGED ?= 0
+# The image's apptainer has no setuid starter, so the user-namespace route is the only
+# one available inside it, and it is now verified on GitHub runners and on WSL2 with
+# byte-identical numbers. Default on: leaving it off made the default the one
+# configuration neither environment can run. Pass 0 for a host apptainer that is setuid.
+APPTAINER_UNPRIVILEGED ?= 1
 DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
 	--security-opt apparmor=unconfined --security-opt systempaths=unconfined \
 	--device /dev/fuse \

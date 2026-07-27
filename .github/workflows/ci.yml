@@ -92,10 +92,11 @@ jobs:
         run: make docker-apptainer-probe
         continue-on-error: true
 
-      # The unprivileged route, confirmed: with the exemptions above, the strict
-      # oracle-1.0/broken-0.0 bracket passes here with no capability granted.
+      # No override: the unprivileged route is the Makefile default now, so this exercises
+      # what a developer running the same target gets. With the exemptions above the strict
+      # oracle-1.0/broken-0.0 bracket passes with no capability granted.
       - name: Guards (T3 recipes, strict, apptainer active)
-        run: make docker-guards-t3 APPTAINER_UNPRIVILEGED=1
+        run: make docker-guards-t3
 
       # The guard prints which levels dropped and, with -v, the per-task reason. These
       # files carry the rest: every level of every sample. Without them a failure here

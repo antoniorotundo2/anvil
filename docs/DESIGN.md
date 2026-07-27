@@ -157,10 +157,17 @@ run at a time on GitHub's runners, the full set is:
   goes through `--fakeroot`.
 
 `--privileged` also works and collapses the list, but grants every capability besides.
-With the full set, the strict oracle-1.0/broken-0.0 bracket passes on GitHub-hosted
-runners. On Docker Desktop for Mac, `build` succeeds but `run` fails with `exec ...
-failed: invalid argument`; this was once attributed to the nested `linuxkit` VM, an
-explanation the AppArmor findings above weaken, and it has not been retested since.
+
+**One configuration, two hosts, identical numbers.** The set above is not "what GitHub
+needs" versus "what WSL2 needs": with it, `make docker-guards-t3` passes on both, and the
+broken model's per-level scores agree to the digit (`syntax` 0.6, `buildable` 0.4 with 9
+skipped, `functional` 0.0667, `resource_fit` 0.2, `safety` 0.8). The exemptions that only
+matter under AppArmor are accepted and inert where AppArmor is not applied, so nothing has
+to be selected per environment. `APPTAINER_UNPRIVILEGED` therefore defaults to on.
+
+On Docker Desktop for Mac, `build` succeeded but `run` failed with `exec ... failed:
+invalid argument`; this was once attributed to the nested `linuxkit` VM, an explanation the
+AppArmor findings above weaken, and it has not been retested since.
 
 ## Cross-distribution ablation
 

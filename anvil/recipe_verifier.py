@@ -1,28 +1,24 @@
 """The T3 verifier: Apptainer recipes, correctness measured by build and
 execution, mirroring the T1/T2 philosophy for a different artifact.
 
-Requires a real `apptainer` (or `singularity`) binary. Inside Docker this
-needs two specific permissions beyond the default anvil image (see
-`docker/Dockerfile`, `WITH_APPTAINER=1`): `--security-opt seccomp=unconfined`
-for the unprivileged build's user namespace, and `--device /dev/fuse` for
-mounting the built `.sif` at run time. `--privileged` also works but grants
-far more than these two actually need; it was observed to be the only option
-that worked on Docker Desktop for Mac (nested `linuxkit` VM), while the two
-narrower flags were sufficient on Docker Desktop for Windows.
+Requires a real `apptainer` (or `singularity`) binary. Inside Docker the package
+in `docker/Dockerfile` (`WITH_APPTAINER=1`) has no setuid starter, so every build
+and run goes through a user namespace, which `_unprivileged()` below selects.
 
-Those two are not sufficient everywhere. On GitHub-hosted runners both `%post`
-and `apptainer run` fail with `Failed to set mount propagation: Permission
-denied`: the container is root but Docker withholds CAP_SYS_ADMIN, so the direct
-mount apptainer attempts as root is refused. That also weakens the nested-VM
-explanation offered for the Mac, which may have been the same cause all along.
-`_unprivileged()` below is the attempt to route around it without granting that
-capability. The --debug trace finally pinned the layer underneath: the bind of
-/root fails inside a user namespace that maps root to root and holds its own
-CAP_SYS_ADMIN, so the denial comes from an LSM, not from capabilities. Docker's
-default AppArmor profile forbids mount regardless of namespaces, which is why
-seccomp=unconfined was never enough and why WSL2, where AppArmor is not applied,
-never saw any of this. The runner therefore adds apparmor=unconfined; the subuid
-mapping lives in `docker/Dockerfile`, a property of the installation.
+That route needs exemptions from Docker's confinement, not capabilities. Each one
+answers a specific failure, found one CI run at a time and listed with its error in
+`docs/DESIGN.md`: seccomp for the namespace, AppArmor because `docker-default`
+denies the `mount` syscall outright, `systempaths` because a fresh procfs cannot be
+mounted while Docker's masked `/proc` entries cover the original, plus a
+subuid/subgid range for root in the image and, on an Ubuntu 24.04 host,
+`kernel.apparmor_restrict_unprivileged_userns=0`.
+
+One configuration covers both verified environments: it passes on GitHub-hosted
+runners and on WSL2 with byte-identical numbers. `--privileged` also works and
+collapses the list, but grants every capability besides. On Docker Desktop for Mac
+`run` failed with `exec ... failed: invalid argument`, once blamed on the nested
+`linuxkit` VM; the AppArmor findings make that explanation doubtful and it has not
+been retested.
 
 Degrades gracefully: when no `apptainer` binary is reachable, `buildable` is
 marked `skipped` (never "passed"), same discipline as `submittability` in
@@ -59,12 +55,11 @@ def _unprivileged() -> bool:
     image. A user namespace supplies that capability inside itself, so nothing has to be
     granted from outside the container.
 
-    Off by default. The machine where T3 is verified today succeeds on the privileged path,
-    and this route is not confirmed there; enabling it everywhere would trade a working
-    configuration for an unproven one.
+    The Makefile turns this on by default for containerised runs, since the image's apptainer
+    is not setuid and the route is confirmed on both verified hosts. It stays a switch so a
+    host apptainer that *is* setuid can take the privileged path instead.
     """
     return os.environ.get("ANVIL_APPTAINER_UNPRIVILEGED", "0") not in ("", "0")
-
 
 
 # --------------------------------------------------------------------------

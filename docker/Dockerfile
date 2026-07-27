@@ -35,12 +35,10 @@
 #
 # T3 (Apptainer recipes) needs its own opt-in build:
 #   docker build -t anvil:apptainer --build-arg WITH_APPTAINER=1 docker/
-#   docker run --rm --security-opt seccomp=unconfined --device /dev/fuse \
-#       -v "$PWD":/work -w /work anvil:apptainer python -m anvil.cli ...
-# The two extra flags are required for apptainer's unprivileged build/run
-# (user namespaces + squashfuse), not for anything else this image does.
-# Observed to fail on Docker Desktop for Mac (nested linuxkit VM); works on
-# Docker Desktop for Windows and is expected to work on a native Linux host.
+# The run needs several exemptions from Docker's confinement, none of them a
+# capability; the Makefile's DOCKER_RUN_APPTAINER carries the current set and
+# docs/DESIGN.md pairs each one with the failure that forced it. Verified on
+# GitHub-hosted runners and on WSL2. Docker Desktop for Mac has not been retested.
 # ─────────────────────────────────────────────────────────────────────────────
 ARG BASE_IMAGE=ubuntu:24.04
 FROM ${BASE_IMAGE}

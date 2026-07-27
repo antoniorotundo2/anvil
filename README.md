@@ -192,10 +192,10 @@ anvil verify-recipe --generations results/recipe_generations.jsonl --tasks tasks
 ```
 
 Apptainer runs unprivileged inside the container, so no capability is granted: what it
-needs is exemptions from Docker's confinement. On Docker Desktop for Windows two are
-enough; a native Ubuntu 24.04 host also confines AppArmor-side, and `make
-docker-guards-t3 APPTAINER_UNPRIVILEGED=1` needs the full set (see the Makefile's
-`DOCKER_RUN_APPTAINER` and `docs/DESIGN.md` for what each one unlocks):
+needs is exemptions from Docker's confinement. `make docker-guards-t3` applies them and
+needs no argument. The same set works on every verified host, so there is nothing to
+select per environment (see the Makefile's `DOCKER_RUN_APPTAINER` and `docs/DESIGN.md`
+for what each one unlocks):
 
 ```
 docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
@@ -203,9 +203,9 @@ docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconf
     -v "$PWD":/work -w /work anvil:apptainer ...
 ```
 
-`--privileged` also works but grants far more than these actually need. The full set is
-verified in CI on GitHub-hosted runners; the two-flag form works on Docker Desktop for
-Windows. On Docker Desktop for Mac, `build` succeeds but `run` fails
+`--privileged` also works but grants far more than these actually need. Verified on
+GitHub-hosted runners and on WSL2, where the strict bracket returns identical per-level
+scores. On Docker Desktop for Mac, `build` succeeded but `run` failed
 (`exec ... failed: invalid argument`), untested since the AppArmor findings.
 
 ### Guards
