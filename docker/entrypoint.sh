@@ -125,6 +125,18 @@ if [[ "${ANVIL_QUIET:-0}" != "1" ]]; then
   echo "==> reference cluster: ${ANVIL_NODES} nodes x ${ANVIL_CPUS} cores x ${ANVIL_MEM_MB} MB x ${ANVIL_GPUS} GPUs"
   sinfo -h -o "    %N %t %C %m %G" 2>/dev/null || echo "    (sinfo unavailable)"
 
+  # `sinfo` prints the declared configuration, not what is running: SlurmdTimeout=0 keeps
+  # slurmctld from ever marking an unreachable node DOWN, so nodes read `idle` with or
+  # without a live slurmd behind them. Count the daemons instead of trusting that column.
+  live_slurmd="$(pgrep -c slurmd 2>/dev/null || true)"
+  live_slurmd="${live_slurmd:-0}"
+  if [[ "${live_slurmd}" -lt "${ANVIL_NODES}" ]]; then
+    echo "    NOTE: ${live_slurmd} of ${ANVIL_NODES} slurmd running, so the 'idle' above is"
+    echo "    the declared state and not a live one. 'submittability' is unaffected, since"
+    echo "    'sbatch --test-only' checks the configuration and needs no slurmd, but a job"
+    echo "    submitted for real would stay pending. See /var/log/slurm/slurmd-*.log."
+  fi
+
   # Canary: does the scheduler accept a minimal script?
   printf '#!/bin/bash\n#SBATCH --time=00:01:00\n#SBATCH --ntasks=1\necho canary\n' > /tmp/canary.sh
   if sbatch --test-only /tmp/canary.sh >/dev/null 2>&1; then
