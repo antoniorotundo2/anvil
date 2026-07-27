@@ -156,7 +156,11 @@ are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). Wha
   it breaks;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- the retrieval ablation, whose tooling is in place but whose measurement is still one seed
-  of three, so 3 of the 9 cells;
+- whether the `vectorless` `resource_fit` collapse (0.19 against 0.49 zero-shot, see
+  [DESIGN.md](DESIGN.md#retrieval-ablation)) is the model copying directive values out of the
+  retrieved documents. The saved generations can be read for copied constants; this run did
+  not do it;
+- the same ablation on a larger model, and a variant that prepends context instead of
+  appending it;
 - a second seed for the cross-distribution ablation, which so far agreed level by level on a
   single one.

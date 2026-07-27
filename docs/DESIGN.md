@@ -212,14 +212,40 @@ tends to get wrong change whether it gets it wrong."
 appends retrieved material after the original prompt, never before it. `make guards` therefore
 stays valid regardless of which retrieval arm is active.
 
-A first pilot (Qwen2.5-Coder-1.5B-Instruct, n=3, single seed) found `strict_all_levels` at
-0.38 (zero-shot), 0.29 (vector) and 0.21 (vectorless): retrieval made this small model *worse*,
-not better. Single seed, single small model: an observation, not a result. Plausible reading, not
-yet tested: appending reference text after the prompt pushes the actual instructions further from
-the point where a small, weakly instruction-following model pays the most attention, independent
-of whether the appended text is relevant. Multiple seeds, a larger model, and a variant that
-prepends context instead of appending it are the next measurements, not a conclusion to draw from
-one run.
+### Result
+
+Qwen2.5-Coder-1.5B-Instruct, n=3, seeds 0/1/2, 8 T1 tasks, on the experiment machine with a
+real scheduler and GNU coreutils. Mean pass@1 across seeds, plus half the range:
+
+| strategy | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | strict |
+|---|---|---|---|---|---|---|
+| zero-shot | 0.58±0.04 | 0.65±0.06 | 0.54±0.04 | **0.49±0.02** | 1.00±0.00 | 0.18±0.02 |
+| vector | 0.54±0.04 | 0.71±0.04 | 0.49±0.06 | 0.42±0.08 | 1.00±0.00 | 0.21±0.04 |
+| vectorless | 0.53±0.02 | 0.65±0.02 | 0.44±0.06 | **0.19±0.04** | 1.00±0.00 | 0.11±0.02 |
+
+**Retrieval does not help this model, and tag-based retrieval hurts it badly.** The one
+clean effect is `resource_fit`: 0.49 zero-shot against 0.19 vectorless, ranges nowhere near
+touching. Nothing else separates. `strict_all_levels` puts vector nominally ahead (0.21 vs
+0.18) but the ranges overlap, so the ordering the single-seed pilot reported does not
+survive three seeds, and that pilot's headline numbers (0.38/0.29/0.21) do not reproduce at
+all: they came from one draw of a quantity whose spread is now visible.
+
+The pilot's explanation, that appended text pushes the instructions away from where a small
+model attends, is not what the data shows either. It predicts a uniform penalty, and instead
+four of five levels are flat while `resource_fit` collapses. A hypothesis that fits the shape
+better: the retrieved documents carry concrete directive values, and the model copies them
+instead of deriving the values the task asks for. That is surface-form imitation, the exact
+failure mode this benchmark exists to detect, and it would explain why the level scoring
+*effective requests against the spec* is the only one that moves. Testing it means reading
+the generations for copied constants, which the saved `--save-generations` files support and
+this run did not do.
+
+Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
+half-ranges are spread, not confidence intervals; one model at one size; `functional` is
+conditional on passing `syntax`, which is why 9 to 12 of its 24 samples are skipped per cell
+and why its column tracks the syntax column. A larger model and a prepend variant remain
+worth measuring, but the vectorless `resource_fit` collapse is now a result rather than an
+observation.
 
 ## Limitations
 
@@ -251,9 +277,9 @@ say so plainly.
         Docker Desktop for Mac (`apptainer run` fails there, see the section above)
   - [x] retrieval ablation — `anvil/retrieval.py` (TF-IDF vector / tag-based vectorless),
         `--retrieval` on `anvil run`, `scripts/retrieval_ablation.sh`, see [Retrieval
-        ablation](#retrieval-ablation). The tooling is what this box covers. The measurement is
-        still a pilot: one seed of three, so 3 of the 9 cells. It belongs on the experiment
-        machine, since a development machine skips `submittability` and is not `gnu_faithful`.
+        ablation](#retrieval-ablation). Measured on the experiment machine across 3 seeds,
+        all 9 cells: retrieval does not help this model and `vectorless` costs 30 points of
+        `resource_fit`.
 - [ ] **Phase 3** — real submission via `sbatch` (see below); QLoRA reference model; state-space
       arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
