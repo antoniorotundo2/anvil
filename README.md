@@ -246,6 +246,18 @@ Compare all three arms on the same model, seeds and tasks:
 MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_ablation.sh
 ```
 
+## Cross-distribution ablation
+
+Verify one set of generations inside several base images and report where the verdicts
+diverge, per sample and per level. It reads the `*.generations.jsonl` files that
+`scripts/run_experiments.sh` saves beside every cell, so it inherits that run's seeds
+without spending inference time again:
+
+```
+./scripts/crossdist_ablation.sh results/<run>
+BASES="ubuntu:24.04 ubuntu:26.04" ./scripts/crossdist_ablation.sh results/<run>
+```
+
 ## Documentation
 
 - [`docs/DESIGN.md`](docs/DESIGN.md) — why execution-based verification, the five levels, the preflight

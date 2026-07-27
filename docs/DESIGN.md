@@ -175,11 +175,23 @@ Generation and verification are decoupled by design (`--save-generations`, then 
 elsewhere): the same generated scripts can be verified again inside a different base image
 without spending accelerator time twice. This is what makes the ablation possible at all.
 
-`docker/Dockerfile` accepts `BASE_IMAGE` as a build argument for exactly this purpose:
+`docker/Dockerfile` accepts `BASE_IMAGE` as a build argument for exactly this purpose, and
+`scripts/crossdist_ablation.sh` drives the whole comparison from the generations a matrix run
+already saved:
 
 ```
-docker build -t anvil:2604 --build-arg BASE_IMAGE=ubuntu:26.04 docker/
+./scripts/crossdist_ablation.sh results/<run>
+BASES="ubuntu:24.04 ubuntu:26.04 rockylinux:9" ./scripts/crossdist_ablation.sh results/<run>
 ```
+
+It compares **per sample and per level**, not summary against summary: two environments can
+reach the same pass@k while disagreeing about which samples pass, so only the per-sample
+comparison supports the claim being made. Alignment is well defined because `verify` walks the
+generations file in order, and the script checks the `task_id` at each index rather than
+trusting it. It also prints the toolchain each image reported and refuses to let agreement pass
+for evidence when every image reports the same one: comparing an image against itself would
+otherwise "confirm portability" while testing nothing, the same trap the scheduler canary guards
+against on `submittability`.
 
 A first run (Qwen2.5-Coder-1.5B-Instruct, 8 T1 tasks, n=3, no seed variation) verified the same
 24 generations inside `ubuntu:24.04` (GNU coreutils 9.4) and `ubuntu:26.04` (`uutils`, the Rust
