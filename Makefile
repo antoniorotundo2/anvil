@@ -75,11 +75,14 @@ help:
 	@echo "Variables: MODEL=$(MODEL)  TASKS=$(TASKS)"
 
 # --- local (development) ----------------------------------------------------
-install:
-	pip install -e ".[dev]"
+.venv/bin/python:
+	python3 -m venv .venv
 
-install-models:
-	pip install -e ".[models]"
+install: .venv/bin/python
+	.venv/bin/python -m pip install -e ".[dev]"
+
+install-models: .venv/bin/python
+	.venv/bin/python -m pip install -e ".[models]"
 
 test:
 	$(PYTHON) -m pytest -q
