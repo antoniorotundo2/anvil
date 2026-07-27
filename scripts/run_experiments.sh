@@ -39,8 +39,11 @@ FOURBIT="${FOURBIT:-1}"   # 1 = 4-bit quantization (requires CUDA)
 # Models to evaluate. On a 12GB GPU: 7B fits in 4-bit, not in fp16.
 MODELS="${MODELS:-Qwen/Qwen2.5-Coder-1.5B-Instruct Qwen/Qwen2.5-Coder-7B-Instruct}"
 
+# OUT is overridable so an interrupted sweep can be resumed into the same directory,
+# where the [skip] checks below can see what already completed. A fresh timestamp every
+# time would make those checks dead code.
 STAMP="$(date +%Y%m%d_%H%M%S)"
-OUT="results/${STAMP}"
+OUT="${OUT:-results/${STAMP}}"
 mkdir -p "$OUT"
 
 echo "==> Environment"

@@ -5,8 +5,11 @@
 #   ./scripts/retrieval_ablation.sh
 #   MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_ablation.sh
 #
-# Same discipline as run_experiments.sh: idempotent, safe to interrupt and
-# resume, hardware recorded alongside every result.
+# To resume an interrupted sweep, point OUT at the directory it was writing to:
+#   OUT=results/retrieval_20260726_101500 ./scripts/retrieval_ablation.sh
+# Cells already on disk are skipped. Without OUT each invocation starts a fresh
+# directory, so the skip never fires and the sweep restarts from nothing: the
+# header used to claim resumability the timestamp made impossible.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -27,7 +30,7 @@ FLAGS=""
 [[ "$FOURBIT" == "1" ]] && FLAGS="--load-in-4bit"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
-OUT="results/retrieval_${STAMP}"
+OUT="${OUT:-results/retrieval_${STAMP}}"
 mkdir -p "$OUT"
 
 echo "==> Retrieval ablation: ${MODEL}, $(echo "$SEEDS" | wc -w) seeds, n=${N}"
