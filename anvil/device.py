@@ -206,6 +206,8 @@ def shell_environment() -> dict[str, str]:
 
 def environment_report() -> dict[str, object]:
     """Summary for `anvil doctor` and for the paper's setup section."""
+    from .verifier import functional_executor  # noqa: PLC0415
+
     info = detect()
     shell = shell_environment()
     faithful = "GNU coreutils" in shell["coreutils"]
@@ -230,7 +232,9 @@ def environment_report() -> dict[str, object]:
         "supports_bf16": info.supports_bf16,
         "supports_fp8": info.supports_fp8,
         "sbatch": shutil.which("sbatch") or "not found",
-        "functional_executor": "bash",   # not sbatch: see check_functional()
+        # Which executor ran the `functional` level, read from the verifier rather than
+        # hardcoded: a number measured under real submission must not be filed as bash.
+        "functional_executor": functional_executor(),
         "apptainer": shutil.which("apptainer") or shutil.which("singularity") or "not found",
         "notes": notes,
     }

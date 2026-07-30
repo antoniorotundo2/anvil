@@ -10,11 +10,13 @@ allows laptop development without corrupting the metrics.
 
 from __future__ import annotations
 
+import glob as globmod
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from .parse import (
@@ -42,6 +44,37 @@ DANGEROUS = [
 
 def slurm_available() -> bool:
     return shutil.which("sbatch") is not None
+
+
+FUNCTIONAL_EXECUTORS = ("bash", "sbatch")
+_executor_override: str | None = None
+
+
+def functional_executor() -> str:
+    """Which executor the `functional` level uses: `bash` (default) or `sbatch`.
+
+    Opt-in, like `--retrieval`, and for the same reason: every T1/T2 number published so
+    far was measured under bash, and switching the default would make the ones measured
+    afterwards incomparable with them. Side by side both remain valid.
+
+    The environment variable exists so a containerised run can select the executor
+    without touching the command line; `set_functional_executor` lets the CLI flag win
+    over it.
+    """
+    return _validated(_executor_override or os.environ.get("ANVIL_FUNCTIONAL_EXECUTOR") or "bash")
+
+
+def set_functional_executor(name: str) -> None:
+    global _executor_override
+    _executor_override = _validated(name)
+
+
+def _validated(name: str) -> str:
+    if name not in FUNCTIONAL_EXECUTORS:
+        raise ValueError(
+            f"unknown functional executor {name!r}: pick one of {', '.join(FUNCTIONAL_EXECUTORS)}"
+        )
+    return name
 
 
 # A minimal, certainly-valid script requesting resources any sane cluster can meet.
@@ -90,6 +123,196 @@ def slurm_healthy(force: bool = False) -> tuple[bool, str]:
     finally:
         os.unlink(tmp)
     return _health
+
+
+# States from which a job never moves again. Anything else (PENDING, RUNNING,
+# CONFIGURING, COMPLETING, SUSPENDED, ...) means the poll has to come back.
+_TERMINAL = {
+    "COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "OUT_OF_MEMORY",
+    "NODE_FAIL", "BOOT_FAIL", "DEADLINE", "PREEMPTED", "SPECIAL_EXIT", "REVOKED",
+}
+
+# Reasons a pending job will never start, however long the poll waits. Waiting them out
+# would cost the whole timeout per sample and then report the same thing. `Dependency` is
+# not hypothetical: t1_dependency_chain asks for `--dependency=afterok:12345`, and the
+# reference cluster satisfies that at submit time with a *held* placeholder job, which by
+# construction never completes.
+_NEVER_STARTS = re.compile(
+    r"Dependency|InvalidAccount|InvalidQOS|ReqNodeNotAvail|NodeConfiguration|"
+    r"PartitionConfig|PartitionNodeLimit|PartitionTimeLimit|BadConstraints|JobHeld"
+)
+
+_exec_health: tuple[bool, str] | None = None
+
+
+def sbatch_execution_healthy(force: bool = False) -> tuple[bool, str]:
+    """Preflight for the sbatch executor: does the scheduler actually *run* a job?
+
+    `slurm_healthy` proves only that `sbatch --test-only` accepts a script, which is a
+    configuration check and needs no slurmd at all. The distinction is not academic: the
+    verification image shipped for months with no slurmd running and still printed `idle`
+    nodes, because `SlurmdTimeout=0` keeps slurmctld from marking them DOWN.
+
+    Under this executor a scheduler that accepts but never runs would fail every artifact,
+    which is the harness-versus-model confusion the canary exists to prevent. So the same
+    discipline applies one level up: when nothing runs, `functional` is **skipped** with
+    the cause, never failed.
+    """
+    global _exec_health
+    if _exec_health is not None and not force:
+        return _exec_health
+
+    healthy, why = slurm_healthy()
+    if not healthy:
+        _exec_health = (False, why)
+        return _exec_health
+
+    workdir = tempfile.mkdtemp(prefix="anvil_canary_")
+    try:
+        job_id, err = _submit(_CANARY, workdir)
+        if job_id is None:
+            _exec_health = (False, f"the scheduler refused the canary for real submission: {err}")
+            return _exec_health
+        outcome, records = _await_job(job_id, timeout=60)
+        state = records[0].get("JobState", "?") if records else "?"
+        if outcome != "done" or state != "COMPLETED":
+            reason = records[0].get("Reason", "?") if records else "?"
+            _exec_health = (
+                False,
+                f"the scheduler accepts jobs but does not run them (canary {job_id}: "
+                f"{outcome}, JobState={state}, Reason={reason}). Is slurmd running?",
+            )
+            _scancel(job_id)
+        elif "canary" not in _read_job_output(_CANARY, workdir):
+            _exec_health = (
+                False,
+                f"canary {job_id} reports COMPLETED but wrote no output: the job ran "
+                "somewhere this process cannot read",
+            )
+        else:
+            _exec_health = (True, "ok")
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+    return _exec_health
+
+
+def _submit(script: str, workdir: str) -> tuple[str | None, str]:
+    """Submit for real and return (job_id, error). `--chdir` puts the job's relative
+    output paths inside the sandbox, so nothing lands in the caller's directory."""
+    path = Path(workdir) / "job.sh"
+    path.write_text(script, encoding="utf-8")
+    _prepare_output_dirs(script, workdir)
+    try:
+        proc = subprocess.run(
+            ["sbatch", "--parsable", "--chdir", workdir, str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "sbatch timed out"
+    if proc.returncode != 0:
+        return None, (proc.stderr or proc.stdout).strip()[:300]
+    # `--parsable` prints `jobid` alone, or `jobid;cluster` on a federation.
+    return proc.stdout.strip().split(";")[0], ""
+
+
+def _output_patterns(script: str) -> list[str]:
+    d = parse_directives(script)
+    pats = [directive_value(d, "--output", "-o"), directive_value(d, "--error", "-e")]
+    pats = [p.strip() for p in pats if p]
+    return pats or ["slurm-%j.out"]
+
+
+def _prepare_output_dirs(script: str, workdir: str) -> None:
+    """Create the directories the script's `--output`/`--error` point at.
+
+    slurmstepd opens those files *before* the script's first command, so a `mkdir -p logs`
+    inside the script is dead code under real submission: the job fails to open the file
+    and never runs. The reference solution for t1_output_paths contains exactly that line,
+    which bash executes in time and sbatch does not. Preparing the working directory is
+    the submitter's job on a real cluster too, so the harness does it here; the level then
+    measures the script rather than the harness's failure to lay the ground.
+    """
+    for pat in _output_patterns(script):
+        parent = Path(re.sub(r"%\w", "x", pat)).parent
+        if str(parent) not in (".", ""):
+            target = parent if parent.is_absolute() else Path(workdir) / parent
+            target.mkdir(parents=True, exist_ok=True)
+
+
+def _read_job_output(script: str, workdir: str) -> str:
+    """Everything the job wrote to its declared stdout/stderr files.
+
+    The filename patterns carry SLURM's format specifiers (`%j`, `%A`, `%a`, `%x`), and an
+    array job produces one file per task, so each pattern is globbed with `%x` replaced by
+    a wildcard rather than expanded: that needs no knowledge of the array task ids.
+    """
+    chunks: list[str] = []
+    for pat in _output_patterns(script):
+        pattern = re.sub(r"%\w", "*", pat)
+        if not os.path.isabs(pattern):
+            pattern = os.path.join(workdir, pattern)
+        for found in sorted(globmod.glob(pattern)):
+            try:
+                chunks.append(Path(found).read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                continue
+    return "".join(chunks)
+
+
+def _scontrol_job(job_id: str) -> list[dict[str, str]] | None:
+    """Every record the scheduler holds for `job_id`, or None when it holds none.
+
+    `sacct` is not an option: it needs accounting storage, which the reference cluster
+    does not configure ("Slurm accounting storage is disabled"). `scontrol` needs nothing
+    beyond slurmctld, at the price of a record that expires `MinJobAge` after the job ends.
+    """
+    try:
+        proc = subprocess.run(
+            ["scontrol", "show", "job", "-o", job_id], capture_output=True, text=True, timeout=30
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    if proc.returncode != 0:
+        return None
+
+    records = []
+    for line in proc.stdout.strip().splitlines():
+        # `-o` prints one record per line as space-separated key=value pairs. A few values
+        # (Command, StdOut) may contain spaces; the tokens they spill carry no `=` and are
+        # dropped, and none of the keys read here is affected.
+        rec = dict(tok.split("=", 1) for tok in line.split() if "=" in tok)
+        if rec:
+            records.append(rec)
+    return records or None
+
+
+def _await_job(job_id: str, timeout: int) -> tuple[str, list[dict[str, str]]]:
+    """Poll until every record of `job_id` reaches a terminal state.
+
+    The outcome names who is responsible, which is the whole reason this returns a string
+    instead of a boolean: "unplaceable" and "pending" are statements about the scheduler,
+    so the level is skipped; "running" past the timeout is a statement about the script,
+    so it fails. "gone" means the record expired before it could be read.
+    """
+    deadline = time.monotonic() + timeout
+    last: list[dict[str, str]] = []
+    while True:
+        records = _scontrol_job(job_id)
+        if records is None:
+            return "gone", last
+        last = records
+        pending = [r for r in records if r.get("JobState") == "PENDING"]
+        if any(_NEVER_STARTS.search(r.get("Reason", "")) for r in pending):
+            return "unplaceable", records
+        if all(r.get("JobState", "") in _TERMINAL for r in records):
+            return "done", records
+        if time.monotonic() >= deadline:
+            return ("pending" if len(pending) == len(records) else "running"), records
+        time.sleep(0.5)
+
+
+def _scancel(job_id: str) -> None:
+    subprocess.run(["scancel", job_id], capture_output=True, text=True, check=False)
 
 
 # --------------------------------------------------------------------------
@@ -162,12 +385,19 @@ def check_submittability(script: str) -> LevelResult:
 # L3 - functional correctness (does it actually run?)
 # --------------------------------------------------------------------------
 def check_functional(script: str, task: Task, timeout: int = 60) -> LevelResult:
-    """Execute the payload.
+    """Execute the payload, under whichever executor is selected.
 
-    Current executor is `bash` in an isolated temporary directory, never `sbatch`.
-    Reported as `functional_executor: "bash"` in the environment report. Real
-    submission (and therefore OOM kills and walltime overruns) is Phase 3 work.
+    `bash` in an isolated temporary directory is the default and the one every published
+    number was measured with; `sbatch` submits the script for real. The choice is recorded
+    as `functional_executor` in the environment report, so no result is left ambiguous
+    about which of the two produced it.
     """
+    if functional_executor() == "sbatch":
+        return _functional_via_sbatch(script, task, timeout)
+    return _functional_via_bash(script, task, timeout)
+
+
+def _functional_via_bash(script: str, task: Task, timeout: int) -> LevelResult:
     workdir = tempfile.mkdtemp(prefix="anvil_run_")
     script_path = Path(workdir) / "job.sh"
     script_path.write_text(script, encoding="utf-8")
@@ -208,6 +438,88 @@ def check_functional(script: str, task: Task, timeout: int = 60) -> LevelResult:
         return LevelResult(Level.FUNCTIONAL, False, f"expected output not found: {missing}")
 
     return LevelResult(Level.FUNCTIONAL, True, "exit 0, expected output present")
+
+
+def _functional_via_sbatch(script: str, task: Task, timeout: int) -> LevelResult:
+    """Submit the script for real, wait for it, and read the outcome from scontrol.
+
+    What this observes and bash cannot: the walltime the script asked for is enforced, so a
+    job that overruns it comes back TIMEOUT instead of finishing; the payload runs with the
+    whole set of variables the scheduler injects, not the three the bash path simulates from
+    the task constraints; and the output has to arrive through the files the script's own
+    `--output`/`--error` name, which bash never opens. What it still does not observe: OOM
+    kills and CPU/GPU binding, which need cgroup enforcement the reference cluster does not
+    configure. See docs/REFERENCE_CLUSTER.md.
+    """
+    healthy, why = sbatch_execution_healthy()
+    if not healthy:
+        return LevelResult(
+            Level.FUNCTIONAL, False, skipped=True,
+            detail=f"level skipped (NOT counted as passed): {why}",
+        )
+
+    workdir = tempfile.mkdtemp(prefix="anvil_sbatch_")
+    try:
+        job_id, err = _submit(script, workdir)
+        if job_id is None:
+            # The canary has already proved that this scheduler accepts and runs a minimal
+            # script under this account, so a refusal here is about the script.
+            return LevelResult(Level.FUNCTIONAL, False, f"sbatch refused the script: {err}")
+
+        outcome, records = _await_job(job_id, timeout)
+        reason = records[0].get("Reason", "?") if records else "?"
+        if outcome != "done":
+            _scancel(job_id)
+
+        if outcome == "unplaceable":
+            return LevelResult(
+                Level.FUNCTIONAL, False, skipped=True,
+                detail=f"level skipped (NOT counted as passed): job {job_id} can never start "
+                       f"(Reason={reason}), which says nothing about the script",
+            )
+        if outcome == "pending":
+            return LevelResult(
+                Level.FUNCTIONAL, False, skipped=True,
+                detail=f"level skipped (NOT counted as passed): job {job_id} was still "
+                       f"PENDING after {timeout}s (Reason={reason})",
+            )
+        if outcome == "gone":
+            return LevelResult(
+                Level.FUNCTIONAL, False, skipped=True,
+                detail=f"level skipped (NOT counted as passed): the scheduler discarded job "
+                       f"{job_id} before it reached a terminal state (MinJobAge too short)",
+            )
+        if outcome == "running":
+            return LevelResult(
+                Level.FUNCTIONAL, False, f"job {job_id} still running after {timeout}s, cancelled"
+            )
+
+        bad = [r for r in records if r.get("JobState") != "COMPLETED"]
+        if bad:
+            states = "; ".join(
+                f"job {r.get('JobId', job_id)} ended {r.get('JobState')} "
+                f"(ExitCode={r.get('ExitCode', '?')})"
+                for r in bad[:4]
+            )
+            tail = " ".join(_read_job_output(script, workdir).split())[-200:]
+            return LevelResult(Level.FUNCTIONAL, False, f"{states}: {tail}" if tail else states)
+
+        combined = _read_job_output(script, workdir)
+        if not combined.strip():
+            return LevelResult(
+                Level.FUNCTIONAL, False,
+                f"job {job_id} COMPLETED but wrote nothing to "
+                f"{', '.join(_output_patterns(script))}",
+            )
+        missing = [s for s in task.expects_in_body if s not in combined]
+        if missing:
+            return LevelResult(Level.FUNCTIONAL, False, f"expected output not found: {missing}")
+
+        return LevelResult(
+            Level.FUNCTIONAL, True, f"job {job_id} COMPLETED, expected output present"
+        )
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
 # --------------------------------------------------------------------------

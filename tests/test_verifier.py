@@ -659,3 +659,336 @@ def test_failed_levels_carry_how_many_samples_they_failed_in(capsys):
 
     assert "(3/3 samples)" in out, "a level failing every sample should say so"
     assert "resource_fit" in out
+
+
+# ------------------------------------------- L3 via sbatch: the real executor
+# `functional` gained a second executor: bash in a sandbox (the default, and what every
+# published number was measured with) and real submission through sbatch. The tests below
+# cover the parts that need no scheduler, which is everything except the submission itself:
+# the executor selection, the output files the job writes, the parsing of scontrol, and the
+# mapping from a job's fate to a level result. That mapping is the part worth guarding,
+# because it decides whether a failure is charged to the script or to the harness.
+SBATCH_TASK = Task(
+    id="t_sbatch", prompt="", constraints={}, expects_in_body=["ANVIL_OK"]
+)
+
+
+def _reference(task_id: str) -> str:
+    for line in REFS.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            rec = json.loads(line)
+            if rec["id"] == task_id:
+                return rec["script"]
+    raise AssertionError(f"no reference solution for {task_id}")
+
+
+def test_executor_defaults_to_bash(monkeypatch):
+    import anvil.verifier as v
+
+    monkeypatch.delenv("ANVIL_FUNCTIONAL_EXECUTOR", raising=False)
+    monkeypatch.setattr(v, "_executor_override", None)
+    assert v.functional_executor() == "bash"
+
+
+def test_environment_variable_selects_the_executor(monkeypatch):
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", None)
+    monkeypatch.setenv("ANVIL_FUNCTIONAL_EXECUTOR", "sbatch")
+    assert v.functional_executor() == "sbatch"
+
+
+def test_the_flag_wins_over_the_environment_variable(monkeypatch):
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", None)
+    monkeypatch.setenv("ANVIL_FUNCTIONAL_EXECUTOR", "sbatch")
+    v.set_functional_executor("bash")
+    assert v.functional_executor() == "bash"
+
+
+def test_unknown_executor_is_refused(monkeypatch):
+    """Silently falling back to bash would file a run under an executor nobody asked for."""
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", None)
+    monkeypatch.setenv("ANVIL_FUNCTIONAL_EXECUTOR", "srun")
+    with pytest.raises(ValueError):
+        v.functional_executor()
+
+
+def test_environment_report_records_the_selected_executor(monkeypatch):
+    import anvil.verifier as v
+    from anvil.device import environment_report
+
+    monkeypatch.setattr(v, "_executor_override", "sbatch")
+    assert environment_report()["functional_executor"] == "sbatch"
+
+
+def test_reference_output_directory_is_created_before_submission(tmp_path):
+    """slurmstepd opens the file named by --output *before* the script's first command, so
+    the `mkdir -p logs` inside the t1_output_paths reference solution is dead code under
+    real submission: the job would fail to open logs/out_%j.txt and never start. Laying out
+    the working directory is the submitter's job on a real cluster too."""
+    import anvil.verifier as v
+
+    v._prepare_output_dirs(_reference("t1_output_paths"), str(tmp_path))
+    assert (tmp_path / "logs").is_dir()
+
+
+def test_declared_output_and_error_files_are_both_read(tmp_path):
+    import anvil.verifier as v
+
+    script = (
+        "#!/bin/bash\n#SBATCH --output=logs/out_%j.txt\n"
+        "#SBATCH --error=logs/err_%j.txt\necho ANVIL_OK\n"
+    )
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "out_77.txt").write_text("ANVIL_OK\n", encoding="utf-8")
+    (tmp_path / "logs" / "err_77.txt").write_text("a warning\n", encoding="utf-8")
+
+    got = v._read_job_output(script, str(tmp_path))
+    assert "ANVIL_OK" in got and "a warning" in got
+
+
+def test_every_array_task_output_is_read(tmp_path):
+    """An array job writes one file per task. Reading only the first would let four of the
+    five tasks fail unnoticed."""
+    import anvil.verifier as v
+
+    script = "#!/bin/bash\n#SBATCH --array=1-5\n#SBATCH --output=out_%A_%a.txt\necho hi\n"
+    for idx in range(1, 6):
+        (tmp_path / f"out_9_{idx}.txt").write_text(f"TASK={idx}\n", encoding="utf-8")
+
+    got = v._read_job_output(script, str(tmp_path))
+    assert all(f"TASK={idx}" in got for idx in range(1, 6))
+
+
+def test_output_defaults_to_the_slurm_pattern(tmp_path):
+    import anvil.verifier as v
+
+    (tmp_path / "slurm-42.out").write_text("ANVIL_OK\n", encoding="utf-8")
+    assert "ANVIL_OK" in v._read_job_output(GOOD, str(tmp_path))
+
+
+def test_absolute_output_path_is_read_where_it_points(tmp_path):
+    """A pattern that is already absolute must not be joined onto the sandbox."""
+    import anvil.verifier as v
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "abs_5.out").write_text("ANVIL_OK\n", encoding="utf-8")
+    script = f"#!/bin/bash\n#SBATCH --output={elsewhere}/abs_%j.out\necho hi\n"
+
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    assert "ANVIL_OK" in v._read_job_output(script, str(sandbox))
+
+
+def test_scontrol_parses_one_record_per_array_task(monkeypatch):
+    import anvil.verifier as v
+
+    text = (
+        "JobId=42_1 JobName=arr JobState=COMPLETED ExitCode=0:0 Reason=None "
+        "Command=/tmp/job.sh\n"
+        "JobId=42_2 JobName=arr JobState=FAILED ExitCode=1:0 Reason=NonZeroExitCode "
+        "Command=/tmp/job.sh\n"
+    )
+
+    class R:
+        returncode = 0
+        stdout = text
+        stderr = ""
+
+    monkeypatch.setattr(v.subprocess, "run", lambda *a, **k: R())
+    records = v._scontrol_job("42")
+    assert [r["JobState"] for r in records] == ["COMPLETED", "FAILED"]
+    assert records[1]["ExitCode"] == "1:0"
+
+
+def test_scontrol_reports_nothing_for_an_expired_record(monkeypatch):
+    import anvil.verifier as v
+
+    class R:
+        returncode = 1
+        stdout = ""
+        stderr = "slurm_load_jobs error: Invalid job id specified"
+
+    monkeypatch.setattr(v.subprocess, "run", lambda *a, **k: R())
+    assert v._scontrol_job("42") is None
+
+
+def _await_with(monkeypatch, records):
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_scontrol_job", lambda job_id: records)
+    return v
+
+
+def test_a_dependency_that_can_never_clear_stops_the_poll_at_once(monkeypatch):
+    """t1_dependency_chain asks for --dependency=afterok:12345, which the reference cluster
+    satisfies at submit time with a held placeholder job. Held means it never completes, so
+    waiting out the timeout would cost a minute per sample and report the same thing."""
+    v = _await_with(
+        monkeypatch, [{"JobId": "42", "JobState": "PENDING", "Reason": "Dependency"}]
+    )
+    assert v._await_job("42", timeout=600)[0] == "unplaceable"
+
+
+def test_a_job_still_queued_at_the_timeout_is_pending_not_running(monkeypatch):
+    v = _await_with(
+        monkeypatch, [{"JobId": "42", "JobState": "PENDING", "Reason": "Resources"}]
+    )
+    assert v._await_job("42", timeout=0)[0] == "pending"
+
+
+def test_one_array_task_still_running_is_not_done(monkeypatch):
+    v = _await_with(monkeypatch, [
+        {"JobId": "42_1", "JobState": "COMPLETED", "Reason": "None"},
+        {"JobId": "42_2", "JobState": "RUNNING", "Reason": "None"},
+    ])
+    assert v._await_job("42", timeout=0)[0] == "running"
+
+
+def test_a_mixed_array_counts_as_running_not_pending(monkeypatch):
+    """Only a job entirely stuck in the queue is the scheduler's responsibility. If any task
+    of the array reached a node, the timeout is about the payload and must not be skipped."""
+    v = _await_with(monkeypatch, [
+        {"JobId": "42_1", "JobState": "PENDING", "Reason": "Resources"},
+        {"JobId": "42_2", "JobState": "RUNNING", "Reason": "None"},
+    ])
+    assert v._await_job("42", timeout=0)[0] == "running"
+
+
+def test_all_terminal_states_end_the_poll(monkeypatch):
+    v = _await_with(monkeypatch, [
+        {"JobId": "42_1", "JobState": "COMPLETED", "Reason": "None"},
+        {"JobId": "42_2", "JobState": "TIMEOUT", "Reason": "TimeLimit"},
+    ])
+    assert v._await_job("42", timeout=600)[0] == "done"
+
+
+def test_an_expired_record_ends_the_poll(monkeypatch):
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_scontrol_job", lambda job_id: None)
+    assert v._await_job("42", timeout=600)[0] == "gone"
+
+
+def _sbatch_stub(monkeypatch, outcome, records, output=""):
+    """Everything the sbatch executor needs except a scheduler."""
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", "sbatch")
+    monkeypatch.setattr(v, "sbatch_execution_healthy", lambda force=False: (True, "ok"))
+    monkeypatch.setattr(v, "_submit", lambda script, workdir: ("42", ""))
+    monkeypatch.setattr(v, "_await_job", lambda job_id, timeout: (outcome, records))
+    monkeypatch.setattr(v, "_read_job_output", lambda script, workdir: output)
+    monkeypatch.setattr(v, "_scancel", lambda job_id: None)
+    return v
+
+
+def test_a_scheduler_that_never_runs_jobs_skips_the_level(monkeypatch):
+    """The failure mode this guards against was real: the verification image ran for months
+    with no slurmd, printing `idle` nodes because SlurmdTimeout=0. Under this executor that
+    would have failed every artifact and looked like a terrible model."""
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", "sbatch")
+    monkeypatch.setattr(
+        v, "sbatch_execution_healthy", lambda force=False: (False, "no slurmd is running")
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert r.skipped and not r.passed
+    assert "no slurmd is running" in r.detail
+
+
+def test_an_unplaceable_job_is_skipped_not_failed(monkeypatch):
+    v = _sbatch_stub(
+        monkeypatch, "unplaceable",
+        [{"JobId": "42", "JobState": "PENDING", "Reason": "DependencyNeverSatisfied"}],
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert r.skipped and not r.passed
+    assert "DependencyNeverSatisfied" in r.detail
+
+
+def test_a_job_still_pending_at_the_timeout_is_skipped_not_failed(monkeypatch):
+    v = _sbatch_stub(
+        monkeypatch, "pending", [{"JobId": "42", "JobState": "PENDING", "Reason": "Resources"}]
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert r.skipped and not r.passed
+
+
+def test_a_job_still_running_at_the_timeout_fails(monkeypatch):
+    """Unlike a queued job, one that is executing is a statement about the script."""
+    v = _sbatch_stub(
+        monkeypatch, "running", [{"JobId": "42", "JobState": "RUNNING", "Reason": "None"}]
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert not r.passed and not r.skipped
+    assert "still running" in r.detail
+
+
+def test_a_walltime_overrun_fails_with_the_state_that_caused_it(monkeypatch):
+    """The failure mode bash cannot see at all: sbatch enforces the --time the script asked
+    for, so a job that overruns comes back TIMEOUT instead of finishing."""
+    v = _sbatch_stub(
+        monkeypatch, "done",
+        [{"JobId": "42", "JobState": "TIMEOUT", "ExitCode": "0:1", "Reason": "TimeLimit"}],
+        output="ANVIL_OK\n",
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert not r.passed and not r.skipped
+    assert "TIMEOUT" in r.detail
+
+
+def test_a_completed_job_with_the_expected_output_passes(monkeypatch):
+    v = _sbatch_stub(
+        monkeypatch, "done",
+        [{"JobId": "42", "JobState": "COMPLETED", "ExitCode": "0:0", "Reason": "None"}],
+        output="ANVIL_OK\n",
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert r.passed and not r.skipped
+    assert "COMPLETED" in r.detail
+
+
+def test_a_completed_job_without_the_expected_output_fails(monkeypatch):
+    v = _sbatch_stub(
+        monkeypatch, "done",
+        [{"JobId": "42", "JobState": "COMPLETED", "ExitCode": "0:0", "Reason": "None"}],
+        output="something else\n",
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert not r.passed and not r.skipped
+    assert "expected output not found" in r.detail
+
+
+def test_a_refused_submission_fails_the_script(monkeypatch):
+    """The canary has already proved the scheduler accepts and runs a minimal script under
+    this account, so a refusal here is about the script, not the harness."""
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", "sbatch")
+    monkeypatch.setattr(v, "sbatch_execution_healthy", lambda force=False: (True, "ok"))
+    monkeypatch.setattr(v, "_submit", lambda script, workdir: (None, "Invalid partition name"))
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert not r.passed and not r.skipped
+    assert "Invalid partition name" in r.detail
+
+
+def test_induce_pins_bash_whatever_the_environment_asks_for(monkeypatch, tmp_path):
+    """t2_repair.jsonl is part of the benchmark definition. Inducing it under a different
+    executor would silently drop the faults that executor happens to catch."""
+    import anvil.verifier as v
+    from anvil.cli import main
+
+    monkeypatch.setattr(v, "_executor_override", None)
+    monkeypatch.setenv("ANVIL_FUNCTIONAL_EXECUTOR", "sbatch")
+    main([
+        "induce", "--tasks", str(TASKS), "--reference", str(REFS),
+        "--out", str(tmp_path / "t2.jsonl"),
+    ])
+    assert v.functional_executor() == "bash"

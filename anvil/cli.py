@@ -31,11 +31,28 @@ from .repair import (
 )
 from .retrieval import STRATEGIES, Document, build_prompt_with_context
 from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task
-from .verifier import slurm_healthy, verify
+from .verifier import (
+    FUNCTIONAL_EXECUTORS,
+    sbatch_execution_healthy,
+    set_functional_executor,
+    slurm_healthy,
+    verify,
+)
 
 
 def _fmt(v: object, w: int) -> str:
     return str(v).ljust(w)
+
+
+def _add_executor_flag(parser: argparse.ArgumentParser) -> None:
+    """The default is None, not "bash": an absent flag must leave
+    ANVIL_FUNCTIONAL_EXECUTOR alone instead of quietly overriding it."""
+    parser.add_argument(
+        "--executor", choices=list(FUNCTIONAL_EXECUTORS), default=None,
+        help="how the 'functional' level executes: bash (default, sandbox) | sbatch "
+        "(real submission; needs a scheduler that actually runs jobs). Also settable "
+        "with ANVIL_FUNCTIONAL_EXECUTOR",
+    )
 
 
 def _file_sha(path: str | Path) -> str:
@@ -66,11 +83,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print("\nVerification levels:")
     print("  syntax          always active")
     print(f"  submittability  {'ACTIVE' if healthy else 'SKIPPED - ' + why}")
-    # NB: check_functional ALWAYS executes with bash in a temporary sandbox; it
-    # never submits to sbatch. Stating this precisely is not pedantry: the string
-    # ends up in environment.json and therefore in the paper's setup section.
-    # Real execution via sbatch is Phase 3 work; it did not ship with Phase 2.
-    print("  functional      active (bash sandbox; NOT via sbatch)")
+    # Which executor runs `functional` has to be stated precisely, not left to the reader:
+    # the string ends up in environment.json and therefore in the paper's setup section.
+    # `bash` is the default and simulates the scheduler; `sbatch` submits for real, and
+    # then a scheduler that accepts jobs without running them skips the level.
+    if rep["functional_executor"] == "sbatch":
+        runs, why_exec = sbatch_execution_healthy()
+        status = "ACTIVE via sbatch (real submission)" if runs else f"SKIPPED - {why_exec}"
+        print(f"  functional      {status}")
+    else:
+        print("  functional      active (bash sandbox; NOT via sbatch)")
     print("  resource_fit    always active")
     print("  safety          always active")
 
@@ -222,6 +244,11 @@ def cmd_induce(args: argparse.Namespace) -> int:
     (see anvil/inducer.py) and keep only the variants that actually fail
     verification. An inducer that produces an accidentally-valid script is a
     bug in the inducer, not a fault worth teaching a model to repair."""
+    # The induced task set is part of the benchmark definition, so it must not depend on
+    # which executor happens to be selected: a fault that survives bash but is caught by a
+    # real submission would silently drop out of t2_repair.jsonl. Pinned, not offered.
+    set_functional_executor("bash")
+
     tasks = Task.load_jsonl(args.tasks)
     reference: dict[str, str] = {}
     with open(args.reference, encoding="utf-8") as fh:
@@ -648,6 +675,7 @@ def main(argv: list[str] | None = None) -> int:
 
     d = sub.add_parser("doctor", help="report this environment's capabilities")
     d.add_argument("--json", action="store_true")
+    _add_executor_flag(d)
     d.set_defaults(func=cmd_doctor)
 
     r = sub.add_parser("run", help="generate with a model and verify")
@@ -671,6 +699,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--retrieval-corpus", default="tasks/retrieval_corpus.jsonl")
     r.add_argument("--retrieval-k", type=int, default=2,
                    help="max documents retrieved per task (ignored for zero-shot)")
+    _add_executor_flag(r)
     r.set_defaults(func=cmd_run)
 
     v = sub.add_parser(
@@ -685,6 +714,7 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--no-exec", action="store_true", help="skip the functional level")
     v.add_argument("--out", help="write full results to JSON")
     v.add_argument("--verbose", "-v", action="store_true")
+    _add_executor_flag(v)
     v.set_defaults(func=cmd_verify)
 
     i = sub.add_parser(
@@ -717,6 +747,7 @@ def main(argv: list[str] | None = None) -> int:
                      help="write the generated repairs to JSONL for later `anvil verify-repair`")
     rp.add_argument("--out", help="write full results to JSON")
     rp.add_argument("--verbose", "-v", action="store_true")
+    _add_executor_flag(rp)
     rp.set_defaults(func=cmd_repair)
 
     vr = sub.add_parser(
@@ -732,6 +763,7 @@ def main(argv: list[str] | None = None) -> int:
     vr.add_argument("--no-exec", action="store_true", help="skip the functional level")
     vr.add_argument("--out", help="write full results to JSON")
     vr.add_argument("--verbose", "-v", action="store_true")
+    _add_executor_flag(vr)
     vr.set_defaults(func=cmd_verify_repair)
 
     rc = sub.add_parser("recipe", help="T3: write an Apptainer recipe with a model and verify")
@@ -767,6 +799,10 @@ def main(argv: list[str] | None = None) -> int:
     vc.set_defaults(func=cmd_verify_recipe)
 
     args = p.parse_args(argv)
+    # One place, so no subcommand can forget it: the executor is module state in the
+    # verifier, read back by the environment report that travels with every result.
+    if getattr(args, "executor", None):
+        set_functional_executor(args.executor)
     return args.func(args)
 
 
