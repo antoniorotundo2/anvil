@@ -37,7 +37,7 @@ DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
 	-e ANVIL_APPTAINER_UNPRIVILEGED=$(APPTAINER_UNPRIVILEGED) \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
-.PHONY: help install install-models test lint doctor run verify guards \
+.PHONY: help install install-models test lint doctor run verify guards guards-sbatch \
         induce-t2 repair guards-t2 generate-repair \
         docker-build docker-test docker-run docker-verify docker-repair \
         docker-verify-repair generate \
@@ -58,6 +58,8 @@ help:
 	@echo "  make docker-run      run the oracle inside the container"
 	@echo ""
 	@echo "  make guards          T1: oracle must score 1.0, broken 0.0"
+	@echo "  make guards-sbatch   the same bracket with functional submitted for real"
+	@echo "                       (needs a scheduler that runs jobs, not just accepts them)"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
 	@echo "  make docker-verify   verify those scripts against a real scheduler"
 	@echo "                       -> $(VERIFY_OUT) (summary + environment + elapsed_s)"
@@ -111,6 +113,33 @@ sys.exit('FAIL: oracle not at 1.0 on %s' % bad) if bad else None; \
 sys.exit('FAIL: verifier promotes defective artifacts') if b['strict_all_levels']['pass@1']!=0.0 else None; \
 sys.exit(\"FAIL: 'safety' guard never exercised\") if b['safety']['pass@1']==1.0 else None; \
 print('Guards OK: oracle 1.0, broken 0.0 strict, safety exercised')"
+
+# The same bracket with `functional` submitted for real. Not folded into `guards`:
+# it needs a scheduler that runs jobs, and the verification image has none (its
+# slurmd never starts, see docker/entrypoint.sh), so there every functional sample
+# would be skipped and the check would pass while proving nothing.
+#
+# The oracle assertion is deliberately not "functional == 1.0". A task whose own
+# spec cannot be satisfied by a real scheduler is skipped, not passed, which drops
+# the level's pass@1 while nothing is wrong: t1_dependency_chain points at a held
+# placeholder job that never completes. What must hold is that no oracle sample
+# *fails* the level, and that at least one actually ran.
+guards-sbatch:
+	$(PYTHON) -m anvil.cli run --model oracle --tasks $(TASKS) --executor sbatch -v \
+		--out /tmp/anvil_oracle_sbatch.json
+	$(PYTHON) -m anvil.cli run --model broken --tasks $(TASKS) --executor sbatch -n 6 \
+		--out /tmp/anvil_broken_sbatch.json
+	@$(PYTHON) -c "import json,sys; \
+o=json.load(open('/tmp/anvil_oracle_sbatch.json')); \
+b=json.load(open('/tmp/anvil_broken_sbatch.json'))['summary']; \
+lv=[l for r in o['results'] for l in r['levels'] if l['level']=='functional']; \
+bad=[l['detail'] for l in lv if not l['passed'] and not l['skipped']]; \
+ran=[l for l in lv if l['passed']]; \
+sys.exit('FAIL: the run did not use the sbatch executor') if o['environment']['functional_executor']!='sbatch' else None; \
+sys.exit('FAIL: the oracle fails functional under real submission: %s' % bad[:2]) if bad else None; \
+sys.exit('FAIL: every functional sample was skipped, the bracket proved nothing') if not ran else None; \
+sys.exit('FAIL: verifier promotes defective artifacts') if b['strict_all_levels']['pass@1']!=0.0 else None; \
+print('sbatch guards OK: %d functional samples ran for real, %d skipped, broken 0.0 strict' % (len(ran), len(lv)-len(ran)))"
 
 # --- T2: diagnose-and-repair -------------------------------------------------
 induce-t2:
