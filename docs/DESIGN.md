@@ -29,7 +29,7 @@ Five independent levels, weakest to strongest:
 |---|---|---|
 | `syntax` | Is it a valid script? | shebang, `bash -n`, misplaced `#SBATCH` |
 | `submittability` | Would SLURM accept it? | `sbatch --test-only` |
-| `functional` | Does it run and exit 0? | sandboxed execution, expected output |
+| `functional` | Does it run and exit 0? | `bash` sandbox, or real `sbatch` submission |
 | `resource_fit` | Does it request what was asked? | effective request vs. task constraints |
 | `safety` | Is it dangerous? | destructive-pattern probes |
 
@@ -301,10 +301,12 @@ observation.
 
 ## Limitations
 
-`functional` runs the script under `bash` in a sandbox; it does not submit it to `sbatch`. This is
-recorded as `functional_executor: "bash"` in every result file. OOM kills, walltime overruns and
-CPU/GPU binding are therefore not observed — precisely the failure modes most interesting for the
-planned repair task. See [`REFERENCE_CLUSTER.md`](REFERENCE_CLUSTER.md).
+`functional` runs the script under `bash` in a sandbox by default, and every number published so
+far was measured that way: `functional_executor: "bash"` in the result file says so. Real
+submission is available as a second executor (see [Real submission](#real-submission-the-sbatch-executor))
+and closes part of the gap, but OOM kills and CPU/GPU binding stay outside it: both need cgroup
+enforcement the reference cluster does not configure. See
+[`REFERENCE_CLUSTER.md`](REFERENCE_CLUSTER.md).
 
 T2 failures will be partly synthetic, induced to obtain ground truth. The taxonomy is anchored to
 [failures observed on real models](OBSERVED_FAILURES.md) and to published HPC-centre FAQs, and we
@@ -333,22 +335,66 @@ say so plainly.
         ablation](#retrieval-ablation). Measured on the experiment machine across 3 seeds,
         all 9 cells: retrieval does not help this model and `vectorless` costs 30 points of
         `resource_fit`.
-- [ ] **Phase 3** — real submission via `sbatch` (see below); QLoRA reference model; state-space
-      arm; hybrid classical-quantum artifacts
+- [ ] **Phase 3**
+  - [x] real submission — `--executor sbatch`, opt-in beside the `bash` default, with its own
+        preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
+  - [ ] cgroup enforcement — OOM kills and CPU/GPU binding, which real submission alone does not
+        deliver
+  - [ ] QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
 
-### Real submission is not in Phase 2
+### Real submission (the sbatch executor)
 
-`functional` executes the payload with `bash` in a sandbox, never through `sbatch`, so no level
-observes what only a scheduler produces: OOM kills, walltime overruns, the allocation a job
-actually receives. `submittability` runs `sbatch --test-only`, which decides whether a script
-would be accepted, not whether it runs.
+`submittability` runs `sbatch --test-only`, which decides whether a script would be *accepted*,
+not whether it runs. `functional` closed part of that gap with `bash`, which ignores every
+`#SBATCH` line and simulates three variables from the task constraints. `--executor sbatch`
+submits the script for real instead, waits for the job, and reads its fate from `scontrol`.
 
-`anvil/cli.py` and `anvil/verifier.py` both used to call real submission Phase 2 work. It was
-never a listed Phase 2 deliverable and it did not ship with the five that were, so it is recorded
-here as Phase 3 rather than left as a promise inside a closed phase. Until it lands, every result
-carries `functional_executor: "bash"` in its environment report, and the gap between submittable
-and runnable stays open.
+It is opt-in, and stays opt-in. Every T1/T2 number in
+[`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md) was measured under `bash`; making real submission
+the default would have made everything measured afterwards incomparable with them, while as a
+second arm both remain valid. The environment report carries `functional_executor`, so no number
+is ambiguous about which produced it.
+
+`anvil/cli.py` and `anvil/verifier.py` both used to call this Phase 2 work. It was never a listed
+Phase 2 deliverable and it did not ship with the five that were, which is why it is recorded here
+instead of inside a closed phase.
+
+What the switch buys, concretely: the walltime the script asked for is enforced, so a job that
+overruns comes back `TIMEOUT` instead of finishing; the payload runs with every variable the
+scheduler injects, not the three simulated ones; and the output has to arrive through the files
+the script's own `--output`/`--error` name, which `bash` never opens. What it does not buy: OOM
+kills and binding, which need cgroup enforcement, and cgroups collide with the declared-topology
+principle. A job asking for 64 GB on the reference cluster cannot be held to a real machine's
+memory without turning the score back into a property of the host.
+
+Two things had to be settled before it could grade anything.
+
+**A scheduler that accepts jobs without running them.** `slurm_healthy` proves `sbatch
+--test-only` works, which is a configuration check needing no `slurmd` at all: the verification
+image ran for months with no `slurmd` and still reported `idle` nodes, because `SlurmdTimeout=0`
+keeps slurmctld from marking them DOWN. Under this executor that would have failed every artifact
+and looked like a terrible model, so there is a second preflight: a canary submitted for real,
+which must reach `COMPLETED` and leave its output where the harness can read it. When it does not,
+`functional` is **skipped**, never failed.
+
+**Whose fault a job that never finishes is.** Four outcomes are the scheduler's and are skipped: a
+pending job whose `Reason` can never clear (`t1_dependency_chain` asks for
+`--dependency=afterok:12345`, which the reference cluster satisfies with a *held* placeholder job,
+so it never starts), a job still queued when the timeout expires, a record the scheduler discarded
+before it could be read, and an unhealthy canary. One outcome is the script's and fails: a job
+still *executing* at the timeout. The distinction is the same one the canary was built for, one
+level up.
+
+One property of real submission had to be handled before a correct script could pass at all.
+slurmstepd opens the file named by `--output` before the script's first command runs, so the
+`mkdir -p logs` inside the `t1_output_paths` reference solution is dead code here: the job fails to
+open `logs/out_%j.txt` and never starts. `bash` executes that line in time, a real scheduler does
+not. Preparing the working directory is the submitter's job on a real cluster too, so the harness
+creates those directories before submitting, and the level goes back to measuring the script.
+
+Evaluated models will include a **state-space** model alongside transformers, to test whether
+architecture matters for operational artifacts.
 
 Evaluated models will include a **state-space** model alongside transformers, to test whether
 architecture matters for operational artifacts.

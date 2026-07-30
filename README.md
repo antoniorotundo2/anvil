@@ -88,6 +88,31 @@ faulty artifacts and must score 0.0. If the oracle drops, the benchmark is broke
 make guards
 ```
 
+### Real submission
+
+`functional` executes the script with `bash` in a sandbox by default. `--executor sbatch` submits
+it to the scheduler for real instead, waits for the job and reads its outcome from `scontrol`, so
+the walltime the script requested is enforced and the payload sees every variable SLURM injects:
+
+```
+anvil run --model oracle --tasks tasks/t1_slurm.jsonl --executor sbatch -v
+ANVIL_FUNCTIONAL_EXECUTOR=sbatch anvil verify --generations results/generations.jsonl
+```
+
+It is opt-in on purpose. Every published number was measured under `bash`, and switching the
+default would make later ones incomparable with them; the executor is recorded in each result
+file as `functional_executor`. It also needs a scheduler that genuinely *runs* jobs, not one that
+merely accepts them: its own canary checks that first, and `functional` is skipped, never failed,
+when the check does not hold. Same for a job the scheduler can never place, such as the dependency
+task pointing at the held placeholder job.
+
+```
+make guards-sbatch
+```
+
+OOM kills and CPU/GPU binding remain outside this level, see
+[`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md).
+
 ## Development
 
 ### Tests

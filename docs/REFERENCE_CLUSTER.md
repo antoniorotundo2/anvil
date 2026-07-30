@@ -52,17 +52,42 @@ terrible model**. It happened during development: the canonical solutions were c
 harness was broken. A benchmark that executes code must be able to tell a failure of its subject
 from a failure of itself.
 
-## Known limitation (Phase 3)
+## Two executors for `functional`
 
-The `functional` level executes the script with **bash in a temporary sandbox**; it does not
-submit it to `sbatch`. This is declared in the environment report as `functional_executor: "bash"`.
+The level has two executors, and the environment report declares which one produced a given
+number in `functional_executor`.
 
-Consequences not to be hidden in the paper:
-- OOM kills, walltime overruns and CPU/GPU binding are not observed — precisely the failure modes
-  most interesting for the T2 repair task;
-- the execution environment lacks the runtime variables SLURM injects beyond those simulated from
-  the task constraints.
+`bash` (the default) runs the script in a temporary sandbox. It ignores every `#SBATCH` line and
+injects `SLURM_NTASKS`, `SLURM_CPUS_PER_TASK` and `SLURM_NNODES` derived from the task
+constraints, so it needs no scheduler at all and every published number was measured with it.
 
-Phase 3: real `functional` via `sbatch`, waiting for completion and reading the exit code from
-`sacct`. This unlocks the induced-failure taxonomy (OOM, walltime) on the reference cluster.
-It was described as Phase 2 work while Phase 2 was open, and did not ship with it.
+`sbatch` (`--executor sbatch`, or `ANVIL_FUNCTIONAL_EXECUTOR=sbatch`) submits the script for real
+with `--chdir` pointed at the sandbox, polls `scontrol` until the job reaches a terminal state, and
+reads the output from the files the script's own `--output`/`--error` name. It needs a scheduler
+that actually runs jobs, not merely one that accepts them, which is what its own canary checks
+before anything is graded. `sacct` is deliberately not used: it needs accounting storage, which
+this cluster does not configure ("Slurm accounting storage is disabled").
+
+Three details of the reference cluster show up only under real submission:
+
+- **A held placeholder job is not a satisfiable dependency.** The placeholder that gives
+  `--dependency=afterok:12345` something to point at is held, so it never completes. Under
+  `--test-only` the script is accepted; submitted for real the job stays PENDING with
+  `Reason=Dependency` forever, so `functional` is **skipped** for `t1_dependency_chain`, not failed.
+- **`--output` directories must exist before submission.** slurmstepd opens that file before the
+  script's first command, so a `mkdir -p logs` inside the script comes too late. The harness creates
+  them.
+- **`MinJobAge` bounds how long the record survives.** `scontrol` forgets a finished job after it,
+  and a record that vanishes before the poll reads it is skipped rather than guessed at.
+
+`make guards-sbatch` is the bracket for this executor: no oracle sample may *fail* `functional`
+under real submission, at least one must actually have run, and the broken model must still score
+0.0 strict.
+
+## What still is not observed (Phase 3, stage 2)
+
+OOM kills and CPU/GPU binding. Both need cgroup enforcement, which the reference cluster does not
+configure, and enabling it collides with the declared topology: a job asking for 64000 MB on a
+4-node reference cluster cannot be held to the memory of whatever machine runs the benchmark
+without making the score a property of that machine again. That tension is the actual open design
+question, not a missing line of configuration.
