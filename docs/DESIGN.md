@@ -340,6 +340,15 @@ say so plainly.
         preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
   - [ ] cgroup enforcement — OOM kills and CPU/GPU binding, which real submission alone does not
         deliver
+  - [ ] Podman as a second verification runtime — rootless by default, so the confinement Docker
+        had to be exempted from may not apply in the first place: the T3 unprivileged path needs
+        `seccomp=unconfined`, `apparmor=unconfined`, `systempaths=unconfined`, `/dev/fuse` and a
+        host `kernel.apparmor_restrict_unprivileged_userns=0` (see [Apptainer recipes
+        (T3)](#apptainer-recipes-t3)), and its cgroup v2 delegation is precisely what the
+        container's `slurmd` lacks. Two things to establish rather than assume: that nested user
+        namespaces still allow `apptainer --fakeroot`, and that both strict brackets return the
+        same per-level scores as Docker. A runtime that changes the numbers is not a fix, it is a
+        second environment to declare
   - [ ] QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4** — dataset release, leaderboard, preprint
 
