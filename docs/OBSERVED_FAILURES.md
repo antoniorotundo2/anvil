@@ -156,13 +156,18 @@ are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). Wha
   it breaks;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- whether the `vectorless` `resource_fit` collapse (0.19 against 0.49 zero-shot, see
-  [DESIGN.md](DESIGN.md#retrieval-ablation)) is the model copying directive values out of the
-  retrieved documents. `scripts/retrieval_copying.py` measures it against the zero-shot arm
-  as a control, since a value the model would have written anyway is not evidence of
-  anything; it needs a sweep whose cells saved their generations;
+- the mechanism behind the `vectorless` `resource_fit` collapse (0.19 against 0.49 zero-shot, see
+  [DESIGN.md](DESIGN.md#retrieval-ablation)). Two candidates were measured with
+  `scripts/retrieval_copying.py` and both are refuted: the arm that collapses reproduces the
+  corpus values *least*, and the share of failures that are omissions falls instead of rising.
+  What moves the level is therefore still unidentified;
 - the same ablation on a larger model, and a variant that prepends context instead of
   appending it;
+- the T1 and T2 matrices measured again under `--executor sbatch`, to see how far `functional`
+  moves once the requested walltime is enforced and the payload receives the scheduler's own
+  environment instead of three simulated variables. Not measurable in the verification image,
+  whose `slurmd` never starts (see `docker/entrypoint.sh`); the experiment machine's native
+  scheduler does run jobs, so that is where this arm has to be measured;
 - a T1 task that depends on a coreutils corner where `uutils` and GNU are known to differ
   (`stat`, `sort`, `date` formatting, flag-level behaviour). The cross-distribution ablation
   now agrees across 3 seeds and 360 level comparisons, but none of the eight current tasks
