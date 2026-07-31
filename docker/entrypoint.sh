@@ -82,6 +82,9 @@ SelectType=select/cons_tres
 SelectTypeParameters=CR_Core_Memory
 
 SlurmdSpoolDir=/var/spool/slurmd/%n
+# Per node, like the spool directory above: the four daemons otherwise contend for one
+# lock on /run/slurmd.pid, and a CI run came back with three of them alive.
+SlurmdPidFile=/run/slurmd-%n.pid
 StateSaveLocation=/var/spool/slurmctld
 SlurmctldLogFile=/var/log/slurm/slurmctld.log
 SlurmdLogFile=/var/log/slurm/slurmd-%n.log
