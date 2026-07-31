@@ -1026,3 +1026,25 @@ def test_the_bash_default_never_submits_a_canary(monkeypatch):
     monkeypatch.setattr(cli, "sbatch_execution_healthy", counted)
     cli.main(["run", "--model", "oracle", "--tasks", str(TASKS)])
     assert not calls
+
+
+def test_the_canary_names_the_cause_the_scheduler_gave(monkeypatch):
+    """A job the controller has already decided will never start is not a missing slurmd,
+    and pointing at the wrong one sends the reader to the wrong fix."""
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_exec_health", None)
+    monkeypatch.setattr(v, "slurm_healthy", lambda force=False: (True, "ok"))
+    monkeypatch.setattr(v, "_submit", lambda script, workdir: ("1920", ""))
+    monkeypatch.setattr(v, "_scancel", lambda job_id: None)
+    monkeypatch.setattr(
+        v, "_await_job",
+        lambda job_id, timeout: (
+            "unplaceable", [{"JobId": "1920", "JobState": "PENDING", "Reason": "InvalidAccount"}]
+        ),
+    )
+
+    healthy, why = v.sbatch_execution_healthy(force=True)
+    assert not healthy
+    assert "InvalidAccount" in why
+    assert "slurmd" not in why

@@ -175,13 +175,31 @@ def sbatch_execution_healthy(force: bool = False) -> tuple[bool, str]:
             return _exec_health
         outcome, records = _await_job(job_id, timeout=60)
         state = records[0].get("JobState", "?") if records else "?"
-        if outcome != "done" or state != "COMPLETED":
-            reason = records[0].get("Reason", "?") if records else "?"
-            _exec_health = (
-                False,
-                f"the scheduler accepts jobs but does not run them (canary {job_id}: "
-                f"{outcome}, JobState={state}, Reason={reason}). Is slurmd running?",
+        reason = records[0].get("Reason", "?") if records else "?"
+        # Name the cause the scheduler actually gave. "Is slurmd running?" is the right
+        # question for a job that sits in the queue and the wrong one for a job the
+        # controller has already decided it will never start, and the difference points at
+        # two different fixes.
+        if outcome == "unplaceable":
+            why_not = (
+                f"the scheduler queued canary {job_id} but it can never start "
+                f"(Reason={reason}): the account, partition or dependency it resolves to "
+                "cannot be satisfied here"
             )
+        elif outcome == "pending":
+            why_not = (
+                f"canary {job_id} was still PENDING after 60s (Reason={reason}). "
+                "Is slurmd running?"
+            )
+        elif outcome == "gone":
+            why_not = f"the scheduler discarded canary {job_id} before it reached a terminal state"
+        elif state != "COMPLETED":
+            why_not = f"canary {job_id} ended {state} (Reason={reason})"
+        else:
+            why_not = ""
+
+        if why_not:
+            _exec_health = (False, why_not)
             _scancel(job_id)
         elif "canary" not in _read_job_output(_CANARY, workdir):
             _exec_health = (
