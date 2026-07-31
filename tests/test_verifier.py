@@ -992,3 +992,37 @@ def test_induce_pins_bash_whatever_the_environment_asks_for(monkeypatch, tmp_pat
         "--out", str(tmp_path / "t2.jsonl"),
     ])
     assert v.functional_executor() == "bash"
+
+
+def test_a_skipped_functional_level_says_why_up_front(capsys, monkeypatch):
+    """A whole column at 0.0 must never be left unexplained. The verbose task lines cannot
+    carry it: they list the levels that failed, and a skipped one did not fail."""
+    import anvil.cli as cli
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", "sbatch")
+    unhealthy = (False, "no slurmd is running")
+    monkeypatch.setattr(cli, "sbatch_execution_healthy", lambda force=False: unhealthy)
+    monkeypatch.setattr(v, "sbatch_execution_healthy", lambda force=False: unhealthy)
+
+    cli.main(["run", "--model", "oracle", "--tasks", str(TASKS)])
+    err = capsys.readouterr().err
+    assert "level 'functional' SKIPPED" in err
+    assert "no slurmd is running" in err
+
+
+def test_the_bash_default_never_submits_a_canary(monkeypatch):
+    """The preflight costs a real job. A run that is not using the executor must not pay it."""
+    import anvil.cli as cli
+    import anvil.verifier as v
+
+    monkeypatch.setattr(v, "_executor_override", "bash")
+    calls: list[int] = []
+
+    def counted(force=False):
+        calls.append(1)
+        return True, "ok"
+
+    monkeypatch.setattr(cli, "sbatch_execution_healthy", counted)
+    cli.main(["run", "--model", "oracle", "--tasks", str(TASKS)])
+    assert not calls

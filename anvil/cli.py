@@ -33,6 +33,7 @@ from .retrieval import STRATEGIES, Document, build_prompt_with_context
 from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task
 from .verifier import (
     FUNCTIONAL_EXECUTORS,
+    functional_executor,
     sbatch_execution_healthy,
     set_functional_executor,
     slurm_healthy,
@@ -53,6 +54,30 @@ def _add_executor_flag(parser: argparse.ArgumentParser) -> None:
         "(real submission; needs a scheduler that actually runs jobs). Also settable "
         "with ANVIL_FUNCTIONAL_EXECUTOR",
     )
+
+
+def _warn_about_skipped_levels() -> None:
+    """Say up front which levels this environment cannot exercise.
+
+    A skipped level is reported as not passed, so a run can come back with a whole column
+    at 0.0 for a reason that has nothing to do with the artifacts. The verbose task lines
+    do not carry it either: they list the levels that *failed*, and a skipped one did not.
+    Under `--executor sbatch` the preflight submits a canary, so this is also where that
+    cost is paid once, before the first task.
+    """
+    healthy, why = slurm_healthy()
+    if not healthy:
+        print(
+            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
+            file=sys.stderr,
+        )
+    if functional_executor() == "sbatch":
+        runs, why_exec = sbatch_execution_healthy()
+        if not runs:
+            print(
+                f"[warning] level 'functional' SKIPPED (not counted as passed): {why_exec}\n",
+                file=sys.stderr,
+            )
 
 
 def _file_sha(path: str | Path) -> str:
@@ -132,12 +157,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     corpus = Document.load_jsonl(args.retrieval_corpus) if args.retrieval != "zero-shot" else []
     retrieve = STRATEGIES[args.retrieval]
 
-    healthy, why = slurm_healthy()
-    if not healthy:
-        print(
-            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
-            file=sys.stderr,
-        )
+    _warn_about_skipped_levels()
 
     results = []
     generations: list[dict] = []
@@ -185,12 +205,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     """
     tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
 
-    healthy, why = slurm_healthy()
-    if not healthy:
-        print(
-            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
-            file=sys.stderr,
-        )
+    _warn_about_skipped_levels()
 
     expected_sha = _file_sha(args.tasks)
 
@@ -301,12 +316,7 @@ def cmd_repair(args: argparse.Namespace) -> int:
     )
     repair_tasks_sha = _file_sha(args.repair_tasks)
 
-    healthy, why = slurm_healthy()
-    if not healthy:
-        print(
-            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
-            file=sys.stderr,
-        )
+    _warn_about_skipped_levels()
 
     results = []
     generations: list[dict] = []
@@ -354,12 +364,7 @@ def cmd_verify_repair(args: argparse.Namespace) -> int:
     t1_tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
     repair_tasks = {rt.id: rt for rt in RepairTask.load_jsonl(args.repair_tasks)}
 
-    healthy, why = slurm_healthy()
-    if not healthy:
-        print(
-            f"[warning] level 'submittability' SKIPPED (not counted as passed): {why}\n",
-            file=sys.stderr,
-        )
+    _warn_about_skipped_levels()
 
     expected_sha = _file_sha(args.repair_tasks)
 
