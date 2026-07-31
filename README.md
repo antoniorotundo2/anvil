@@ -108,10 +108,17 @@ task pointing at the held placeholder job.
 
 ```
 make guards-sbatch
+make docker-guards-sbatch SCHED_IMAGE=<image>
 ```
 
-OOM kills and CPU/GPU binding remain outside this level, see
-[`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md).
+The container form needs `--privileged --cgroupns=host`, which the Makefile supplies: `slurmd`
+creates its cgroup scope under `/sys/fs/cgroup`, mounted read-only by a plain `docker run`. It also
+needs an image whose scheduler executes jobs, which the default one does not: Ubuntu 24.04 ships a
+SLURM that accepts every job and then refuses it with `Reason=InvalidAccount`. The base image stays
+24.04 anyway, because that is where the coreutils are faithful. Both points, and what the executor
+scores where it does run, are in [`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md).
+
+OOM kills and CPU/GPU binding remain outside this level.
 
 ## Development
 

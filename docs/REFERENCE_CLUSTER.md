@@ -82,7 +82,39 @@ Three details of the reference cluster show up only under real submission:
 
 `make guards-sbatch` is the bracket for this executor: no oracle sample may *fail* `functional`
 under real submission, at least one must actually have run, and the broken model must still score
-0.0 strict.
+0.0 strict. `make docker-guards-sbatch SCHED_IMAGE=<image>` runs it in a container, which needs
+`--privileged --cgroupns=host` (see below) and an image whose scheduler can execute.
+
+## Making the container execute, and where it stops
+
+Nothing in the image had ever run a job: `sbatch --test-only` needs no `slurmd`, so no `slurmd` had
+to work, and four separate faults sat there undisturbed until the day one was asked to. In order:
+
+- **The cgroup slice above the stepd scope does not exist.** slurmd creates
+  `<base>/system.slice/nodeN_slurmstepd.scope` but not the `system.slice` above it, and under
+  Docker that parent is missing, so cgroup/v2 fails to initialise and the daemon exits. The
+  entrypoint now creates it, which needs a writable `/sys/fs/cgroup`, hence `--privileged
+  --cgroupns=host` on the container. `sbatch --test-only` needs neither.
+- **Multi-slurmd needs one port per virtual node.** All four were declared with the range form and
+  no `Port=`, so three died on "Address already in use" and one survived.
+- **A registering slurmd reports the GPUs it can see.** With none, the controller answers
+  "gres/gpu count reported lower than configured (0 < 4)" and drains the node. The entrypoint
+  backs the declared GPUs with device files, and falls back to the count-only form where it
+  cannot create them.
+- **Ubuntu 24.04's SLURM refuses every job it accepts.** With those three fixed, all four nodes
+  register and stay IDLE, and every job still sits at `PENDING` with `Reason=InvalidAccount`. It is
+  not this configuration: a minimal stock `slurm.conf` in the same image behaves identically. The
+  package (23.11.4-1.2ubuntu5) ships `accounting_storage_slurmdbd.so` and nothing else, so with no
+  `slurmdbd` the association manager has no entries and the scheduler rejects each job. The same
+  base image with Ubuntu 26.04 (SLURM 25.11.2) runs the same job to `COMPLETED`.
+
+So the base that is faithful on coreutils cannot execute, and the one that executes is not
+faithful on coreutils. The verification image stays on 24.04, where fidelity is what matters and
+`bash` is the executor; real submission has been exercised on a 26.04-based scheduler image, where
+the oracle scores `strict_all_levels` 1.0 with seven of eight tasks executed for real and
+`t1_dependency_chain` skipped for the held placeholder it depends on. Closing the gap properly
+means either an opt-in `slurmdbd` alongside the reference image or a newer SLURM on the 24.04 base;
+neither is done.
 
 ## What still is not observed (Phase 3, stage 2)
 

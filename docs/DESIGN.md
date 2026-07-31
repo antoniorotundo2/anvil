@@ -395,6 +395,14 @@ before it could be read, and an unhealthy canary. One outcome is the script's an
 still *executing* at the timeout. The distinction is the same one the canary was built for, one
 level up.
 
+Where it can run at all turned out to be its own story. The verification image had never executed
+a job, because `sbatch --test-only` needs no `slurmd` and so no `slurmd` ever had to work; four
+faults had been sitting there undisturbed, three of them now fixed and the fourth a property of
+Ubuntu 24.04's SLURM package. They are recorded in
+[`REFERENCE_CLUSTER.md`](REFERENCE_CLUSTER.md#making-the-container-execute-and-where-it-stops).
+The executor itself has been exercised end to end against a scheduler that does run jobs: eight
+tasks, seven executed for real, one skipped for a dependency that can never clear, `strict_all_levels` 1.0.
+
 One property of real submission had to be handled before a correct script could pass at all.
 slurmstepd opens the file named by `--output` before the script's first command runs, so the
 `mkdir -p logs` inside the `t1_output_paths` reference solution is dead code here: the job fails to
