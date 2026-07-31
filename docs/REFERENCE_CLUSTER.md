@@ -106,15 +106,29 @@ to work, and four separate faults sat there undisturbed until the day one was as
   not this configuration: a minimal stock `slurm.conf` in the same image behaves identically. The
   package (23.11.4-1.2ubuntu5) ships `accounting_storage_slurmdbd.so` and nothing else, so with no
   `slurmdbd` the association manager has no entries and the scheduler rejects each job. The same
-  base image with Ubuntu 26.04 (SLURM 25.11.2) runs the same job to `COMPLETED`.
+  base image with Ubuntu 26.04 (SLURM 25.11.2) runs the same job to `COMPLETED`, so it is this
+  package rather than SLURM.
 
-So the base that is faithful on coreutils cannot execute, and the one that executes is not
-faithful on coreutils. The verification image stays on 24.04, where fidelity is what matters and
-`bash` is the executor; real submission has been exercised on a 26.04-based scheduler image, where
-the oracle scores `strict_all_levels` 1.0 with seven of eight tasks executed for real and
-`t1_dependency_chain` skipped for the held placeholder it depends on. Closing the gap properly
-means either an opt-in `slurmdbd` alongside the reference image or a newer SLURM on the 24.04 base;
-neither is done.
+## The accounting image
+
+Switching the base to 26.04 would trade a scheduler that cannot execute for coreutils that are not
+GNU, which is the one thing this image exists to avoid. So accounting is added instead, opt-in for
+the same reason apptainer is, and on the same 24.04 base:
+
+```
+make docker-build-sched          # docker build --build-arg WITH_SLURMDBD=1
+make docker-guards-sbatch        # the strict bracket, submitted for real
+```
+
+It adds `slurmdbd` and a local MariaDB, and the entrypoint brings up the database, writes
+`slurmdbd.conf` on port 6899 (6819 would collide with the virtual nodes), and registers the
+cluster, one account and the submitting user before slurmctld starts. `AccountingStorageEnforce`
+stays unset: the association manager needs something to find, not a policy to apply, and limits
+would make a job's fate a property of this file.
+
+Where it stands: the oracle scores `strict_all_levels` 1.0 with seven of eight tasks executed for
+real, `t1_dependency_chain` skipped for the held placeholder it depends on, and the broken model
+0.0 strict.
 
 ## What still is not observed (Phase 3, stage 2)
 

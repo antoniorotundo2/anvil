@@ -397,11 +397,12 @@ level up.
 
 Where it can run at all turned out to be its own story. The verification image had never executed
 a job, because `sbatch --test-only` needs no `slurmd` and so no `slurmd` ever had to work; four
-faults had been sitting there undisturbed, three of them now fixed and the fourth a property of
-Ubuntu 24.04's SLURM package. They are recorded in
-[`REFERENCE_CLUSTER.md`](REFERENCE_CLUSTER.md#making-the-container-execute-and-where-it-stops).
-The executor itself has been exercised end to end against a scheduler that does run jobs: eight
-tasks, seven executed for real, one skipped for a dependency that can never clear, `strict_all_levels` 1.0.
+faults sat there undisturbed, the last of them a property of Ubuntu 24.04's SLURM package rather
+than of this configuration. All four are recorded in
+[`REFERENCE_CLUSTER.md`](REFERENCE_CLUSTER.md#making-the-container-execute-and-where-it-stops),
+together with the opt-in accounting image that closes them without giving up GNU coreutils. The
+bracket there: eight tasks, seven executed for real, one skipped for a dependency that can never
+clear, `strict_all_levels` 1.0, broken model 0.0.
 
 One property of real submission had to be handled before a correct script could pass at all.
 slurmstepd opens the file named by `--output` before the script's first command runs, so the
