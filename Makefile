@@ -25,11 +25,11 @@ DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 # Real submission needs slurmd, and slurmd needs to create its stepd scope under
 # /sys/fs/cgroup, which a plain `docker run` mounts read-only. Nothing else in the
 # project needs these two flags: `sbatch --test-only` never talks to a daemon.
-# SCHED_IMAGE exists because the reference base cannot execute jobs at all, see
-# docs/REFERENCE_CLUSTER.md: Ubuntu 24.04 ships SLURM 23.11 without an
-# accounting_storage plugin other than slurmdbd, and every job it accepts is then
-# refused with Reason=InvalidAccount.
-SCHED_IMAGE ?= $(IMAGE)
+# SCHED_IMAGE is not $(IMAGE): the default image accepts jobs and never runs them,
+# because this Ubuntu's SLURM has no accounting plugin other than slurmdbd and refuses
+# every job with Reason=InvalidAccount. `docker-build-sched` adds one, see
+# docs/REFERENCE_CLUSTER.md.
+SCHED_IMAGE ?= anvil:sched
 DOCKER_RUN_SCHED = docker run --rm --privileged --cgroupns=host \
 	-v "$(PWD)":/work -w /work $(SCHED_IMAGE)
 # apptainer's unprivileged build/run needs these two beyond the default image:
@@ -47,7 +47,7 @@ DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
 	-e ANVIL_APPTAINER_UNPRIVILEGED=$(APPTAINER_UNPRIVILEGED) \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
-.PHONY: help install install-models test lint doctor run verify guards guards-sbatch docker-guards-sbatch \
+.PHONY: help install install-models test lint doctor run verify guards guards-sbatch docker-guards-sbatch docker-build-sched \
         induce-t2 repair guards-t2 generate-repair \
         docker-build docker-test docker-run docker-verify docker-repair \
         docker-verify-repair generate \
@@ -70,8 +70,8 @@ help:
 	@echo "  make guards          T1: oracle must score 1.0, broken 0.0"
 	@echo "  make guards-sbatch   the same bracket with functional submitted for real"
 	@echo "                       (needs a scheduler that runs jobs, not just accepts them)"
-	@echo "  make docker-guards-sbatch  the same, inside the container:"
-	@echo "                       SCHED_IMAGE=<image> is required, see REFERENCE_CLUSTER.md"
+	@echo "  make docker-guards-sbatch  the same inside the container (builds $(SCHED_IMAGE),"
+	@echo "                       which adds the accounting the scheduler needs to run jobs)"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
 	@echo "  make docker-verify   verify those scripts against a real scheduler"
 	@echo "                       -> $(VERIFY_OUT) (summary + environment + elapsed_s)"
@@ -153,12 +153,14 @@ sys.exit('FAIL: every functional sample was skipped, the bracket proved nothing'
 sys.exit('FAIL: verifier promotes defective artifacts') if b['strict_all_levels']['pass@1']!=0.0 else None; \
 print('sbatch guards OK: %d functional samples ran for real, %d skipped, broken 0.0 strict' % (len(ran), len(lv)-len(ran)))"
 
-# The same bracket inside the container, where the topology is the declared one. Needs an
-# image whose scheduler can actually run jobs:
-#     make docker-guards-sbatch SCHED_IMAGE=anvil:sched26
-# On the default image every sample comes back skipped with the cause, which the check
-# below reports as a failure rather than passing vacuously.
-docker-guards-sbatch:
+# The same bracket inside the container, where the topology is the declared one. Runs on
+# the accounting-enabled image, since the default one cannot execute a job at all. Where
+# a scheduler accepts jobs without running them every sample comes back skipped, and the
+# check below calls that a failure rather than passing vacuously.
+docker-build-sched:
+	docker build -t $(SCHED_IMAGE) --build-arg WITH_SLURMDBD=1 docker/
+
+docker-guards-sbatch: docker-build-sched
 	@mkdir -p results
 	$(DOCKER_RUN_SCHED) python -m anvil.cli run --model oracle --tasks $(TASKS) \
 		--executor sbatch -v --out results/sbatch_oracle.json

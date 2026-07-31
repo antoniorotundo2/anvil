@@ -65,6 +65,13 @@ jobs:
       - name: Oracle repair against a real scheduler
         run: make docker-repair
 
+      # The bracket for the sbatch executor, on the image that can actually run jobs.
+      # Worth the extra build: nothing else here would notice if real execution broke,
+      # exactly as nothing noticed that no slurmd had ever started (the guard's own
+      # vacuity check is what turns "everything skipped" into a failure).
+      - name: Guards (real submission via sbatch)
+        run: make docker-guards-sbatch
+
       # T3 on this runner needs more than the seccomp+fuse pair that suffices on
       # WSL2: docs/DESIGN.md lists the full exemption set and the failure that
       # forced each one, established here one run at a time.
