@@ -14,6 +14,12 @@ TASKS      ?= tasks/t1_slurm.jsonl
 REFERENCE  ?= tasks/t1_reference.jsonl
 REPAIR_TASKS ?= tasks/t2_repair.jsonl
 RECIPE_TASKS ?= tasks/t3_apptainer.jsonl
+# Execution-sensitive set: one task whose memory need only the payload knows, and the
+# repair variants induced from it. Kept apart from the shared T1/T2 files on purpose,
+# so that adding it changes no digest and no published number.
+EXEC_TASKS ?= tasks/t1_exec.jsonl
+EXEC_REFERENCE ?= tasks/t1_exec_reference.jsonl
+EXEC_REPAIR_TASKS ?= tasks/t2_exec_repair.jsonl
 MODEL      ?= Qwen/Qwen2.5-Coder-1.5B-Instruct
 GENERATIONS ?= results/generations.jsonl
 REPAIR_GENERATIONS ?= results/repair_generations.jsonl
@@ -48,6 +54,7 @@ DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
 .PHONY: help install install-models test lint doctor run verify guards guards-sbatch docker-guards-sbatch docker-build-sched \
+        induce-exec docker-guards-enforcement \
         induce-t2 repair guards-t2 generate-repair \
         docker-build docker-test docker-run docker-verify docker-repair \
         docker-verify-repair generate \
@@ -72,6 +79,8 @@ help:
 	@echo "                       (needs a scheduler that runs jobs, not just accepts them)"
 	@echo "  make docker-guards-sbatch  the same inside the container (builds $(SCHED_IMAGE),"
 	@echo "                       which adds the accounting the scheduler needs to run jobs)"
+	@echo "  make docker-guards-enforcement  a memory under-request must be OOM-killed:"
+	@echo "                       the bracket for cgroup enforcement ($(EXEC_TASKS))"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
 	@echo "  make docker-verify   verify those scripts against a real scheduler"
 	@echo "                       -> $(VERIFY_OUT) (summary + environment + elapsed_s)"
@@ -177,6 +186,40 @@ sys.exit('FAIL: the oracle fails functional under real submission: %s' % bad[:2]
 sys.exit('FAIL: every functional sample was skipped, the bracket proved nothing') if not ran else None; \
 sys.exit('FAIL: verifier promotes defective artifacts') if b['strict_all_levels']['pass@1']!=0.0 else None; \
 print('sbatch guards OK in the container: %d functional samples ran for real, %d skipped' % (len(ran), len(lv)-len(ran)))"
+
+# F8 is induced under real submission, because that is the only place it fails: the value
+# it writes is well formed, within spec and accepted by the scheduler. Regenerating it
+# needs the accounting image, hence the container.
+induce-exec: docker-build-sched
+	$(DOCKER_RUN_SCHED) python -m anvil.cli induce --tasks $(EXEC_TASKS) \
+		--reference $(EXEC_REFERENCE) --out $(EXEC_REPAIR_TASKS) --executor sbatch
+
+# The bracket for cgroup enforcement. Its last assertion is the one that matters: the
+# no-op repair of the F8 task must FAIL `functional`, and it can only fail there by being
+# OOM-killed. Without enforcement that sample passes and this target says so, which is
+# what keeps the guard from certifying an environment that enforces nothing.
+docker-guards-enforcement: docker-build-sched
+	@mkdir -p results
+	$(DOCKER_RUN_SCHED) python -m anvil.cli run --model oracle --tasks $(EXEC_TASKS) \
+		--executor sbatch -v --out results/exec_oracle.json
+	$(DOCKER_RUN_SCHED) python -m anvil.cli repair --model oracle \
+		--repair-tasks $(EXEC_REPAIR_TASKS) --tasks $(EXEC_TASKS) --executor sbatch \
+		--out results/exec_repair_oracle.json
+	$(DOCKER_RUN_SCHED) python -m anvil.cli repair --model broken \
+		--repair-tasks $(EXEC_REPAIR_TASKS) --tasks $(EXEC_TASKS) --executor sbatch \
+		--out results/exec_repair_broken.json
+	@$(PYTHON) -c "import json,sys; \
+t=json.load(open('results/exec_oracle.json'))['summary']; \
+o=json.load(open('results/exec_repair_oracle.json'))['summary']; \
+b=json.load(open('results/exec_repair_broken.json')); \
+sys.exit('FAIL: the oracle does not solve the execution task') if t['strict_all_levels']['pass@1']!=1.0 else None; \
+sys.exit('FAIL: the oracle repair does not fix every induced fault') if o['strict_all_levels']['pass@1']!=1.0 else None; \
+sys.exit('FAIL: the no-op repair passes induced faults') if b['summary']['strict_all_levels']['pass@1']!=0.0 else None; \
+f8=[r for r in b['results'] if r['task_id'].endswith('__F8')]; \
+sys.exit('FAIL: no F8 sample in the set, enforcement is untested') if not f8 else None; \
+lv=[l for r in f8 for l in r['levels'] if l['level']=='functional']; \
+sys.exit('FAIL: the under-requesting script was not stopped, so nothing is enforced: %s' % [l['detail'][:80] for l in lv]) if any(l['passed'] or l['skipped'] for l in lv) else None; \
+print('enforcement guards OK: the memory under-request is caught only by execution')"
 
 # --- T2: diagnose-and-repair -------------------------------------------------
 induce-t2:

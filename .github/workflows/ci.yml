@@ -72,6 +72,13 @@ jobs:
       - name: Guards (real submission via sbatch)
         run: make docker-guards-sbatch
 
+      # The bracket for cgroup enforcement. Its point is the last assertion: a script that
+      # asks for less memory than its payload uses must be OOM-killed, and that sample
+      # passes everywhere the allocation is not enforced. A guard that certified an
+      # environment enforcing nothing would be worse than no guard.
+      - name: Guards (cgroup enforcement)
+        run: make docker-guards-enforcement
+
       # T3 on this runner needs more than the seccomp+fuse pair that suffices on
       # WSL2: docs/DESIGN.md lists the full exemption set and the failure that
       # forced each one, established here one run at a time.
