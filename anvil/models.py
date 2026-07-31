@@ -217,9 +217,20 @@ class HFModel(Model):
 
 def reference_path_for(tasks_path: str | Path) -> Path:
     """tasks/t1_slurm.jsonl -> tasks/t1_reference.jsonl; tasks/t3_apptainer.jsonl
-    -> tasks/t3_reference.jsonl. The "tN" prefix is the only part that matters."""
-    prefix = Path(tasks_path).stem.split("_", 1)[0]
-    return Path(tasks_path).with_name(f"{prefix}_reference.jsonl")
+    -> tasks/t3_reference.jsonl. The "tN" prefix is the only part that matters.
+
+    A task file may also carry its own solutions beside it, which
+    tasks/t1_exec.jsonl does in tasks/t1_exec_reference.jsonl. A set that only the
+    sbatch executor can grade has no business in the reference file the rest of the
+    benchmark shares: adding it there would change the digest every published T1
+    number was measured against.
+    """
+    path = Path(tasks_path)
+    own = path.with_name(f"{path.stem}_reference.jsonl")
+    if own.exists():
+        return own
+    prefix = path.stem.split("_", 1)[0]
+    return path.with_name(f"{prefix}_reference.jsonl")
 
 
 def build_model(spec: str, tasks_path: str | Path, **kw) -> Model:

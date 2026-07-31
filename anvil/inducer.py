@@ -34,6 +34,7 @@ FAULT_CATEGORIES: dict[str, str] = {
     "F5": "no #SBATCH directive at all",
     "F6": "payload/spec mismatch",
     "F7": "malformed directive value rejected by the scheduler",
+    "F8": "memory request below what the payload actually uses",
 }
 
 
@@ -208,6 +209,38 @@ def inject_f7_malformed_value(script: str, task: Task) -> str | None:
     return "\n".join(out) + ("\n" if script.endswith("\n") else "")
 
 
+# --------------------------------------------------------------------------
+# F8 - memory request below what the payload uses
+# --------------------------------------------------------------------------
+def inject_f8_memory_underrequest(script: str, task: Task) -> str | None:
+    """Cut `--mem` to a value the payload cannot fit in.
+
+    The first fault class no static check can see and `bash` cannot either: the value
+    stays well formed, the scheduler accepts it, and the script runs to completion
+    everywhere except where the allocation is enforced, which is the sbatch executor on a
+    cluster with cgroup constraints. There the job comes back OUT_OF_MEMORY.
+
+    Applies only where the spec does not pin the memory. A task that states a minimum
+    already has this covered statically: cutting the value below it fails `resource_fit`,
+    which is F3's and F4's territory. The interesting case is the one where the payload's
+    real need is the only ground truth, and no check that reads the text can reach it.
+    """
+    if "mem_min_mb" in task.constraints:
+        return None
+    lines = script.splitlines()
+    out: list[str] = []
+    changed = False
+    for ln in lines:
+        if not changed and _line_declares(ln, "--mem"):
+            out.append(f"{_leading_ws(ln)}#SBATCH --mem=16M")
+            changed = True
+            continue
+        out.append(ln)
+    if not changed:
+        return None
+    return "\n".join(out) + ("\n" if script.endswith("\n") else "")
+
+
 INDUCERS: dict[str, Callable[[str, Task], str | None]] = {
     "F1": inject_f1_silent_underrequest,
     "F2": inject_f2_misplaced_directive,
@@ -216,6 +249,7 @@ INDUCERS: dict[str, Callable[[str, Task], str | None]] = {
     "F5": inject_f5_no_sbatch,
     "F6": inject_f6_payload_mismatch,
     "F7": inject_f7_malformed_value,
+    "F8": inject_f8_memory_underrequest,
 }
 
 

@@ -260,9 +260,11 @@ def cmd_induce(args: argparse.Namespace) -> int:
     verification. An inducer that produces an accidentally-valid script is a
     bug in the inducer, not a fault worth teaching a model to repair."""
     # The induced task set is part of the benchmark definition, so it must not depend on
-    # which executor happens to be selected: a fault that survives bash but is caught by a
-    # real submission would silently drop out of t2_repair.jsonl. Pinned, not offered.
-    set_functional_executor("bash")
+    # whichever executor happens to be selected: a fault that survives bash but is caught
+    # by a real submission would silently drop out of t2_repair.jsonl. Pinned unless the
+    # caller asks for the other one, which is how tasks/t2_exec_repair.jsonl is built: a
+    # set whose faults only real execution can see belongs in a file of its own.
+    set_functional_executor(getattr(args, "executor", None) or "bash")
 
     tasks = Task.load_jsonl(args.tasks)
     reference: dict[str, str] = {}
@@ -733,6 +735,7 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--out", default="tasks/t2_repair.jsonl")
     i.add_argument("--no-exec", action="store_true",
                     help="skip the functional level when filtering induced variants")
+    _add_executor_flag(i)
     i.set_defaults(func=cmd_induce)
 
     rp = sub.add_parser("repair", help="generate a diagnose-and-repair with a model and verify")

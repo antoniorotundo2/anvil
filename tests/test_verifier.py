@@ -1048,3 +1048,56 @@ def test_the_canary_names_the_cause_the_scheduler_gave(monkeypatch):
     assert not healthy
     assert "InvalidAccount" in why
     assert "slurmd" not in why
+
+
+# ------------------------------------------- F8 and the execution-only fault set
+# The first fault class no static check and no bash run can see. It exists because
+# `functional` gained an executor that enforces the allocation, and it is kept in its own
+# task file so that adding it changes no digest the published numbers were measured with.
+def test_f8_only_applies_where_the_spec_leaves_memory_open():
+    """A task that states a minimum already covers this statically: cutting the value
+    below it fails resource_fit, which is F3's and F4's job."""
+    from anvil.inducer import inject_f8_memory_underrequest
+
+    pinned = Task(id="x", prompt="p", constraints={"mem_min_mb": 512})
+    assert inject_f8_memory_underrequest(GOOD, pinned) is None
+
+    open_spec = Task(id="x", prompt="p", constraints={"nodes": 1})
+    broken = inject_f8_memory_underrequest(GOOD, open_spec)
+    assert broken is not None and "--mem=16M" in broken
+
+
+def test_f8_is_invisible_to_every_static_level():
+    """If any of these caught it, the fault would prove nothing about execution."""
+    from anvil.inducer import inject_f8_memory_underrequest
+
+    task = Task(
+        id="t1_memory_bound", prompt="p", constraints={"nodes": 1, "ntasks": 1},
+        required_directives=["--mem", "--time"], expects_in_body=["ANVIL_OK"],
+    )
+    broken = inject_f8_memory_underrequest(GOOD, task)
+    assert check_syntax(broken).passed
+    assert check_resource_fit(broken, task).passed
+    assert check_safety(broken).passed
+
+
+def test_the_execution_task_set_keeps_its_own_reference_file():
+    """Folding it into tasks/t1_reference.jsonl would change the digest every published
+    T1 number was measured against."""
+    from anvil.models import reference_path_for
+
+    assert reference_path_for(ROOT / "tasks" / "t1_exec.jsonl").name == "t1_exec_reference.jsonl"
+    assert reference_path_for(TASKS).name == "t1_reference.jsonl"
+
+
+def test_the_shared_repair_set_carries_no_execution_only_fault():
+    """t2_repair.jsonl is graded under bash, where an F8 sample would pass and quietly
+    weaken the no-op-repair guard."""
+    import json as _json
+
+    path = ROOT / "tasks" / "t2_repair.jsonl"
+    categories = {
+        _json.loads(line)["fault_category"]
+        for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    }
+    assert "F8" not in categories

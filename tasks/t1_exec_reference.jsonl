@@ -1,0 +1,1 @@
+{"id": "t1_memory_bound", "script": "#!/bin/bash\n#SBATCH --job-name=memhold\n#SBATCH --nodes=1\n#SBATCH --ntasks=1\n#SBATCH --time=00:15:00\n#SBATCH --mem=256M\n\nchunk=$(head -c 67108864 /dev/zero | tr '\\0' 'x')\necho \"ALLOCATED=${#chunk}\"\necho ANVIL_OK\n"}
