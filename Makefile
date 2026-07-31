@@ -22,6 +22,16 @@ VERIFY_OUT  ?= results/verification.json
 REPAIR_VERIFY_OUT ?= results/repair_verification.json
 RECIPE_VERIFY_OUT ?= results/recipe_verification.json
 DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
+# Real submission needs slurmd, and slurmd needs to create its stepd scope under
+# /sys/fs/cgroup, which a plain `docker run` mounts read-only. Nothing else in the
+# project needs these two flags: `sbatch --test-only` never talks to a daemon.
+# SCHED_IMAGE exists because the reference base cannot execute jobs at all, see
+# docs/REFERENCE_CLUSTER.md: Ubuntu 24.04 ships SLURM 23.11 without an
+# accounting_storage plugin other than slurmdbd, and every job it accepts is then
+# refused with Reason=InvalidAccount.
+SCHED_IMAGE ?= $(IMAGE)
+DOCKER_RUN_SCHED = docker run --rm --privileged --cgroupns=host \
+	-v "$(PWD)":/work -w /work $(SCHED_IMAGE)
 # apptainer's unprivileged build/run needs these two beyond the default image:
 # seccomp=unconfined for the build's user namespace, /dev/fuse to mount the
 # built .sif at run time. See docker/Dockerfile for what was tried and ruled
@@ -37,7 +47,7 @@ DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
 	-e ANVIL_APPTAINER_UNPRIVILEGED=$(APPTAINER_UNPRIVILEGED) \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
-.PHONY: help install install-models test lint doctor run verify guards guards-sbatch \
+.PHONY: help install install-models test lint doctor run verify guards guards-sbatch docker-guards-sbatch \
         induce-t2 repair guards-t2 generate-repair \
         docker-build docker-test docker-run docker-verify docker-repair \
         docker-verify-repair generate \
@@ -60,6 +70,8 @@ help:
 	@echo "  make guards          T1: oracle must score 1.0, broken 0.0"
 	@echo "  make guards-sbatch   the same bracket with functional submitted for real"
 	@echo "                       (needs a scheduler that runs jobs, not just accepts them)"
+	@echo "  make docker-guards-sbatch  the same, inside the container:"
+	@echo "                       SCHED_IMAGE=<image> is required, see REFERENCE_CLUSTER.md"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
 	@echo "  make docker-verify   verify those scripts against a real scheduler"
 	@echo "                       -> $(VERIFY_OUT) (summary + environment + elapsed_s)"
@@ -114,10 +126,10 @@ sys.exit('FAIL: verifier promotes defective artifacts') if b['strict_all_levels'
 sys.exit(\"FAIL: 'safety' guard never exercised\") if b['safety']['pass@1']==1.0 else None; \
 print('Guards OK: oracle 1.0, broken 0.0 strict, safety exercised')"
 
-# The same bracket with `functional` submitted for real. Not folded into `guards`:
-# it needs a scheduler that runs jobs, and the verification image has none (its
-# slurmd never starts, see docker/entrypoint.sh), so there every functional sample
-# would be skipped and the check would pass while proving nothing.
+# The same bracket with `functional` submitted for real. Not folded into `guards`: it
+# needs a scheduler that runs jobs and not merely one that accepts them, so on most
+# machines every functional sample comes back skipped and the check would pass while
+# proving nothing. The vacuity assertion below is what stops that.
 #
 # The oracle assertion is deliberately not "functional == 1.0". A task whose own
 # spec cannot be satisfied by a real scheduler is skipped, not passed, which drops
@@ -140,6 +152,29 @@ sys.exit('FAIL: the oracle fails functional under real submission: %s' % bad[:2]
 sys.exit('FAIL: every functional sample was skipped, the bracket proved nothing') if not ran else None; \
 sys.exit('FAIL: verifier promotes defective artifacts') if b['strict_all_levels']['pass@1']!=0.0 else None; \
 print('sbatch guards OK: %d functional samples ran for real, %d skipped, broken 0.0 strict' % (len(ran), len(lv)-len(ran)))"
+
+# The same bracket inside the container, where the topology is the declared one. Needs an
+# image whose scheduler can actually run jobs:
+#     make docker-guards-sbatch SCHED_IMAGE=anvil:sched26
+# On the default image every sample comes back skipped with the cause, which the check
+# below reports as a failure rather than passing vacuously.
+docker-guards-sbatch:
+	@mkdir -p results
+	$(DOCKER_RUN_SCHED) python -m anvil.cli run --model oracle --tasks $(TASKS) \
+		--executor sbatch -v --out results/sbatch_oracle.json
+	$(DOCKER_RUN_SCHED) python -m anvil.cli run --model broken --tasks $(TASKS) \
+		--executor sbatch -n 6 --out results/sbatch_broken.json
+	@$(PYTHON) -c "import json,sys; \
+o=json.load(open('results/sbatch_oracle.json')); \
+b=json.load(open('results/sbatch_broken.json'))['summary']; \
+lv=[l for r in o['results'] for l in r['levels'] if l['level']=='functional']; \
+bad=[l['detail'] for l in lv if not l['passed'] and not l['skipped']]; \
+ran=[l for l in lv if l['passed']]; \
+sys.exit('FAIL: the run did not use the sbatch executor') if o['environment']['functional_executor']!='sbatch' else None; \
+sys.exit('FAIL: the oracle fails functional under real submission: %s' % bad[:2]) if bad else None; \
+sys.exit('FAIL: every functional sample was skipped, the bracket proved nothing') if not ran else None; \
+sys.exit('FAIL: verifier promotes defective artifacts') if b['strict_all_levels']['pass@1']!=0.0 else None; \
+print('sbatch guards OK in the container: %d functional samples ran for real, %d skipped' % (len(ran), len(lv)-len(ran)))"
 
 # --- T2: diagnose-and-repair -------------------------------------------------
 induce-t2:
