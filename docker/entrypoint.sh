@@ -25,6 +25,19 @@
 #     sbatch answers "Job dependency problem".
 #   * RealMemory is in MB. A task asking for --mem=16G (16384 MB) does NOT fit a
 #     node declared with 16000. The reference cluster is generous on purpose.
+#
+# Three more, found the day a slurmd was asked to actually run a job rather than
+# only to make `sbatch --test-only` answer. Each one kept every daemon down, and
+# none of them could show up while nothing ever registered:
+#   * slurmd creates its own stepd scope directory but not the parent slice, and
+#     under Docker that parent does not exist ("Could not create scope directory
+#     .../system.slice/nodeN_slurmstepd.scope: No such file or directory").
+#   * multi-slurmd on one host needs one port per virtual node, otherwise the
+#     second daemon dies on "Error binding slurm stream socket: Address already
+#     in use" and only one of the four survives.
+#   * a registering slurmd reports the GPUs it can see. With none, the controller
+#     answers "gres/gpu count reported lower than configured (0 < 4)" and drains
+#     the node, which would take `submittability` down with it.
 set -euo pipefail
 
 HOST="$(hostname -s)"
@@ -62,10 +75,19 @@ StateSaveLocation=/var/spool/slurmctld
 SlurmctldLogFile=/var/log/slurm/slurmctld.log
 SlurmdLogFile=/var/log/slurm/slurmd-%n.log
 
-NodeName=node[1-${ANVIL_NODES}] NodeHostname=${HOST} NodeAddr=127.0.0.1 \
-    CPUs=${ANVIL_CPUS} RealMemory=${ANVIL_MEM_MB} Gres=gpu:${ANVIL_GPUS} State=IDLE
-PartitionName=debug Nodes=ALL Default=YES MaxTime=INFINITE State=UP
 EOF
+
+# One line per virtual node instead of the range form, because each needs its own port:
+# several slurmd on the same host cannot share 6818, and the ones that lose the race die
+# on "Address already in use". slurmctld holds 6817, so the nodes take 6818 upward.
+for i in $(seq 1 "${ANVIL_NODES}"); do
+  cat >>/etc/slurm/slurm.conf <<EOF
+NodeName=node${i} NodeHostname=${HOST} NodeAddr=127.0.0.1 Port=$((6817 + i)) \
+    CPUs=${ANVIL_CPUS} RealMemory=${ANVIL_MEM_MB} Gres=gpu:${ANVIL_GPUS} State=IDLE
+EOF
+done
+echo "PartitionName=debug Nodes=ALL Default=YES MaxTime=INFINITE State=UP" \
+  >>/etc/slurm/slurm.conf
 
 cat >/etc/slurm/cgroup.conf <<EOF
 # Containers have no systemd. Without IgnoreSystemd, slurmd dies with
@@ -76,9 +98,31 @@ CgroupPlugin=autodetect
 IgnoreSystemd=yes
 EOF
 
+# The declared GPUs need something on disk behind them the moment a slurmd registers:
+# with nothing, it reports zero and the controller drains the node with "gres/gpu count
+# reported lower than configured". Character devices where the container may create them
+# (the same privilege real submission needs anyway), and the count-only form otherwise,
+# which is what --test-only has always run on.
+gpu_devices=0
+for i in $(seq 0 $((ANVIL_GPUS - 1))); do
+  dev="/dev/anvilgpu${i}"
+  if [[ -e "${dev}" ]] || mknod "${dev}" c 195 "${i}" 2>/dev/null; then
+    gpu_devices=$((gpu_devices + 1))
+  fi
+done
+
+if [[ "${gpu_devices}" -eq "${ANVIL_GPUS}" ]]; then
+  if [[ "${ANVIL_GPUS}" -eq 1 ]]; then
+    gres_spec="File=/dev/anvilgpu0"
+  else
+    gres_spec="File=/dev/anvilgpu[0-$((ANVIL_GPUS - 1))]"
+  fi
+else
+  gres_spec="Count=${ANVIL_GPUS}"
+fi
+
 cat >/etc/slurm/gres.conf <<EOF
-# GPUs declared without File: no real devices, sufficient for --test-only.
-NodeName=node[1-${ANVIL_NODES}] Name=gpu Count=${ANVIL_GPUS}
+NodeName=node[1-${ANVIL_NODES}] Name=gpu ${gres_spec}
 EOF
 
 if [[ ! -s /etc/munge/munge.key ]]; then
@@ -100,6 +144,14 @@ sleep 1
 rm -rf /var/spool/slurmctld/* 2>/dev/null || true
 ( setsid /usr/sbin/slurmctld >/dev/null 2>&1 </dev/null & )
 sleep 3
+
+# slurmd creates its own stepd scope but not the slice above it, and under Docker that
+# slice is missing, so cgroup/v2 fails to initialise and the daemon exits before
+# registering. Creating the parent is the whole fix; it needs a writable /sys/fs/cgroup,
+# which Docker Desktop for Mac does not provide, and there the outcome is what it has
+# always been: no slurmd, and the NOTE below saying so.
+container_cgroup="$(awk -F: '$1 == "0" { print $3 }' /proc/self/cgroup 2>/dev/null || true)"
+mkdir -p "/sys/fs/cgroup${container_cgroup%/*}/system.slice" 2>/dev/null || true
 
 # One slurmd per virtual node (multi-slurmd). If it fails, Anvil's preflight marks
 # `submittability` as SKIPPED with an explicit cause - never as a model failure.
