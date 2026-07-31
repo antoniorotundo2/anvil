@@ -60,6 +60,46 @@ fi
 # Not slurmdbd's default 6819: the virtual nodes take 6818 upward and would collide.
 DBD_PORT=6899
 
+# cgroup v2 delegation, done before any daemon starts so that all of them inherit the
+# leaf below and the container's own cgroup stays free of processes. That is the kernel's
+# "no internal processes" rule, and it is why the move comes first: a cgroup holding
+# processes cannot delegate controllers to its children.
+#
+# What it buys is the whole of stage 2. With the controllers reaching the scope slurmd
+# creates, task/cgroup holds a job to the memory it asked for, so a script that
+# under-requests comes back OUT_OF_MEMORY (ExitCode 0:125) instead of quietly succeeding.
+# Swap has to be constrained too: with memory.max alone the excess is paged out and the
+# job completes, which is what the first measurement showed.
+#
+# Detected, never assumed: without a writable /sys/fs/cgroup the delegation fails, and
+# then the cgroup plugins would keep slurmd from starting at all, which is worse than no
+# enforcement. In that case the configuration below stays on the plugins that need none.
+ENFORCEMENT=0
+container_cgroup="$(awk -F: '$1 == "0" { print $3 }' /proc/self/cgroup 2>/dev/null || true)"
+cgbase="/sys/fs/cgroup${container_cgroup}"
+if mkdir -p "${cgbase}/init" "${cgbase}/system.slice" 2>/dev/null; then
+  while read -r pid; do
+    echo "${pid}" >"${cgbase}/init/cgroup.procs" 2>/dev/null || true
+  done <"${cgbase}/cgroup.procs"
+  echo "+cpuset +cpu +memory" >"${cgbase}/cgroup.subtree_control" 2>/dev/null || true
+  echo "+cpuset +cpu +memory" >"${cgbase}/system.slice/cgroup.subtree_control" 2>/dev/null || true
+  case "$(cat "${cgbase}/system.slice/cgroup.subtree_control" 2>/dev/null)" in
+    *memory*) ENFORCEMENT=1 ;;
+  esac
+fi
+# The slice slurmd looks for sits one level above its own cgroup. That is
+# ${cgbase}/system.slice once the move above succeeded, and the sibling path when it did
+# not, so both are created and the daemon finds one either way.
+mkdir -p "/sys/fs/cgroup${container_cgroup%/*}/system.slice" 2>/dev/null || true
+
+if [[ "${ENFORCEMENT}" -eq 1 ]]; then
+  PROCTRACK=proctrack/cgroup
+  TASKPLUGIN=task/cgroup
+else
+  PROCTRACK=proctrack/linuxproc
+  TASKPLUGIN=task/none
+fi
+
 cat >/etc/slurm/slurm.conf <<EOF
 ClusterName=anvil
 SlurmctldHost=${HOST}
@@ -71,8 +111,8 @@ SlurmdParameters=config_overrides
 GresTypes=gpu
 FirstJobId=12345
 
-ProctrackType=proctrack/linuxproc
-TaskPlugin=task/none
+ProctrackType=${PROCTRACK}
+TaskPlugin=${TASKPLUGIN}
 JobAcctGatherType=jobacct_gather/none
 ReturnToService=2
 SlurmdTimeout=0
@@ -121,6 +161,16 @@ cat >/etc/slurm/cgroup.conf <<EOF
 CgroupPlugin=autodetect
 IgnoreSystemd=yes
 EOF
+
+if [[ "${ENFORCEMENT}" -eq 1 ]]; then
+  cat >>/etc/slurm/cgroup.conf <<EOF
+# Swap is constrained alongside RAM on purpose: with memory.max alone the pages over the
+# limit are simply paged out and an under-requesting job finishes as if nothing happened.
+ConstrainRAMSpace=yes
+ConstrainSwapSpace=yes
+ConstrainCores=yes
+EOF
+fi
 
 # The declared GPUs need something on disk behind them the moment a slurmd registers:
 # with nothing, it reports zero and the controller drains the node with "gres/gpu count
@@ -210,14 +260,6 @@ rm -rf /var/spool/slurmctld/* 2>/dev/null || true
 ( setsid /usr/sbin/slurmctld >/dev/null 2>&1 </dev/null & )
 sleep 3
 
-# slurmd creates its own stepd scope but not the slice above it, and under Docker that
-# slice is missing, so cgroup/v2 fails to initialise and the daemon exits before
-# registering. Creating the parent is the whole fix; it needs a writable /sys/fs/cgroup,
-# which Docker Desktop for Mac does not provide, and there the outcome is what it has
-# always been: no slurmd, and the NOTE below saying so.
-container_cgroup="$(awk -F: '$1 == "0" { print $3 }' /proc/self/cgroup 2>/dev/null || true)"
-mkdir -p "/sys/fs/cgroup${container_cgroup%/*}/system.slice" 2>/dev/null || true
-
 # One slurmd per virtual node (multi-slurmd). If it fails, Anvil's preflight marks
 # `submittability` as SKIPPED with an explicit cause - never as a model failure.
 for i in $(seq 1 "${ANVIL_NODES}"); do
@@ -241,6 +283,13 @@ if [[ "${ANVIL_QUIET:-0}" != "1" ]]; then
   echo "==> base image: ${ANVIL_BASE_IMAGE:-unknown}"
   echo "==> reference cluster: ${ANVIL_NODES} nodes x ${ANVIL_CPUS} cores x ${ANVIL_MEM_MB} MB x ${ANVIL_GPUS} GPUs"
   sinfo -h -o "    %N %t %C %m %G" 2>/dev/null || echo "    (sinfo unavailable)"
+  if [[ "${ENFORCEMENT}" -eq 1 ]]; then
+    echo "==> resource enforcement: cgroup (RAM, swap, cores), so a job that exceeds what"
+    echo "    it requested comes back OUT_OF_MEMORY instead of completing"
+  else
+    echo "==> resource enforcement: none (${TASKPLUGIN}), so a job may use more than it"
+    echo "    requested and still complete. Needs a writable /sys/fs/cgroup."
+  fi
 
   # `sinfo` prints the declared configuration, not what is running: SlurmdTimeout=0 keeps
   # slurmctld from ever marking an unreachable node DOWN, so nodes read `idle` with or
