@@ -49,6 +49,17 @@ ANVIL_GPUS="${ANVIL_GPUS:-4}"
 mkdir -p /etc/slurm /var/spool/slurmctld /var/log/slurm /run/munge
 chown -R slurm:slurm /var/spool/slurmctld /var/log/slurm 2>/dev/null || true
 
+# Accounting is present only in the image built with WITH_SLURMDBD=1, and it exists for
+# one reason: without it this SLURM refuses every job it accepts (Reason=InvalidAccount),
+# so nothing can be executed for real. Detected rather than configured, so the default
+# image behaves exactly as before.
+ACCOUNTING=0
+if command -v slurmdbd >/dev/null 2>&1 && command -v mariadbd >/dev/null 2>&1; then
+  ACCOUNTING=1
+fi
+# Not slurmdbd's default 6819: the virtual nodes take 6818 upward and would collide.
+DBD_PORT=6899
+
 cat >/etc/slurm/slurm.conf <<EOF
 ClusterName=anvil
 SlurmctldHost=${HOST}
@@ -76,6 +87,16 @@ SlurmctldLogFile=/var/log/slurm/slurmctld.log
 SlurmdLogFile=/var/log/slurm/slurmd-%n.log
 
 EOF
+
+if [[ "${ACCOUNTING}" -eq 1 ]]; then
+  cat >>/etc/slurm/slurm.conf <<EOF
+# Enforcement stays off: the point is to give the association manager something to find,
+# not to police anything. Limits would turn a job's fate into a property of this file.
+AccountingStorageType=accounting_storage/slurmdbd
+AccountingStorageHost=localhost
+AccountingStoragePort=${DBD_PORT}
+EOF
+fi
 
 # One line per virtual node instead of the range form, because each needs its own port:
 # several slurmd on the same host cannot share 6818, and the ones that lose the race die
@@ -140,6 +161,47 @@ else
 fi
 sleep 1
 
+# The database, then slurmdbd, then the cluster and the association: all of it has to be
+# in place before slurmctld starts, because the controller registers with the cluster it
+# finds there. The password is a local secret in a throwaway container reachable only
+# over a unix socket; treating it as one would be theatre.
+if [[ "${ACCOUNTING}" -eq 1 ]]; then
+  mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
+  ( setsid mariadbd --user=mysql >/var/log/slurm/mariadb.log 2>&1 </dev/null & )
+  for _ in $(seq 1 30); do
+    mariadb-admin ping >/dev/null 2>&1 && break
+    sleep 1
+  done
+  mariadb -e "CREATE DATABASE IF NOT EXISTS slurm_acct_db;
+              CREATE USER IF NOT EXISTS 'slurm'@'localhost' IDENTIFIED BY 'slurm';
+              GRANT ALL ON slurm_acct_db.* TO 'slurm'@'localhost';
+              FLUSH PRIVILEGES;" >/dev/null 2>&1 || true
+
+  # slurmdbd refuses to start on a world-readable config, since it holds the password.
+  cat >/etc/slurm/slurmdbd.conf <<EOF
+AuthType=auth/munge
+DbdHost=localhost
+DbdPort=${DBD_PORT}
+SlurmUser=root
+StorageType=accounting_storage/mysql
+StorageHost=localhost
+StorageUser=slurm
+StoragePass=slurm
+StorageLoc=slurm_acct_db
+LogFile=/var/log/slurm/slurmdbd.log
+PidFile=/run/slurmdbd.pid
+EOF
+  chmod 600 /etc/slurm/slurmdbd.conf
+  ( setsid /usr/sbin/slurmdbd >/dev/null 2>&1 </dev/null & )
+  for _ in $(seq 1 30); do
+    sacctmgr -i show cluster >/dev/null 2>&1 && break
+    sleep 1
+  done
+  sacctmgr -i add cluster anvil >/dev/null 2>&1 || true
+  sacctmgr -i add account anvil Description=anvil Organization=anvil >/dev/null 2>&1 || true
+  sacctmgr -i add user root DefaultAccount=anvil >/dev/null 2>&1 || true
+fi
+
 # slurmctld daemonises itself: no `&` (that would attach it to the session).
 rm -rf /var/spool/slurmctld/* 2>/dev/null || true
 ( setsid /usr/sbin/slurmctld >/dev/null 2>&1 </dev/null & )
@@ -180,7 +242,9 @@ if [[ "${ANVIL_QUIET:-0}" != "1" ]]; then
   # `sinfo` prints the declared configuration, not what is running: SlurmdTimeout=0 keeps
   # slurmctld from ever marking an unreachable node DOWN, so nodes read `idle` with or
   # without a live slurmd behind them. Count the daemons instead of trusting that column.
-  live_slurmd="$(pgrep -c slurmd 2>/dev/null || true)"
+  # -x: an unanchored match counts slurmdbd too, and would hide four dead slurmd behind
+  # the one daemon that is not a node.
+  live_slurmd="$(pgrep -xc slurmd 2>/dev/null || true)"
   live_slurmd="${live_slurmd:-0}"
   if [[ "${live_slurmd}" -lt "${ANVIL_NODES}" ]]; then
     echo "    NOTE: ${live_slurmd} of ${ANVIL_NODES} slurmd running, so the 'idle' above is"

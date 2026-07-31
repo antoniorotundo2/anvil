@@ -93,6 +93,24 @@ RUN if [ "$WITH_APPTAINER" = "1" ]; then \
 # host homes inside containers, and the grep still fails the build if a renamed config
 # key ever makes the sed silently miss.
 
+# Accounting is opt-in for the same reason apptainer is: nothing in T1, T2 or T3 needs
+# it, and a database in a verification image is a cost nobody should pay by default.
+#   docker build -t anvil:sched --build-arg WITH_SLURMDBD=1 docker/
+#
+# What forces it: this Ubuntu's slurm package ships accounting_storage_slurmdbd.so and no
+# other accounting plugin, so with no slurmdbd the association manager stays empty and
+# every job the scheduler accepts is then refused with Reason=InvalidAccount. Verified
+# with a minimal stock slurm.conf in this same image, so it is not anvil's configuration.
+# `sbatch --test-only` is unaffected, which is why the default image never noticed.
+ARG WITH_SLURMDBD=0
+RUN if [ "$WITH_SLURMDBD" = "1" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            slurmdbd mariadb-server \
+        && rm -rf /var/lib/apt/lists/* \
+        && mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld \
+        && mariadb-install-db --user=mysql --datadir=/var/lib/mysql >/dev/null ; \
+    fi
+
 # venv to work around the PEP 668 lock on Ubuntu >= 24.04
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
