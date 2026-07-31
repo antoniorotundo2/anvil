@@ -119,7 +119,24 @@ like the apptainer image and on the same base, so the coreutils stay GNU. The ru
 under `/sys/fs/cgroup`, which a plain `docker run` mounts read-only. See
 [`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md).
 
-OOM kills and CPU/GPU binding remain outside this level.
+### What only execution can catch
+
+With `slurmd` running, the container also enforces the allocation through cgroups, so a job that
+uses more memory than it requested is killed instead of finishing. Nothing in the eight T1 tasks
+allocates enough to notice, so `tasks/t1_exec.jsonl` adds one that holds 64MB and asks for enough
+memory to fit it, with no number in the specification: the payload's real need is the ground truth.
+The fault induced from it (F8, `--mem` cut to 16M) is well formed, within spec, accepted by the
+scheduler, and passes under `bash`. It fails only here:
+
+```
+make docker-guards-enforcement
+```
+
+The set lives in its own file so that adding it changes no digest: `tasks/t1_slurm.jsonl` and
+`tasks/t2_repair.jsonl` are untouched, and every published number stays comparable.
+
+CPU and GPU binding remain outside this level: a job is confined to its cores, but no task asks
+what it was given.
 
 ## Development
 

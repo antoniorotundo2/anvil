@@ -130,10 +130,28 @@ Where it stands: the oracle scores `strict_all_levels` 1.0 with seven of eight t
 real, `t1_dependency_chain` skipped for the held placeholder it depends on, and the broken model
 0.0 strict.
 
-## What still is not observed (Phase 3, stage 2)
+## Enforcement, and why it does not import the host
 
-OOM kills and CPU/GPU binding. Both need cgroup enforcement, which the reference cluster does not
-configure, and enabling it collides with the declared topology: a job asking for 64000 MB on a
-4-node reference cluster cannot be held to the memory of whatever machine runs the benchmark
-without making the score a property of that machine again. That tension is the actual open design
-question, not a missing line of configuration.
+With the cgroup controllers delegated, `TaskPlugin=task/cgroup` holds every job to what it asked
+for: `ConstrainRAMSpace`, `ConstrainSwapSpace` and `ConstrainCores`. A script that requests less
+memory than its payload uses now comes back `OUT_OF_MEMORY` with `ExitCode=0:125` instead of
+completing. Swap has to be constrained alongside RAM, and that is not a detail: with `memory.max`
+alone the pages over the limit are simply paged out and the job finishes as if nothing had
+happened, which is what the first measurement showed.
+
+The tension with the declared topology is narrower than it looks. A cgroup limit is a ceiling, not
+a reservation: a job that requests 64000 MB and touches 10 MB runs on a machine with 8 GB, because
+nothing is set aside. What the limit compares is the job's own request against the job's own usage,
+and both travel with the artifact. The host only enters if a task's payload really allocates, which
+is why the one task that does asks for tens of megabytes and not gigabytes.
+
+Enforcement is detected, never assumed. Without a writable `/sys/fs/cgroup` the delegation fails,
+and the configuration falls back to the plugins that need none: the entrypoint prints which of the
+two is in force, since the same script scores differently under each.
+
+## What still is not observed
+
+CPU and GPU binding. `ConstrainCores` is on, so a job is confined to the cores it was allocated,
+but no task in the set reads its own affinity, and the GPUs are device files with nothing behind
+them, so a task that checked which one it was given would be checking the harness. Both are
+task-set work rather than configuration.

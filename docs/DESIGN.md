@@ -303,9 +303,10 @@ observation.
 
 `functional` runs the script under `bash` in a sandbox by default, and every number published so
 far was measured that way: `functional_executor: "bash"` in the result file says so. Real
-submission is available as a second executor (see [Real submission](#real-submission-the-sbatch-executor))
-and closes part of the gap, but OOM kills and CPU/GPU binding stay outside it: both need cgroup
-enforcement the reference cluster does not configure. See
+submission is available as a second executor (see [Real submission](#real-submission-the-sbatch-executor)),
+and with cgroup enforcement behind it a job is held to the memory it requested. What no task
+exercises yet is binding: a job is confined to its cores, but nothing in the set asks what it was
+given, and the GPUs are device files with nothing behind them. See
 [`REFERENCE_CLUSTER.md`](REFERENCE_CLUSTER.md).
 
 T2 failures will be partly synthetic, induced to obtain ground truth. The taxonomy is anchored to
@@ -338,8 +339,10 @@ say so plainly.
 - [ ] **Phase 3**
   - [x] real submission — `--executor sbatch`, opt-in beside the `bash` default, with its own
         preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
-  - [ ] cgroup enforcement — OOM kills and CPU/GPU binding, which real submission alone does not
-        deliver
+  - [x] cgroup enforcement — `task/cgroup` with RAM, swap and cores constrained, plus the task set
+        that exercises it (`tasks/t1_exec.jsonl`, fault F8) and `make docker-guards-enforcement`
+  - [ ] binding — a task that reads the affinity and the GPU it was actually given, which needs
+        real devices rather than the placeholder files the declared topology stands on
   - [ ] Podman as a second verification runtime — rootless by default, so the confinement Docker
         had to be exempted from may not apply in the first place: the T3 unprivileged path needs
         `seccomp=unconfined`, `apparmor=unconfined`, `systempaths=unconfined`, `/dev/fuse` and a
@@ -403,6 +406,27 @@ than of this configuration. All four are recorded in
 together with the opt-in accounting image that closes them without giving up GNU coreutils. The
 bracket there: eight tasks, seven executed for real, one skipped for a dependency that can never
 clear, `strict_all_levels` 1.0, broken model 0.0.
+
+### The fault only execution can see
+
+Enforcement is worth nothing unless something exercises it, and none of the eight T1 tasks
+allocates enough memory to notice a limit. `tasks/t1_exec.jsonl` adds one that does: it holds 64MB
+in a shell variable and asks for enough memory to fit, without the spec stating a number. That
+omission is the whole design. A task that pins a minimum has the fault covered statically already,
+since cutting the value below it fails `resource_fit`; leaving it open makes the payload's real
+need the only ground truth, and no check that reads the text can reach it.
+
+From it the inducer builds **F8**, a `--mem` cut to 16M. The value is well formed, within spec, and
+accepted by the scheduler; the script runs to completion under `bash` and dies `OUT_OF_MEMORY`
+under real submission with enforcement. That is the first fault class in the taxonomy that only
+execution can catch, and it is why the set lives in its own file: `anvil induce` keeps only
+variants that actually fail, so inducing it needs `--executor sbatch`, and the shared
+`tasks/t2_repair.jsonl` stays byte-identical to the one every published T2 number was measured on.
+
+The guard that protects it is `make docker-guards-enforcement`, and its last assertion is the one
+that matters: the no-op repair of the F8 sample must *fail* `functional`. It passes wherever the
+allocation is not enforced, so a guard that only checked the bracket would happily certify an
+environment enforcing nothing.
 
 One property of real submission had to be handled before a correct script could pass at all.
 slurmstepd opens the file named by `--output` before the script's first command runs, so the

@@ -72,6 +72,25 @@ Three of the eight tasks failed here. This is the class where dry-run validation
 
 ---
 
+## F8 — Memory request below what the payload uses
+
+The one class in the taxonomy that was **not** observed on a model, and it is listed apart for
+that reason. It exists because the verifier gained the ability to see it: with real submission and
+cgroup enforcement, a script that asks for less memory than it uses comes back `OUT_OF_MEMORY`
+instead of completing.
+
+It cannot be induced from the eight T1 tasks. Each of them states a memory minimum, and a value
+below that minimum fails `resource_fit` before anything runs, which makes the fault a static one
+already covered by F3 and F4. `tasks/t1_exec.jsonl` therefore states no minimum: the payload holds
+64MB and the prompt asks for enough memory to fit it, so the ground truth is what the script
+actually needs and no check that reads the text can reach it.
+
+Whether a real model commits this error when the specification leaves the number open is exactly
+the measurement this class is waiting for. Until then it is a capability of the harness, not an
+observation about models, and the count of tasks in the shared set stays at eight.
+
+---
+
 ## Two verifications that dry-run cannot do
 
 Both observed in the container, against a live `slurmctld`:
