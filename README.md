@@ -308,6 +308,22 @@ without spending inference time again:
 BASES="ubuntu:24.04 ubuntu:26.04" ./scripts/crossdist_ablation.sh results/<run>
 ```
 
+## Executor ablation
+
+Same shape, with the executor as the varying factor instead of the base image: it verifies each
+cell twice, under `bash` and under real submission, inside the one image so nothing else changes.
+
+```
+make docker-build-sched
+./scripts/executor_ablation.sh results/<run>
+```
+
+The number it reports is not either pass@k but the disagreement: how many scripts the sandbox
+promotes and the scheduler stops, grouped by what stopped them (`OUT_OF_MEMORY`, `TIMEOUT`, a
+refused submission, missing output). It also counts the samples real submission cannot judge, such
+as the dependency task waiting on a job that never completes, which are skipped rather than
+charged to the model.
+
 ## Documentation
 
 - [`docs/DESIGN.md`](docs/DESIGN.md) — why execution-based verification, the five levels, the preflight

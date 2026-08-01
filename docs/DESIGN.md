@@ -407,6 +407,11 @@ together with the opt-in accounting image that closes them without giving up GNU
 bracket there: eight tasks, seven executed for real, one skipped for a dependency that can never
 clear, `strict_all_levels` 1.0, broken model 0.0.
 
+Measuring the executor means comparing it with the one it stands beside, not reporting its pass@k
+alone: `scripts/executor_ablation.sh` verifies the same generations twice inside the same image and
+counts the samples on which the two arms part company. Two environments can reach the same pass@k
+while disagreeing about which scripts run, and that disagreement is the result worth reporting.
+
 ### The fault only execution can see
 
 Enforcement is worth nothing unless something exercises it, and none of the eight T1 tasks
