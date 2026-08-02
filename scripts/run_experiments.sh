@@ -58,9 +58,13 @@ echo
 echo "==> Regression guards (before spending GPU time)"
 "$PYTHON" -m anvil.cli run --model oracle --tasks "$TASKS" --out "${OUT}/oracle.json" >/dev/null
 "$PYTHON" -m anvil.cli run --model broken --tasks "$TASKS" -n 3 --out "${OUT}/broken.json" >/dev/null
-"$PYTHON" - <<'PY'
-import json, sys, glob, os
-out = sorted(glob.glob("results/*/"))[-1]
+# $OUT is passed in rather than guessed at. This block used to take the alphabetically
+# last directory under results/, which was the run being written only for as long as every
+# directory there had a numeric name: the first `retrieval_` sweep sorted after it and the
+# guard aborted the campaign reading a file that had never been in that directory.
+"$PYTHON" - "$OUT" <<'PY'
+import json, sys, os
+out = sys.argv[1]
 o = json.load(open(os.path.join(out, "oracle.json")))["summary"]
 b = json.load(open(os.path.join(out, "broken.json")))["summary"]
 bad = [l for l in ("syntax", "functional", "resource_fit", "safety") if o[l]["pass@1"] != 1.0]
