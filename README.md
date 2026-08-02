@@ -54,6 +54,19 @@ To generate scripts with a real model, also install the model extras:
 make install-models
 ```
 
+An unauthenticated sweep can be rate limited by the hub. `ANVIL_HF_ENDPOINT` names a mirror to
+retry against, once, when a download fails; it is unset by default, so nothing here sends model
+downloads to a host you have not chosen. The mirror has to speak the hub's own protocol, since
+`huggingface_hub` performs the download:
+
+```
+ANVIL_HF_ENDPOINT=https://hf-mirror.com make generate MODEL=ibm-granite/granite-4.1-3b
+```
+
+Which endpoint served the weights is printed when it is not the default. For a long sweep the
+cheaper answer is still to fetch the model once and then run with `HF_HUB_OFFLINE=1`, which also
+pins the revision for the whole matrix.
+
 ## Run
 
 To run the project you can use two methods. The first one (recommended) uses Docker, which ships a

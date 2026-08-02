@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import random
+import sys
 import zlib
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -106,6 +107,55 @@ class BrokenModel(Model):
         ]
 
 
+DEFAULT_HF_ENDPOINT = "https://huggingface.co"
+
+
+def _load_with_fallback(load):
+    """Load from the default hub, and on failure retry against a declared mirror.
+
+    An unauthenticated sweep gets rate limited by the hub, and a download failure ends a
+    cell for a reason the benchmark is not measuring. This retries once against a mirror
+    the caller names in `ANVIL_HF_ENDPOINT`, which is unset by default: nothing here
+    points model weights at a third-party host that whoever runs it has not chosen.
+
+    The mirror has to speak the hub's own protocol, since `huggingface_hub` is what
+    performs the download. A catalogue with its own API is not a drop-in: it would need
+    its manifest read, its files fetched and its bytes checked against the hub's hashes
+    before `transformers` is allowed near them, which is a different piece of work and
+    not this one.
+
+    Returns (tokenizer, model, endpoint), so the caller can say where the weights came
+    from rather than leave it implicit.
+    """
+    import os  # noqa: PLC0415
+
+    try:
+        tok, model = load()
+        return tok, model, os.environ.get("HF_ENDPOINT", DEFAULT_HF_ENDPOINT)
+    except Exception as first:  # noqa: BLE001
+        mirror = os.environ.get("ANVIL_HF_ENDPOINT")
+        if not mirror:
+            raise
+        # Scoped to this load: leaving HF_ENDPOINT set would silently redirect every
+        # later download in the process, including ones that would have succeeded.
+        previous = os.environ.get("HF_ENDPOINT")
+        os.environ["HF_ENDPOINT"] = mirror
+        print(
+            f"[warning] {DEFAULT_HF_ENDPOINT} failed ({type(first).__name__}: "
+            f"{str(first)[:120]}), retrying from {mirror}",
+            file=sys.stderr,
+        )
+        try:
+            tok, model = load()
+            print(f"[info] weights served by {mirror}", file=sys.stderr)
+            return tok, model, mirror
+        finally:
+            if previous is None:
+                os.environ.pop("HF_ENDPOINT", None)
+            else:
+                os.environ["HF_ENDPOINT"] = previous
+
+
 class HFModel(Model):
     """Hugging Face model. CPU-first; uses the GPU when available.
 
@@ -165,8 +215,12 @@ class HFModel(Model):
         else:
             kwargs["torch_dtype"] = torch_dtype(info)
 
-        tok = AutoTokenizer.from_pretrained(self.name)
-        model = AutoModelForCausalLM.from_pretrained(self.name, **kwargs)
+        tok, model, self.weights_from = _load_with_fallback(
+            lambda: (
+                AutoTokenizer.from_pretrained(self.name),
+                AutoModelForCausalLM.from_pretrained(self.name, **kwargs),
+            )
+        )
 
         # device_map="auto" needs accelerate and targets multi-GPU CUDA.
         # On MPS and CPU we move the model explicitly.
