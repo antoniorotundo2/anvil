@@ -65,6 +65,20 @@ terrible model**. It happened during development: the canonical solutions were c
 harness was broken. A benchmark that executes code must be able to tell a failure of its subject
 from a failure of itself.
 
+### The second canary: is this the cluster we declare?
+
+The minimal canary asks whether the scheduler works, and every working SLURM says yes. That turned
+out not to be the question. A full multi-seed table was measured against the experiment machine's
+own scheduler, which has one node and no GPUs: it passed the canary, refused three of the eight
+canonical solutions, and produced `submittability` numbers in which a script that forgets `--gpus`
+outscores one that asks for it. The oracle scored 0.625 there.
+
+So the preflight has a second half, built from the topology this cluster declares: a job asking for
+`ANVIL_NODES` nodes with a GPU on each (`--gres=gpu:1`, since `--gpus` counts across the whole
+allocation and SLURM refuses one GPU spread over four nodes). A scheduler that cannot accept it is
+not the reference cluster, whatever else it can do, and `submittability` is skipped with that in
+plain text rather than scored. Both canaries run once per process and the result is cached.
+
 ## Two executors for `functional`
 
 The level has two executors, and the environment report declares which one produced a given

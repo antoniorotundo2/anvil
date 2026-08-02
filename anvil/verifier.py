@@ -80,6 +80,34 @@ def _validated(name: str) -> str:
 # A minimal, certainly-valid script requesting resources any sane cluster can meet.
 _CANARY = "#!/bin/bash\n#SBATCH --time=00:01:00\n#SBATCH --ntasks=1\necho canary\n"
 
+
+def _topology_canary() -> tuple[str, str]:
+    """A script only the *declared* reference cluster can accept, and what it asks for.
+
+    The minimal canary above answers "does this scheduler work", and every working SLURM
+    says yes. That is not the question. A whole multi-seed table was once measured against
+    the experiment machine's own scheduler, which has one node and no GPUs: it accepted the
+    canary, refused three of the eight canonical solutions, and produced `submittability`
+    numbers where a script that forgets `--gpus` outscores one that asks for it.
+
+    So the second canary asks for what the topology promises, which the entrypoint exports.
+    The two distinguishing features are enough; memory is left out because a partition can
+    cap it for reasons that have nothing to do with the declared size.
+    """
+    nodes = os.environ.get("ANVIL_NODES", "4")
+    gpus = os.environ.get("ANVIL_GPUS", "4")
+    lines = ["#!/bin/bash", "#SBATCH --time=00:01:00", f"#SBATCH --nodes={nodes}"]
+    asked = [f"{nodes} nodes"]
+    if gpus.isdigit() and int(gpus) > 0:
+        # --gres, not --gpus: the latter is a total across the allocation, and SLURM
+        # refuses one GPU spread over four nodes ("Invalid generic resource (gres)
+        # specification"). The reference cluster declares GPUs per node, so does this.
+        lines.append("#SBATCH --gres=gpu:1")
+        asked.append("a GPU on each")
+    lines.append("echo topology_canary")
+    return "\n".join(lines) + "\n", " and ".join(asked)
+
+
 _health: tuple[bool, str] | None = None
 
 
@@ -110,7 +138,7 @@ def slurm_healthy(force: bool = False) -> tuple[bool, str]:
             ["sbatch", "--test-only", tmp], capture_output=True, text=True, timeout=30
         )
         if proc.returncode == 0:
-            _health = (True, "ok")
+            _health = _topology_healthy()
         else:
             msg = (proc.stderr or proc.stdout).strip().splitlines()[-1:] or [""]
             _health = (
@@ -123,6 +151,37 @@ def slurm_healthy(force: bool = False) -> tuple[bool, str]:
     finally:
         os.unlink(tmp)
     return _health
+
+
+def _topology_healthy() -> tuple[bool, str]:
+    """Second half of the preflight: is this scheduler the cluster we declare?
+
+    Skipping `submittability` here is the same discipline as skipping it when no scheduler
+    is reachable. Numbers from a cluster that is not the declared one are not a harder or
+    easier version of the benchmark, they are a different one.
+    """
+    script, asked = _topology_canary()
+    with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as fh:
+        fh.write(script)
+        tmp = fh.name
+    try:
+        proc = subprocess.run(
+            ["sbatch", "--test-only", tmp], capture_output=True, text=True, timeout=30
+        )
+    except subprocess.TimeoutExpired:
+        return False, "sbatch --test-only: topology canary timed out"
+    finally:
+        os.unlink(tmp)
+
+    if proc.returncode == 0:
+        return True, "ok"
+    msg = ((proc.stderr or proc.stdout).strip().splitlines() or [""])[-1]
+    return (
+        False,
+        f"this scheduler works but is not the declared reference cluster: it refuses a job "
+        f"asking for {asked} ({msg[:80]}). Run the verification inside the container, or "
+        "declare a topology this scheduler implements",
+    )
 
 
 # States from which a job never moves again. Anything else (PENDING, RUNNING,

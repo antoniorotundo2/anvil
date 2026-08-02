@@ -304,8 +304,10 @@ def test_preflight_is_cached(monkeypatch):
     monkeypatch.setattr(v.shutil, "which", lambda _: "/usr/bin/sbatch")
     monkeypatch.setattr(v.subprocess, "run", fake_run)
     assert v.slurm_healthy(force=True)[0]
+    submitted = len(calls)
+    assert submitted == 2, "one minimal canary, then one asking for the declared topology"
     assert v.slurm_healthy()[0]
-    assert len(calls) == 1, "the canary must run exactly once"
+    assert len(calls) == submitted, "the preflight must run once per process and be cached"
     v._health = None
 
 
@@ -1162,3 +1164,58 @@ def test_strict_reports_how_many_samples_rest_on_a_skip():
     clean = _levels(LevelResult(Level.SYNTAX, True), LevelResult(Level.SUBMITTABILITY, True))
     summary = aggregate([resting, clean], k=1)
     assert summary["strict_all_levels"]["n_skipped_samples"] == 1
+
+
+# ------------------------------- the second canary: is this the declared cluster?
+# The first canary asks whether the scheduler works, and every working SLURM says yes. A
+# whole multi-seed table was measured against a one-node scheduler with no GPUs that
+# answered yes: it refused three of the eight canonical solutions, and on it a script that
+# forgets `--gpus` outscored one that asks for it.
+def test_the_topology_canary_asks_for_what_the_topology_promises(monkeypatch):
+    import anvil.verifier as v
+
+    monkeypatch.setenv("ANVIL_NODES", "4")
+    monkeypatch.setenv("ANVIL_GPUS", "4")
+    script, asked = v._topology_canary()
+    assert "#SBATCH --nodes=4" in script
+    assert "#SBATCH --gres=gpu:1" in script
+    assert "4 nodes" in asked and "GPU" in asked
+
+
+def test_a_gpuless_topology_does_not_ask_for_a_gpu(monkeypatch):
+    """Declaring ANVIL_GPUS=0 is a legitimate topology, and the canary must match it."""
+    import anvil.verifier as v
+
+    monkeypatch.setenv("ANVIL_NODES", "2")
+    monkeypatch.setenv("ANVIL_GPUS", "0")
+    script, asked = v._topology_canary()
+    assert "--gpus" not in script and "GPU" not in asked
+    assert "#SBATCH --nodes=2" in script
+
+
+def test_a_working_scheduler_that_is_not_the_declared_cluster_skips_the_level(monkeypatch):
+    """The measured case: submittability must be skipped, not scored, on such a machine."""
+    import anvil.verifier as v
+
+    calls = []
+
+    class R:
+        def __init__(self, code, err=""):
+            self.returncode, self.stderr, self.stdout = code, err, ""
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        # the minimal canary passes, the topology one is refused
+        return R(0) if len(calls) == 1 else R(1, "Requested node configuration is not available")
+
+    monkeypatch.setattr(v, "_health", None)
+    monkeypatch.setattr(v.shutil, "which", lambda _: "/usr/bin/sbatch")
+    monkeypatch.setattr(v.subprocess, "run", fake_run)
+
+    healthy, why = v.slurm_healthy(force=True)
+    assert not healthy
+    assert "not the declared reference cluster" in why
+
+    monkeypatch.setattr(v, "slurm_healthy", lambda force=False: (healthy, why))
+    r = v.check_submittability(GOOD)
+    assert r.skipped and not r.passed

@@ -43,10 +43,13 @@
 set -euo pipefail
 
 HOST="$(hostname -s)"
-ANVIL_NODES="${ANVIL_NODES:-4}"
-ANVIL_CPUS="${ANVIL_CPUS:-16}"
-ANVIL_MEM_MB="${ANVIL_MEM_MB:-64000}"
-ANVIL_GPUS="${ANVIL_GPUS:-4}"
+# Exported, not merely set: the verifier reads them to build a canary that asks for what
+# this topology promises, and a scheduler that cannot satisfy it is not the cluster this
+# benchmark declares, however well it works otherwise.
+export ANVIL_NODES="${ANVIL_NODES:-4}"
+export ANVIL_CPUS="${ANVIL_CPUS:-16}"
+export ANVIL_MEM_MB="${ANVIL_MEM_MB:-64000}"
+export ANVIL_GPUS="${ANVIL_GPUS:-4}"
 
 mkdir -p /etc/slurm /var/spool/slurmctld /var/log/slurm /run/munge
 chown -R slurm:slurm /var/spool/slurmctld /var/log/slurm 2>/dev/null || true
@@ -298,7 +301,10 @@ sbatch --chdir=/tmp --output=/dev/null /tmp/anvil_placeholder.sh >/dev/null 2>&1
 # can actually run it: with no slurmd the job stays pending forever and the wait would add
 # its full timeout to every container start, CI included. `--test-only` needs the job to
 # exist, not to have finished, so nothing is lost by not waiting there.
-if [[ "$(pgrep -xc slurmd 2>/dev/null || echo 0)" -gt 0 ]]; then
+# `pgrep -c` prints 0 and exits 1 when nothing matches, so a `|| echo 0` fallback appends
+# a second zero and the test below sees "0\n0". Take the substitution as it comes.
+live_daemons="$(pgrep -xc slurmd 2>/dev/null || true)"
+if [[ "${live_daemons:-0}" -gt 0 ]]; then
   for _ in $(seq 1 20); do
     [[ -z "$(squeue -h -j 12345 -o %T 2>/dev/null || true)" ]] && break
     sleep 1
