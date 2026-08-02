@@ -67,6 +67,17 @@ Which endpoint served the weights is printed when it is not the default. For a l
 cheaper answer is still to fetch the model once and then run with `HF_HUB_OFFLINE=1`, which also
 pins the revision for the whole matrix.
 
+A mirror moves the root of trust, since the download is verified against the manifest of whichever
+endpoint served it. Check the two agree before relying on one:
+
+```
+./scripts/mirror_parity.py
+```
+
+It compares the repository commit, the file set and the sha256 of every hashed file, and exits
+non-zero on any divergence, so it can gate a sweep. `hf-mirror.com` currently matches the hub on
+all four models used here, revision included.
+
 ## Run
 
 To run the project you can use two methods. The first one (recommended) uses Docker, which ships a
