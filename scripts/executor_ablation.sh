@@ -71,6 +71,20 @@ if ! docker image inspect "$SCHED_IMAGE" >/dev/null 2>&1; then
   exit 2
 fi
 
+# The entrypoint is COPYed into the image, not mounted from the checkout, so pulling a fix
+# to it changes nothing until the image is rebuilt. That cost an hour of verification once
+# and gave back numbers identical to the run it was meant to correct, which is the worst
+# shape a stale result can take: it looks like a finding. cksum is POSIX and behaves the
+# same on both machines this runs on.
+disk_sum="$(cksum <docker/entrypoint.sh | cut -d' ' -f1)"
+image_sum="$(docker run --rm --entrypoint cat "$SCHED_IMAGE" /usr/local/bin/entrypoint.sh \
+  2>/dev/null | cksum | cut -d' ' -f1)"
+if [[ "$disk_sum" != "$image_sum" ]]; then
+  echo "${SCHED_IMAGE} was built from a different docker/entrypoint.sh than the one here." >&2
+  echo "Rebuild it before measuring: make docker-build-sched" >&2
+  exit 2
+fi
+
 STAMP="$(date +%Y%m%d_%H%M%S)"
 OUT="${OUT:-results/executor_${STAMP}}"
 mkdir -p "$OUT"
