@@ -59,6 +59,13 @@ if [[ ${#GENERATIONS[@]} -eq 0 ]]; then
   exit 2
 fi
 
+# Two different problems with one symptom: `docker image inspect` fails the same way when
+# the image is missing and when the daemon is down, and the second answer sends the reader
+# to build an image that is already there.
+if ! docker info >/dev/null 2>&1; then
+  echo "the docker daemon is not reachable: start it and run this again." >&2
+  exit 2
+fi
 if ! docker image inspect "$SCHED_IMAGE" >/dev/null 2>&1; then
   echo "${SCHED_IMAGE} is not built: run \`make docker-build-sched\` first." >&2
   exit 2
