@@ -433,6 +433,13 @@ that matters: the no-op repair of the F8 sample must *fail* `functional`. It pas
 allocation is not enforced, so a guard that only checked the bracket would happily certify an
 environment enforcing nothing.
 
+An induced fault only shows that the harness can catch something. Whether a model commits it is a
+separate question, and on this task the answer is yes: asked for enough memory to hold 64MB, the
+1.5B model writes `--mem=64M` in fourteen of fifteen samples, the size of the data with nothing
+left for the process holding it, and one of those samples passes every other level and is then
+OOM-killed. The measurement is in
+[`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#f8-memory-request-below-what-the-payload-uses).
+
 One property of real submission had to be handled before a correct script could pass at all.
 slurmstepd opens the file named by `--output` before the script's first command runs, so the
 `mkdir -p logs` inside the `t1_output_paths` reference solution is dead code here: the job fails to

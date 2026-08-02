@@ -74,20 +74,40 @@ Three of the eight tasks failed here. This is the class where dry-run validation
 
 ## F8: Memory request below what the payload uses
 
-The one class in the taxonomy that was **not** observed on a model, and it is listed apart for
-that reason. It exists because the verifier gained the ability to see it: with real submission and
-cgroup enforcement, a script that asks for less memory than it uses comes back `OUT_OF_MEMORY`
-instead of completing.
+The class the verifier had to grow a new ability to see: with real submission and cgroup
+enforcement, a script that asks for less memory than it uses comes back `OUT_OF_MEMORY` instead of
+completing. It cannot be induced from the eight T1 tasks, because each of them states a memory
+minimum and a value below it fails `resource_fit` before anything runs, which is F3's and F4's
+territory. `tasks/t1_exec.jsonl` therefore states no minimum: the payload holds 64MB and the prompt
+asks for enough memory to fit it, so the ground truth is what the script actually needs.
 
-It cannot be induced from the eight T1 tasks. Each of them states a memory minimum, and a value
-below that minimum fails `resource_fit` before anything runs, which makes the fault a static one
-already covered by F3 and F4. `tasks/t1_exec.jsonl` therefore states no minimum: the payload holds
-64MB and the prompt asks for enough memory to fit it, so the ground truth is what the script
-actually needs and no check that reads the text can reach it.
+**Observed, on the same 1.5B model.** 15 samples, 3 seeds, n=5, verified twice inside the same
+image, once per executor (`results/executor_20260802_081626` on the development machine,
+`scripts/memory_request.py` for the breakdown). Fourteen of the fifteen request exactly
+`--mem=64M`: the size of the data, with nothing left for the process that builds it. The fifteenth
+asks for 6M.
 
-Whether a real model commits this error when the specification leaves the number open is exactly
-the measurement this class is waiting for. Until then it is a capability of the harness, not an
-observation about models, and the count of tasks in the shared set stays at eight.
+One sample is the whole point:
+
+```
+#SBATCH --mem=64M
+string=$(head -c 67108864 /dev/zero | tr '\0' '\n')
+```
+
+It passes `syntax`, `submittability`, `resource_fit` and `safety`, it runs to completion under the
+`bash` executor, and it is counted as a fully correct artifact by everything the benchmark could do
+before this. Submitted for real it is OOM-killed: a command substitution holds the pipe buffer and
+the variable at once, so the peak is at least twice the 64MB the model reasoned about. Strict
+pass@1 on that seed goes from 0.20 under `bash` to 0.00 under real submission.
+
+Two caveats, both structural. First, 64M sits on the boundary: three other samples requesting the
+same value completed, because how the payload is written moves the peak, which is precisely why
+only execution can decide the outcome. Second, the executor stopped three samples in total, but the
+other two had already failed `submittability`; for those, real execution only aligned `functional`
+with what the level above had said. The new information is the one sample that everything else
+called correct.
+
+**One model, one task, 15 samples: an observation, not a rate.**
 
 ---
 
@@ -184,9 +204,13 @@ are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). Wha
   appending it;
 - the T1 and T2 matrices measured again under `--executor sbatch`, to see how far `functional`
   moves once the requested walltime is enforced and the payload receives the scheduler's own
-  environment instead of three simulated variables. Not measurable in the verification image,
-  whose `slurmd` never starts (see `docker/entrypoint.sh`); the experiment machine's native
-  scheduler does run jobs, so that is where this arm has to be measured;
+  environment instead of three simulated variables. The tooling is in place
+  (`scripts/executor_ablation.sh` against the accounting image), and the one task measured that
+  way so far is the execution set below; the matrices themselves need generations, which the
+  earlier multi-seed run did not save;
+- F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
+  single task whose payload sits on the boundary of what it requests. Whether larger models leave
+  headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
 - a T1 task that depends on a coreutils corner where `uutils` and GNU are known to differ
   (`stat`, `sort`, `date` formatting, flag-level behaviour). The cross-distribution ablation
   now agrees across 3 seeds and 360 level comparisons, but none of the eight current tasks
