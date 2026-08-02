@@ -140,10 +140,13 @@ def level(result, name):
 
 samples = 0
 stopped = []          # passed under bash, failed under sbatch: the finding
-unverifiable = 0      # skipped under sbatch: says nothing about the script
+unverifiable = 0      # bash could judge it and sbatch could not
 rescued = []          # failed under bash, passed under sbatch: worth knowing if ever
 other_levels = 0      # any disagreement outside `functional`
+strict_flips = []     # the verdict on the whole artifact changed
 reasons = Counter()
+# summary[family][model][level][executor] -> list of pass@1, one per seed
+scores: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
 
 for cell, per in sorted(cells.items()):
     if len(per) < 2:
@@ -161,8 +164,11 @@ for cell, per in sorted(cells.items()):
         fa, fb = level(ra, "functional"), level(rb, "functional")
         if fa is None or fb is None:
             continue
+        # Skipped under both arms is not the executor's doing: a script that fails
+        # `syntax` never reaches either. Counting those here once suggested a third of
+        # the run was beyond real submission's reach.
         if fb["skipped"]:
-            unverifiable += 1
+            unverifiable += 0 if fa["skipped"] else 1
         elif fa["passed"] and not fb["passed"]:
             stopped.append((cell, rb["task_id"], i, fb["detail"]))
             # The detail carries the job id, which is unique per sample; the terminal
@@ -176,15 +182,51 @@ for cell, per in sorted(cells.items()):
                 reasons["other"] += 1
         elif fb["passed"] and not fa["passed"]:
             rescued.append((cell, rb["task_id"], i, fa["detail"]))
+        if ra["all_passed"] != rb["all_passed"]:
+            strict_flips.append((cell, rb["task_id"], i, rb["all_passed"]))
         for name in ("syntax", "submittability", "resource_fit", "safety"):
             la, lb = level(ra, name), level(rb, name)
             if la and lb and (la["passed"], la["skipped"]) != (lb["passed"], lb["skipped"]):
                 other_levels += 1
 
+# What each arm says, not only where they differ. The `bash` column is the corrected
+# table: these cells were graded inside the image, against the declared topology, which
+# is the whole reason the run is verified here rather than wherever it was generated.
+for cell, per in sorted(cells.items()):
+    family = "T2 repair" if cell.startswith("repair__") else "T1"
+    model = cell[len("repair__"):] if cell.startswith("repair__") else cell
+    model = model.rsplit("__seed", 1)[0]
+    for executor, data in per.items():
+        for level, row in data["summary"].items():
+            scores[family][model][level][executor].append(row["pass@1"])
+
+for family in sorted(scores):
+    print(f"\n{family}: pass@1 per arm, mean over seeds (half-range in brackets)")
+    levels = ["syntax", "submittability", "functional", "resource_fit", "safety",
+              "strict_all_levels"]
+    print(f"  {'model':<34}{'level':<20}{'bash':>16}{'sbatch':>16}")
+    for model in sorted(scores[family]):
+        for level in levels:
+            cell_scores = scores[family][model][level]
+            if not cell_scores:
+                continue
+            out_cols = []
+            for executor in ("bash", "sbatch"):
+                vals = cell_scores.get(executor, [])
+                if not vals:
+                    out_cols.append("n/a".rjust(16))
+                    continue
+                mean = sum(vals) / len(vals)
+                half = (max(vals) - min(vals)) / 2
+                out_cols.append(f"{mean:.3f}+-{half:.3f}".rjust(16))
+            print(f"  {model[:33]:<34}{level:<20}" + "".join(out_cols))
+
 print(f"\n{len(cells)} cells, {samples} sample comparisons")
+print(f"  {len(strict_flips)} artifacts whose strict verdict changes with the executor")
 print(f"  {len(stopped)} promoted by bash and stopped by real submission")
 print(f"  {len(rescued)} failed under bash and passed under real submission")
-print(f"  {unverifiable} not verifiable under sbatch (skipped, says nothing about the script)")
+print(f"  {unverifiable} judged by bash and not by sbatch (skipped, says nothing "
+      "about the script)")
 print(f"  {other_levels} disagreements outside `functional`, which should be zero: "
       "the other four levels do not depend on the executor")
 
@@ -196,6 +238,14 @@ if reasons:
     print("\nWhat stopped them:")
     for kind, count in reasons.most_common():
         print(f"  {count:>4}  {kind}")
+
+if strict_flips:
+    print("\nArtifacts the two executors disagree about, as whole artifacts:")
+    for cell, task_id, i, now_passes in strict_flips[:10]:
+        verdict = "only real submission accepts it" if now_passes else "only bash accepts it"
+        print(f"  {cell} {task_id}[{i}]: {verdict}")
+    if len(strict_flips) > 10:
+        print(f"  ... and {len(strict_flips) - 10} more")
 
 if stopped:
     print("\nFirst samples that only real execution rejects:")
