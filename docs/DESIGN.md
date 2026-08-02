@@ -213,14 +213,47 @@ put `submittability` inside the comparison.
 
 This is a real result, not a shortcut past the fidelity concern that motivates pinning
 `ubuntu:24.04` as the default. The T1 task suite's shell payloads are dominated by bash builtins
-and `mkdir -p`, operations where `uutils`'s GNU compatibility is presumably solid; they do not
-exercise the coreutils corners (`stat`, `sort`, `date` formatting, flag-level differences) where
-`uutils` and GNU coreutils are known to diverge. The ablation did not find a difference here
-because the current tasks are not shaped to surface one, not because the difference does not
-exist. A meaningful negative result would need a task that specifically depends on one of those
-corners; none of the eight T1 tasks currently do. Tripling the samples does not change that
-argument: 72 scripts drawn from the same eight prompts probe the same operations more times,
-not more operations.
+and `mkdir -p`, and the ablation did not find a difference because the current tasks are not
+shaped to surface one. Tripling the samples does not change that argument: 72 scripts drawn from
+the same eight prompts probe the same operations more times, not more operations.
+
+### Where the two implementations do differ
+
+That argument was worth settling directly rather than assuming, so
+`scripts/coreutils_divergence.sh` asks the question with no tasks and no model in the way: 73
+invocations chosen for what a job script does with its results and what a careful one does around
+them, run in both images, diffed.
+
+**Fifty-one of the fifty-one work invocations agree**, exactly, output for output: sorting,
+counting, cutting, hashing, `stat -c`, `du`, `df`, `seq`, `numfmt --to=iec`, `date` in four
+formats, `split`, `join`, `comm`, `od`, `base64`. So does every exit code, including the ones a
+careful script checks: a missing file, a bad flag, an expired `timeout`, `timeout
+--preserve-status`. On this evidence `uutils` 0.8.0 is a faithful stand-in for GNU coreutils 9.4
+for what these scripts do.
+
+Four divergences remain, and they fall into two kinds.
+
+**Error text, not behaviour.** `mkdir`, `stat` and `ls` word their failures differently, and
+`uutils` drops the `Try 'ls --help'` line and adds `(os error 2)`. Exit codes match, so only a
+script that greps stderr would notice. That is not unheard of in job scripts, but it is a thin
+target for a task.
+
+**Locale fallback, which is behaviour.** Both images generate only `C`, `C.utf8` and `POSIX`.
+Asked for `en_US.UTF-8`, GNU falls back to C and `uutils` applies its own Unicode collation
+anyway:
+
+| | GNU 9.4 | uutils 0.8.0 |
+|---|---|---|
+| `LC_ALL=C sort` | `10 9 A B a b` | `10 9 A B a b` |
+| `LC_ALL=en_US.UTF-8 sort` | `10 9 A B a b` | `10 9 a A b B` |
+| `LC_ALL=en_US.UTF-8 numfmt --grouping 1234567` | `1234567` | `1,234,567` |
+
+A cluster whose login profile sets a locale that the compute nodes do not generate is not a
+contrived situation, and there the same script produces a different ordering depending on which
+coreutils the node runs. This is the corner a distribution-sensitive task would have to sit in,
+and pinning `LC_ALL=C` before sorting is the practice that makes an artifact portable across it.
+Whether a model does that is unmeasured: exercising it needs the execution environment to declare
+a locale, which is a change to the reference environment and not to a task file.
 
 ## Retrieval ablation
 
