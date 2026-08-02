@@ -20,9 +20,11 @@
 #     stay "idle*" and sbatch --test-only rejects EVERY script.
 #   * SlurmdParameters=config_overrides makes slurmctld trust the configuration
 #     instead of interrogating the hardware.
-#   * FirstJobId=12345 plus a held placeholder job: tasks that declare a
-#     dependency on an existing job (afterok:12345) then validate. Without it,
-#     sbatch answers "Job dependency problem".
+#   * FirstJobId=12345 plus a placeholder job that runs and completes: tasks that
+#     declare a dependency on an existing job (afterok:12345) then validate, and
+#     under real submission the dependency can actually clear. Without the job,
+#     sbatch answers "Job dependency problem"; with it held, the dependent job
+#     waits forever and no executor can judge it.
 #   * RealMemory is in MB. A task asking for --mem=16G (16384 MB) does NOT fit a
 #     node declared with 16000. The reference cluster is generous on purpose.
 #
@@ -117,6 +119,12 @@ JobAcctGatherType=jobacct_gather/none
 ReturnToService=2
 SlurmdTimeout=0
 InactiveLimit=0
+# The placeholder must stay resolvable for the length of a sweep, and a finished job is
+# forgotten MinJobAge seconds after it ends (300 by default). The same setting keeps
+# scontrol answering about a finished job, which the sbatch executor polls for.
+# No backticks in this heredoc: it is unquoted, so the shell would run what they enclose
+# while the file it is writing sits truncated. That is not hypothetical, it happened here.
+MinJobAge=86400
 SchedulerType=sched/backfill
 SelectType=select/cons_tres
 SelectTypeParameters=CR_Core_Memory
@@ -270,14 +278,32 @@ sleep 3
 scontrol update nodename="node[1-${ANVIL_NODES}]" state=resume >/dev/null 2>&1 || true
 sleep 1
 
-# Held placeholder job: takes id 12345 and makes afterok dependencies valid.
+# The placeholder takes id 12345 so that a task declaring --dependency=afterok:12345 has
+# something to point at. It used to be submitted with --hold, which is enough for
+# `sbatch --test-only`, where a dependency is checked for existence and never waited on.
+# Under real submission a held job never completes, so `afterok` can never clear: the
+# dependent job sits PENDING forever and the level cannot be judged for anybody, the
+# canonical solution included. So it runs and completes instead, and MinJobAge keeps the
+# record around long enough for the dependency to still resolve hours into a sweep.
 cat >/tmp/anvil_placeholder.sh <<'PH'
 #!/bin/bash
 #SBATCH --job-name=anvil_placeholder
 #SBATCH --time=00:01:00
-sleep 1
+echo anvil_placeholder_done
 PH
-sbatch --hold /tmp/anvil_placeholder.sh >/dev/null 2>&1 || true
+# --chdir and --output: a job that runs writes its stdout somewhere, and the working
+# directory here is the mounted repository. Nobody reads this output.
+sbatch --chdir=/tmp --output=/dev/null /tmp/anvil_placeholder.sh >/dev/null 2>&1 || true
+# Wait for it, so the first dependent job of a run does not race it. Only where a daemon
+# can actually run it: with no slurmd the job stays pending forever and the wait would add
+# its full timeout to every container start, CI included. `--test-only` needs the job to
+# exist, not to have finished, so nothing is lost by not waiting there.
+if [[ "$(pgrep -xc slurmd 2>/dev/null || echo 0)" -gt 0 ]]; then
+  for _ in $(seq 1 20); do
+    [[ -z "$(squeue -h -j 12345 -o %T 2>/dev/null || true)" ]] && break
+    sleep 1
+  done
+fi
 
 if [[ "${ANVIL_QUIET:-0}" != "1" ]]; then
   echo "==> base image: ${ANVIL_BASE_IMAGE:-unknown}"
