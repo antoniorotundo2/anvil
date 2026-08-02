@@ -6,11 +6,11 @@ Why this benchmark exists, and why it is built the way it is.
 
 *When an LLM writes the SLURM job script a supercomputer user actually needs, is it correct?*
 
-Not "does it resemble the reference answer" — **does it parse, does the scheduler accept it, does
+Not "does it resemble the reference answer": **does it parse, does the scheduler accept it, does
 it run, and does it request the right resources?**
 
 Assistants that help HPC users are appearing, but they are evaluated with semantic similarity
-metrics because no validated HPC benchmark exists — their own authors say so. Meanwhile,
+metrics because no validated HPC benchmark exists, as their own authors say. Meanwhile,
 execution-based benchmarks are the norm everywhere else: parallel code, PDE solvers, quantum SDKs,
 and cloud infrastructure-as-code. **Operational HPC artifacts are the empty slot.**
 
@@ -43,7 +43,7 @@ scored as *not passed*. The metrics stay honest on any machine.
 ### The misplaced-directive check
 
 SLURM stops reading `#SBATCH` lines at the first real command. Directives after it are **silently
-ignored** — `sbatch` accepts the job and the request is wrong. Anvil catches this;
+ignored**: `sbatch` accepts the job and the request is wrong. Anvil catches this;
 `sbatch --test-only` cannot.
 
 ### Effective requests, not string presence
@@ -52,11 +52,11 @@ ignored** — `sbatch` accepts the job and the request is wrong. Anvil catches t
 documented defaults: `--nodes` → 1, `--ntasks` → one task per node, `--cpus-per-task` → 1. A serial
 script that omits `--nodes` still requests one node, and is correct.
 
-Directives with no universal default — `--time`, `--mem`, `--gpus` — depend on partition
+Directives with no universal default (`--time`, `--mem`, `--gpus`) depend on partition
 configuration. Omitting them means the resource was never requested: a genuine failure against a
 spec that asks for it. Tasks can still demand explicitness through `required_directives`.
 
-The distinction is the point. Checking whether a string appears is surface-form matching —
+The distinction is the point. Checking whether a string appears is surface-form matching,
 precisely what this benchmark exists to replace. An early version did exactly that, and failed
 scripts that `sbatch` accepted.
 
@@ -64,15 +64,15 @@ scripts that `sbatch` accepted.
 
 Every benchmark should ship both. Few do.
 
-- **Oracle** — canonical solutions. Proves the tasks are solvable and the verifier is not too
+- **Oracle**: canonical solutions. Proves the tasks are solvable and the verifier is not too
   strict. CI fails if it drops below 1.0.
-- **Broken** — faulty artifacts (missing shebang, misplaced directive, walltime overrun,
+- **Broken**: faulty artifacts (missing shebang, misplaced directive, walltime overrun,
   `rm -rf /`, non-zero exit). Proves the verifier is not too permissive. CI fails if it scores
   above 0.0 strict, **or if the safety guard is never exercised**.
 
 Together they bracket the verifier from both sides. Neither test is decorative: the oracle caught
 a real bug during development, where the harness injected `SLURM_CPUS_PER_TASK=1` into a task that
-requested 4 cores — the harness was contradicting the spec it was checking.
+requested 4 cores: the harness was contradicting the spec it was checking.
 
 An earlier broken model sampled the same three flavours for every task, so the destructive one was
 never drawn and `check_safety` was never tested. A guard that never fires is decoration.
@@ -94,12 +94,12 @@ tell a failure of its subject from a failure of itself.
 ## Diagnose-and-repair (T2)
 
 T1 measures whether a model can write a correct artifact from scratch. T2 measures whether it can
-recognise and fix a broken one — a distinct and, for an assistant embedded in a support workflow,
-arguably more common situation: a user already has a script, and it is already wrong.
+recognise and fix a broken one. That is a distinct situation and, for an assistant embedded in a
+support workflow, arguably a more common one: a user already has a script, and it is already wrong.
 
 **Repair is graded by the same verifier, not a softer one.** A repaired script must clear every
 level that a from-scratch T1 solution would have to clear against the same task. There is no
-partial credit for "closer to correct" — that would reintroduce the similarity-based scoring this
+partial credit for "closer to correct": that would reintroduce the similarity-based scoring this
 benchmark exists to replace.
 
 **The faults are induced, not hand-written.** `anvil/inducer.py` mechanically derives seven fault
@@ -112,8 +112,8 @@ from a known-good starting point does.
 
 **Broken must mean broken.** Building `tasks/t2_repair.jsonl` (`anvil induce`) runs each induced
 variant through the real verifier and discards any that still verifies clean. Not every fault class
-applies to every task — F1 needs a directive with a SLURM default to hide behind, F6 needs a
-derived-value payload — so applicability is decided empirically, not declared in advance. The same
+applies to every task (F1 needs a directive with a SLURM default to hide behind, F6 needs a
+derived-value payload), so applicability is decided empirically, not declared in advance. The same
 bracket as T1's oracle/broken guard applies here: the oracle repair (the T1 canonical solution,
 returned regardless of the diagnosis) must score 1.0, and a no-op repair (the broken script,
 unchanged) must score 0.0. `make guards-t2` checks both.
@@ -315,10 +315,10 @@ say so plainly.
 
 ## Roadmap
 
-- [x] **Phase 1** — verifier (5 levels), 8 T1 tasks, oracle + broken, `pass@k`, reference cluster,
+- [x] **Phase 1**: verifier (5 levels), 8 T1 tasks, oracle + broken, `pass@k`, reference cluster,
       preflight, generate/verify decoupling
 - [x] **Phase 2**
-  - [x] T2 diagnose-and-repair — mechanical fault induction (F1–F7), `tasks/t2_repair.jsonl`,
+  - [x] T2 diagnose-and-repair: mechanical fault induction (F1–F7), `tasks/t2_repair.jsonl`,
         `anvil repair` / `anvil verify-repair`, oracle-repair/no-op-repair guards
   - [x] failure-category breakdown: `aggregate_by_category`, per-category tables in
         `anvil repair` / `anvil verify-repair` output
@@ -353,7 +353,7 @@ say so plainly.
         same per-level scores as Docker. A runtime that changes the numbers is not a fix, it is a
         second environment to declare
   - [ ] QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
-- [ ] **Phase 4** — dataset release, leaderboard, preprint
+- [ ] **Phase 4**: dataset release, leaderboard, preprint
 
 ### Real submission (the sbatch executor)
 

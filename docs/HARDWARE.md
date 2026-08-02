@@ -14,7 +14,7 @@ run jobs on nodes you do not control.
 
 ---
 
-## Mac — development
+## Mac: development
 
 This is where 90% of the time goes: authoring tasks, developing the verifier, running the tests,
 using `oracle` and `broken`, writing the paper.
@@ -41,7 +41,7 @@ huggingface-cli delete-cache
 ```
 
 **The fidelity problem, and its fix.** macOS ships `bash` 3.2 and BSD coreutils. A generated script
-using GNU-isms may pass on the Mac and fail on the cluster — or the reverse. The `functional` level
+using GNU-isms may pass on the Mac and fail on the cluster, or the reverse. The `functional` level
 would return verdicts of no scientific value. For results that go in the paper, run the verifier in
 the Linux container:
 
@@ -57,10 +57,10 @@ builds the image natively for arm64.
 
 ---
 
-## Windows PC — experiments
+## Windows PC: experiments
 
 This is where the real numbers come from. The RTX 3060 is **Ampere**: it supports bf16, **not** FP8
-(which needs Hopper, sm_90+) — the practical confirmation that the Transformer Engine was out of
+(which needs Hopper, sm_90+), the practical confirmation that the Transformer Engine was out of
 reach.
 
 VRAM: the desktop 3060 is typically 12 GB (an 8 GB variant exists). Check with `anvil doctor`,
@@ -76,7 +76,7 @@ So the 7B class is evaluated **in 4-bit**. Not a concession: quantization is alr
 axis, and now it has a hardware justification for the paper.
 
 The 64 GB of system RAM allow CPU offload and many parallel verification sandboxes. The Gen4 SSD
-makes weight loading negligible — put `HF_HOME` there, you have 2 TB.
+makes weight loading negligible: put `HF_HOME` there, you have 2 TB.
 
 ### Recommended setup: WSL2
 

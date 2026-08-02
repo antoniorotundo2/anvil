@@ -27,13 +27,13 @@ tasks: version it and cite it in the paper.
 
 ## Non-obvious details, learned empirically
 
-- **`SlurmdParameters=config_overrides`** — slurmctld trusts the configuration instead of
+- **`SlurmdParameters=config_overrides`**: slurmctld trusts the configuration instead of
   interrogating the hardware. Without it, a single-core container rejects a job asking for eight.
 - **`RealMemory` is in MB.** A task requesting `--mem=16G` (16384 MB) does **not** fit a node
   declared with 16000. The first reference cluster was too tight and rejected `t1_gpu_single`:
   the canonical solution was correct, the cluster was not.
 - **`FirstJobId=12345` plus a held placeholder job.** Tasks declaring
-  `--dependency=afterok:12345` otherwise fail with *"Job dependency problem"* — the job does not
+  `--dependency=afterok:12345` otherwise fail with *"Job dependency problem"*: the job does not
   exist. The placeholder deterministically takes that id.
 - **`cgroup.conf` with `IgnoreSystemd=yes`.** Containers have no systemd: without it slurmd dies
   on *"can't stat /sys/fs/cgroup/systemd/"*, never registers, nodes stay `idle*`, and
