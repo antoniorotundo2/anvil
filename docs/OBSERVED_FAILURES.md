@@ -152,45 +152,107 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 
 ## Multi-seed validation (T1 and T2)
 
-The single-seed pilot above named three gaps before its numbers could be quoted as a rate.
-This run closes all three: 3 seeds (0/1/2), n=5, two model sizes, on a real machine with GNU
-coreutils and a live `slurmctld` (WSL2, Ubuntu 24.04, RTX 3060, 4-bit quantization). Full
-per-category results are in `results/20260724_124032/` on the experiment machine.
+3 seeds (0/1/2), n=5, two model sizes, 4-bit on an RTX 3060. Generated on the experiment
+machine, **graded inside the container**, which the first version of this table was not: see
+[A table measured against the wrong cluster](#a-table-measured-against-the-wrong-cluster) below.
+Generations in `results/20260802_091236/`, verdicts in `results/executor_20260802_140437/`.
 
-**T1 (from scratch), pass@1, mean ± half-range across seeds:**
+**T1 (from scratch), pass@1, mean and half-range across seeds:**
 
-| model | syntax | submittability | functional | resource_fit | strict_all_levels |
-|---|---|---|---|---|---|
-| Qwen2.5-Coder-1.5B-Instruct | 0.58±0.02 | 0.68±0.05 | 0.53±0.04 | 0.44±0.01 | 0.18±0.03 |
-| Qwen2.5-Coder-7B-Instruct   | 1.00±0.00 | 0.62±0.00 | 0.88±0.00 | 1.00±0.00 | 0.50±0.00 |
+| model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict (bash) | strict (sbatch) |
+|---|---|---|---|---|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.375±0.025 | 0.442±0.013 | 0.308±0.025 | 0.308±0.025 |
+| Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 | 0.667±0.025 |
 
 **T2 (diagnose-and-repair), same protocol:**
 
-| model | syntax | submittability | functional | resource_fit | strict_all_levels |
-|---|---|---|---|---|---|
-| Qwen2.5-Coder-1.5B-Instruct | 0.79±0.02 | 0.57±0.00 | 0.66±0.00 | 0.41±0.01 | 0.20±0.00 |
-| Qwen2.5-Coder-7B-Instruct   | 0.98±0.00 | 0.61±0.00 | 0.87±0.00 | 0.97±0.01 | 0.46±0.00 |
+| model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict (bash) | strict (sbatch) |
+|---|---|---|---|---|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.412±0.014 | 0.291±0.000 | 0.292±0.002 |
+| Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 | 0.824±0.002 |
 
-Two findings hold across both models and all three seeds.
+`safety` is 1.000±0.000 everywhere and is left out of both tables.
 
-**`submittability` does not scale with model size.** Every other level improves sharply from
-1.5B to 7B. `submittability` stays roughly flat (0.68 to 0.62 in T1, 0.57 to 0.61 in T2). These
-failures look like scheduler-facing syntactic edge cases rather than semantic misunderstanding,
-and a bigger model does not fix them on its own.
+### `submittability` does not scale with model size
 
-**F1 is the hardest repair category, now with numbers behind it.** At 1.5B, `resource_fit` for
-F1 repairs is 0.0 on all three seeds: the small model never restores the missing directive. At
-7B, `resource_fit` reaches 1.0, but `strict_all_levels` still caps at 0.33, because the
-bottleneck moves to `submittability` (also 0.33): the model now understands what was missing,
-but the resulting script still often fails `sbatch --test-only`. F6 (payload/spec mismatch), by
-contrast, reaches `strict_all_levels` = 1.0 for both models on almost every seed: it is the easy
-category of the taxonomy.
+It falls: 0.842 at 1.5B against 0.792 at 7B on T1, while every other level improves and two of
+them reach 1.000. The mechanism is visible in the refusals. Of 1560 verdicts, 106 were
+`invalid partition specified`, naming `gpu`, `small`, or the placeholder `your_partition_name`
+left in from a template. The reference cluster declares one partition and no task asks for one,
+so a script that volunteers a name is asserting something about a cluster it has not seen, which
+is exactly what gets a job rejected on a real system. The larger model writes better formed
+scripts and volunteers more of them.
+
+### Real submission moves `functional` and barely touches the verdict
+
+`functional` drops under real submission in every cell, by 16 points at 1.5B and 21 at 7B on T1.
+`strict_all_levels` does not move at all: 0.308 against 0.308, 0.667 against 0.667, and the two
+T2 rows agree to within 0.001. Of 1560 artifacts, exactly **one** changes verdict between the two
+executors.
+
+The reason is that the scripts real submission stops were already failing another level. The 106
+partition refusals fail `submittability` in both arms; the executor only propagates the verdict
+into `functional`. So on these eight tasks the extra strictness of real execution is almost
+entirely redundant with the static levels, which is worth saying plainly rather than claiming an
+executor earns its keep by itself. Where it does earn it is on a task built to need it: F8 below
+is invisible to every static check and to bash.
+
+### The one artifact the two executors disagree about
+
+```bash
+if [ -z "$OMP_NUM_THREADS" ]; then
+    export OMP_NUM_THREADS=$(nproc)
+fi
+```
+
+A repair of `t1_cpus_per_task__F6`. Under `bash` it prints the host's core count and fails; under
+real submission `ConstrainCores` confines the job to the four cores it was allocated, `nproc`
+answers 4, and it passes. The sandbox is the one that is wrong here, and it is wrong in the
+direction that matters least in aggregate and most in kind: it produces a **false negative** on an
+idiomatic script. Deriving threads from the allocation is normal practice on a cluster that
+enforces binding.
+
+It also settles a question the roadmap had left open. Binding was listed as unobservable until a
+task existed that reads its own affinity. No such task was needed: a model wrote one.
+
+### F1 is the hardest repair category
+
+At 1.5B, `resource_fit` for F1 repairs is 0.0 on all three seeds: the small model never restores
+the missing directive. At 7B `resource_fit` reaches 1.0 while `strict_all_levels` caps at 0.33,
+with `submittability` at 0.33 as the bottleneck: the model now understands what was missing, and
+the resulting script still often fails `sbatch --test-only`. F6 reaches `strict_all_levels` 1.0
+for both models on almost every seed, and is the easy category of the taxonomy.
+
+### A table measured against the wrong cluster
+
+The first version of these numbers was verified on the experiment machine's own SLURM rather than
+inside the container. Every result file recorded it, `base_image: "n/a (outside the container)"`,
+and nobody read that field. That scheduler has no GPUs, one node, and no job 12345, so it rejects
+three of the eight canonical solutions: the oracle itself scored `submittability` 0.625 there.
+
+The published numbers were 0.68 and 0.62; graded against the declared topology they are 0.842 and
+0.792, and `strict_all_levels` moves from 0.18 and 0.50 to 0.308 and 0.667. T2 moves further
+still, the 7B from 0.46 to 0.824. `syntax`, `functional` and `resource_fit` are unchanged to the
+digit, which is the expected signature: they do not depend on the scheduler.
+
+The distortion was not a uniform ceiling either. The 1.5B scored 0.68 where the oracle scored
+0.625, because on a cluster without GPUs a script that forgets `--gpus` is accepted and the
+correct one is refused. That environment rewarded the omission F1 and F4 exist to catch.
+
+The canary could not have caught this. It submits a minimal script and asks whether the scheduler
+accepts it, and any scheduler does. What was missing is a check that the scheduler in front of us
+implements the topology this benchmark declares, and it is now the first item under
+[Next measurements needed](#next-measurements-needed).
 
 ## Next measurements needed
 
 The three gaps named above (multiple seeds, a scheduler-faithful environment, a larger model)
 are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). What remains open:
 
+- a preflight that checks the scheduler in front of us against the *declared* topology, not only
+  that it accepts a minimal script. The canary passes on any working SLURM, which is how a whole
+  table came to be measured against a one-node cluster with no GPUs. A second canary requesting
+  what `ANVIL_NODES` and `ANVIL_GPUS` promise would have refused to score at all;
 - more than two model sizes and families, to see where the `submittability` plateau breaks, if
   it breaks;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic

@@ -409,8 +409,19 @@ clear, `strict_all_levels` 1.0, broken model 0.0.
 
 Measuring the executor means comparing it with the one it stands beside, not reporting its pass@k
 alone: `scripts/executor_ablation.sh` verifies the same generations twice inside the same image and
-counts the samples on which the two arms part company. Two environments can reach the same pass@k
-while disagreeing about which scripts run, and that disagreement is the result worth reporting.
+counts the samples on which the two arms part company.
+
+The answer on the current task set is deflationary, and worth stating that way. Across 1560
+artifacts, real submission costs `functional` between 7 and 21 points depending on the cell, and
+moves `strict_all_levels` by nothing at all: the scripts it stops were already failing another
+level, mostly `submittability`, so the executor propagates a verdict rather than producing one.
+Exactly one artifact of the 1560 changes verdict, and it changes in favour of real submission,
+which accepts a script the sandbox wrongly rejects. The numbers are in
+[`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-moves-functional-and-barely-touches-the-verdict).
+
+That is a statement about these eight tasks, not about the executor. A task built to need real
+execution does need it: F8 below is invisible to every static level and to bash, and there the
+verdict does change.
 
 ### The fault only execution can see
 
