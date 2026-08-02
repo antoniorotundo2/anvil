@@ -3,7 +3,7 @@
 Given a broken script (mechanically induced, see inducer.py) and the original
 task spec, the model must diagnose the problem and produce a corrected
 script. A repair is correct if and only if the repaired script clears the
-SAME verifier used to grade a from-scratch T1 solution — this module adds no
+SAME verifier used to grade a from-scratch T1 solution. This module adds no
 separate notion of "close enough".
 
 Two models bracket the task, mirroring `OracleModel`/`BrokenModel` in
@@ -51,7 +51,7 @@ class RepairOracleModel(Model):
     """The T1 canonical solution, regardless of what was broken.
 
     `build_repair_prompt` always starts the prompt with the base task's
-    original NL spec, so — exactly like `OracleModel` for T1 — the correct
+    original NL spec, so (exactly like `OracleModel` for T1) the correct
     reference script is recovered by matching that prefix, with no need to
     thread repair-task ids through `generate`'s prompt-only interface.
     """
@@ -120,10 +120,10 @@ def induce_t2_tasks(
     t1_tasks: list[Task], reference: dict[str, str], run_functional: bool = True
 ) -> tuple[list[RepairTask], list[str]]:
     """Build the T2 task set from T1 references, keeping only induced variants
-    that actually fail the verifier — `induce()` is a pure string transform
+    that actually fail the verifier: `induce()` is a pure string transform
     and cannot guarantee that on its own.
 
-    Returns (repair_tasks, warnings) — warnings list categories that an
+    Returns (repair_tasks, warnings), where the warnings list categories that an
     inducer produced but that turned out to still verify clean, and were
     therefore dropped.
     """

@@ -14,7 +14,7 @@ deliberately kept free of subprocess/SLURM dependencies so they stay fast and
 hermetic to unit-test. The caller that builds tasks/t2_repair.jsonl is
 responsible for running the real verifier and discarding any variant that
 does not fail (an inducer that produces an accidentally-valid script is a bug
-in the inducer, not a fault worth teaching a model to repair — the same
+in the inducer, not a fault worth teaching a model to repair, the same
 "broken must mean broken" bracketing DESIGN.md applies to T1's broken model).
 """
 
@@ -63,7 +63,7 @@ def _drop_directive(script: str, directive: str) -> str | None:
 def inject_f1_silent_underrequest(script: str, task: Task) -> str | None:
     """Drop --cpus-per-task or --ntasks: SLURM's default masks the drop.
 
-    The scheduler still accepts the job and it still runs — at a fraction of
+    The scheduler still accepts the job and it still runs, at a fraction of
     the requested parallelism. Only `resource_fit` catches this.
     """
     c = task.constraints
@@ -255,7 +255,7 @@ INDUCERS: dict[str, Callable[[str, Task], str | None]] = {
 
 def induce(script: str, task: Task) -> dict[str, str]:
     """Return {fault_category: broken_script} for every inducer applicable to
-    this task. Categories whose inducer returns None (or a no-op) are absent —
+    this task. Categories whose inducer returns None (or a no-op) are absent:
     not every task exhibits every fault class."""
     out: dict[str, str] = {}
     for category, fn in INDUCERS.items():

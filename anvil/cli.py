@@ -189,7 +189,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             for g in generations:
                 fh.write(json.dumps(g, ensure_ascii=False) + "\n")
         print(f"Generations written to {args.save_generations} "
-              f"({len(generations)} scripts) — verify them elsewhere with `anvil verify`.")
+              f"({len(generations)} scripts). Verify them elsewhere with `anvil verify`.")
 
     _report(model.name, args.tasks, tasks, results, args, elapsed)
     return 0
@@ -200,7 +200,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
     Generation needs the machine with the accelerator; faithful verification needs
     the machine with the scheduler and GNU coreutils. Decoupling them lets you
-    generate once and verify anywhere — including across several base images, to
+    generate once and verify anywhere, including across several base images, to
     test whether artifact correctness is portable between distributions.
     """
     tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
@@ -352,8 +352,8 @@ def cmd_repair(args: argparse.Namespace) -> int:
             for g in generations:
                 fh.write(json.dumps(g, ensure_ascii=False) + "\n")
         print(
-            f"Generations written to {args.save_generations} ({len(generations)} scripts) "
-            "— verify them elsewhere with `anvil verify-repair`."
+            f"Generations written to {args.save_generations} ({len(generations)} scripts). "
+            "Verify them elsewhere with `anvil verify-repair`."
         )
 
     categories = {rt.id: rt.fault_category for rt in repair_tasks}
@@ -469,7 +469,7 @@ def cmd_recipe(args: argparse.Namespace) -> int:
             for g in generations:
                 fh.write(json.dumps(g, ensure_ascii=False) + "\n")
         print(f"Generations written to {args.save_generations} "
-              f"({len(generations)} recipes) — verify them elsewhere with `anvil verify-recipe`.")
+              f"({len(generations)} recipes). Verify them elsewhere with `anvil verify-recipe`.")
 
     _report_recipe(model.name, args.tasks, tasks, results, args, elapsed)
     return 0
@@ -610,7 +610,7 @@ def _report(
 ) -> None:
     """categories: {repair_task_id: fault_category}, only for T2 (repair/verify-repair).
     When given, breaks the summary down per fault category (F1-F7) in addition
-    to the overall one — a category is invisible to pass@k otherwise, and the
+    to the overall one: a category is invisible to pass@k otherwise, and the
     whole point of inducing faults by class is to see which classes a model
     actually repairs."""
     summary = aggregate(results, k=args.k)

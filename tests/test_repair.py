@@ -3,7 +3,7 @@
 Guiding principle, same as test_verifier.py: broken must mean broken, and the
 oracle must mean solvable. An inducer that produces an accidentally-valid
 script, or a repair verifier that is accidentally permissive, is a bug in the
-harness — not a property of the model under test.
+harness, not a property of the model under test.
 """
 
 from __future__ import annotations
@@ -65,7 +65,7 @@ def test_induction_guard_broken_means_broken():
         base_task = by_base[rt.base_task_id]
         res = verify(rt.broken_script, base_task)
         assert not res.all_passed, (
-            f"{rt.id} ({rt.fault_category}) verifies clean — the inducer did not "
+            f"{rt.id} ({rt.fault_category}) verifies clean: the inducer did not "
             "actually break anything"
         )
 
@@ -194,7 +194,7 @@ def test_aggregate_by_category_partitions_by_fault_category():
     assert n_tasks_total == len(repair_tasks)
 
     # the oracle repair passes every task: strict pass@1 must be 1.0 in EVERY
-    # category, not just on average — a category-blind aggregate could hide a
+    # category, not just on average: a category-blind aggregate could hide a
     # category the oracle fails.
     for cat, summary in by_category.items():
         assert summary["strict_all_levels"]["pass@1"] == 1.0, f"oracle fails category {cat}"
