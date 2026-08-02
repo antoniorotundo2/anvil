@@ -72,7 +72,7 @@ Three of the eight tasks failed here. This is the class where dry-run validation
 
 ---
 
-## F8 — Memory request below what the payload uses
+## F8: Memory request below what the payload uses
 
 The one class in the taxonomy that was **not** observed on a model, and it is listed apart for
 that reason. It exists because the verifier gained the ability to see it: with real submission and

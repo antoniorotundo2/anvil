@@ -227,12 +227,12 @@ not more operations.
 Does giving a model reference material about SLURM semantics change how correctly it writes a
 script? Three conditions, compared on the same model, seeds and tasks:
 
-* **zero-shot** — the task prompt alone. This is what T1/T2/T3 have always done; introducing the
+* **zero-shot**: the task prompt alone. This is what T1/T2/T3 have always done; introducing the
   other two arms changes nothing about the default behaviour.
-* **vector** — TF-IDF cosine similarity between the task prompt and a small corpus of reference
+* **vector**: TF-IDF cosine similarity between the task prompt and a small corpus of reference
   documents (`tasks/retrieval_corpus.jsonl`), implemented in pure Python (stdlib only): the corpus
   is small enough that a neural embedding model would be a dependency this ablation does not need.
-* **vectorless** — exact tag overlap between the task and a document, no similarity scoring.
+* **vectorless**: exact tag overlap between the task and a document, no similarity scoring.
   Structure-based, not similarity-based: a document is retrieved because it is declared to be
   *about* the task's topic, not because its text happens to resemble the prompt.
 
@@ -320,30 +320,30 @@ say so plainly.
 - [x] **Phase 2**
   - [x] T2 diagnose-and-repair — mechanical fault induction (F1–F7), `tasks/t2_repair.jsonl`,
         `anvil repair` / `anvil verify-repair`, oracle-repair/no-op-repair guards
-  - [x] failure-category breakdown — `aggregate_by_category`, per-category tables in
+  - [x] failure-category breakdown: `aggregate_by_category`, per-category tables in
         `anvil repair` / `anvil verify-repair` output
-  - [x] cross-distribution ablation — `BASE_IMAGE` build arg plus
+  - [x] cross-distribution ablation: `BASE_IMAGE` build arg plus
         `scripts/crossdist_ablation.sh`, comparing per sample and per level. 24.04 against
         26.04 across 3 seeds: 360 level comparisons, zero divergence, see [Cross-distribution
         ablation](#cross-distribution-ablation)
-  - [x] Apptainer recipes — `RecipeTask`, `RecipeLevel`, `anvil recipe` / `anvil verify-recipe`,
+  - [x] Apptainer recipes: `RecipeTask`, `RecipeLevel`, `anvil recipe` / `anvil verify-recipe`,
         `tasks/t3_apptainer.jsonl`, see [Apptainer recipes (T3)](#apptainer-recipes-t3). Both
         guards confirmed: `make guards-t3` (lenient) and `make docker-guards-t3` (strict,
         oracle 1.0 / broken 0.0, `apptainer` active) on Docker Desktop for Windows; ruled out on
         Docker Desktop for Mac (`apptainer run` fails there, see the section above)
-  - [x] retrieval ablation — `anvil/retrieval.py` (TF-IDF vector / tag-based vectorless),
+  - [x] retrieval ablation: `anvil/retrieval.py` (TF-IDF vector / tag-based vectorless),
         `--retrieval` on `anvil run`, `scripts/retrieval_ablation.sh`, see [Retrieval
         ablation](#retrieval-ablation). Measured on the experiment machine across 3 seeds,
         all 9 cells: retrieval does not help this model and `vectorless` costs 30 points of
         `resource_fit`.
 - [ ] **Phase 3**
-  - [x] real submission — `--executor sbatch`, opt-in beside the `bash` default, with its own
+  - [x] real submission: `--executor sbatch`, opt-in beside the `bash` default, with its own
         preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
-  - [x] cgroup enforcement — `task/cgroup` with RAM, swap and cores constrained, plus the task set
+  - [x] cgroup enforcement: `task/cgroup` with RAM, swap and cores constrained, plus the task set
         that exercises it (`tasks/t1_exec.jsonl`, fault F8) and `make docker-guards-enforcement`
-  - [ ] binding — a task that reads the affinity and the GPU it was actually given, which needs
+  - [ ] binding: a task that reads the affinity and the GPU it was actually given, which needs
         real devices rather than the placeholder files the declared topology stands on
-  - [ ] Podman as a second verification runtime — rootless by default, so the confinement Docker
+  - [ ] Podman as a second verification runtime, rootless by default, so the confinement Docker
         had to be exempted from may not apply in the first place: the T3 unprivileged path needs
         `seccomp=unconfined`, `apparmor=unconfined`, `systempaths=unconfined`, `/dev/fuse` and a
         host `kernel.apparmor_restrict_unprivileged_userns=0` (see [Apptainer recipes
