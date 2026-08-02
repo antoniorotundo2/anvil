@@ -121,11 +121,25 @@ class LevelResult:
     passed: bool
     detail: str = ""
     skipped: bool = False   # e.g. L2 when no working scheduler is reachable
+    # Whose limitation the skip is, and it decides whether strict scoring lets the
+    # artifact through. "environment" means this machine lacks the capability and every
+    # artifact is skipped alike, so counting it as satisfied keeps the metric usable on a
+    # laptop; the alternative would score every run there 0.0. "artifact" means this
+    # particular script cannot be judged anywhere, and letting that through promotes a
+    # broken artifact to fully correct, which is what a measurement caught it doing: ten
+    # repairs of the dependency task failed under bash and passed strict under real
+    # submission, because the job they submit can never start.
+    skip_scope: str = "environment"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["level"] = self.level.value
         return d
+
+
+def _satisfied(lr: LevelResult) -> bool:
+    """Does this level stand in the way of calling the artifact correct?"""
+    return lr.passed or (lr.skipped and lr.skip_scope == "environment")
 
 
 @dataclass
@@ -144,7 +158,12 @@ class VerificationResult:
 
     @property
     def all_passed(self) -> bool:
-        return all(lr.passed or lr.skipped for lr in self.levels)
+        """Every level either passed or was out of this machine's reach.
+
+        A level skipped because *this artifact* cannot be judged does not count: see
+        LevelResult.skip_scope for the measurement that forced the distinction.
+        """
+        return all(_satisfied(lr) for lr in self.levels)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -174,7 +193,7 @@ class RecipeVerificationResult:
 
     @property
     def all_passed(self) -> bool:
-        return all(lr.passed or lr.skipped for lr in self.levels)
+        return all(_satisfied(lr) for lr in self.levels)
 
     def to_dict(self) -> dict[str, Any]:
         return {

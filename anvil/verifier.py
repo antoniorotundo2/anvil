@@ -490,10 +490,13 @@ def _functional_via_sbatch(script: str, task: Task, timeout: int) -> LevelResult
             _scancel(job_id)
 
         if outcome == "unplaceable":
+            # Artifact-scoped: no machine can judge this one, so strict scoring must not
+            # wave it through. Ten repairs of the dependency task did exactly that before
+            # the distinction existed, failing under bash and passing strict here.
             return LevelResult(
-                Level.FUNCTIONAL, False, skipped=True,
+                Level.FUNCTIONAL, False, skipped=True, skip_scope="artifact",
                 detail=f"level skipped (NOT counted as passed): job {job_id} can never start "
-                       f"(Reason={reason}), which says nothing about the script",
+                       f"(Reason={reason}), which says nothing about how the script would run",
             )
         if outcome == "pending":
             return LevelResult(
@@ -684,7 +687,7 @@ def verify(script: str, task: Task, run_functional: bool = True) -> Verification
     else:
         res.levels.append(
             LevelResult(
-                Level.FUNCTIONAL, False, skipped=True,
+                Level.FUNCTIONAL, False, skipped=True, skip_scope="artifact",
                 detail="not executed (invalid syntax or unsafe script)",
             )
         )

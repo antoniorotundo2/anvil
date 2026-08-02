@@ -220,10 +220,14 @@ def verify_recipe(
             if run_functional and sif_path:
                 res.levels.append(check_recipe_functional(sif_path, task))
             else:
+                # A failed build is the recipe's doing and must not be waved through; a
+                # caller passing --no-exec is not, and every recipe is skipped alike.
                 res.levels.append(
                     LevelResult(
                         RecipeLevel.FUNCTIONAL, False, skipped=True,
-                        detail="not run (build failed or functional disabled)",
+                        skip_scope="environment" if not run_functional else "artifact",
+                        detail="not run (functional disabled)" if not run_functional
+                        else "not run (the build did not produce an image)",
                     )
                 )
         finally:
@@ -231,13 +235,13 @@ def verify_recipe(
     else:
         res.levels.append(
             LevelResult(
-                RecipeLevel.BUILDABLE, False, skipped=True,
+                RecipeLevel.BUILDABLE, False, skipped=True, skip_scope="artifact",
                 detail="not built (invalid syntax or unsafe recipe)",
             )
         )
         res.levels.append(
             LevelResult(
-                RecipeLevel.FUNCTIONAL, False, skipped=True,
+                RecipeLevel.FUNCTIONAL, False, skipped=True, skip_scope="artifact",
                 detail="not run (invalid syntax or unsafe recipe)",
             )
         )

@@ -25,6 +25,15 @@ def pass_at_k(n: int, c: int, k: int) -> float:
     return 1.0 - prod
 
 
+def _rests_on_a_skip(result) -> bool:
+    """Does this sample owe its strict verdict to a level nobody could check here?
+
+    Only an environment-scoped skip can do that: an artifact-scoped one now fails the
+    sample outright, so it never props a score up.
+    """
+    return result.all_passed and any(lr.skipped for lr in result.levels)
+
+
 def aggregate(
     results: list[VerificationResult], k: int = 1
 ) -> dict[str, dict[str, float | int]]:
@@ -52,16 +61,20 @@ def aggregate(
             "n_skipped_samples": n_skipped,
         }
 
-    # "strict": every non-skipped level passed
+    # "strict": every level either passed or was out of this machine's reach. The count
+    # beside it is how many samples rest on such a level, and it used to be hardcoded to
+    # zero, which hid exactly the case that made the distinction necessary.
     strict: list[float] = []
+    strict_skipped = 0
     for _, rs in by_task.items():
         n = len(rs)
         c = sum(1 for r in rs if r.all_passed)
+        strict_skipped += sum(1 for r in rs if _rests_on_a_skip(r))
         strict.append(pass_at_k(n, c, min(k, n)))
     out["strict_all_levels"] = {
         f"pass@{k}": round(mean(strict), 4) if strict else 0.0,
         "n_tasks": len(by_task),
-        "n_skipped_samples": 0,
+        "n_skipped_samples": strict_skipped,
     }
     return out
 
@@ -108,13 +121,15 @@ def aggregate_recipes(
         }
 
     strict: list[float] = []
+    strict_skipped = 0
     for _, rs in by_task.items():
         n = len(rs)
         c = sum(1 for r in rs if r.all_passed)
+        strict_skipped += sum(1 for r in rs if _rests_on_a_skip(r))
         strict.append(pass_at_k(n, c, min(k, n)))
     out["strict_all_levels"] = {
         f"pass@{k}": round(mean(strict), 4) if strict else 0.0,
         "n_tasks": len(by_task),
-        "n_skipped_samples": 0,
+        "n_skipped_samples": strict_skipped,
     }
     return out

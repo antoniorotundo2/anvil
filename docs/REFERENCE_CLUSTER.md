@@ -25,6 +25,19 @@ Overridable via `ANVIL_NODES`, `ANVIL_CPUS`, `ANVIL_MEM_MB`, `ANVIL_GPUS`.
 **Changing the topology changes the results.** It is part of the benchmark definition, like the
 tasks: version it and cite it in the paper.
 
+### One partition, and what that measures
+
+The cluster declares a single partition, `debug`, and it stays that way. A script naming any other
+is rejected at submit, and models do it often: in the multi-seed run 106 samples of 1560 came back
+`invalid partition specified`, naming `gpu`, `small`, and in several cases the placeholder
+`your_partition_name` left in from a template.
+
+Declaring a `gpu` partition would accept most of those and would look more like a real centre. It
+is left undeclared deliberately. No task asks for a partition and no reference solution sets one,
+so a script that volunteers a name is assuming something about a cluster it has never seen, and on
+a real system that assumption is precisely what gets the job rejected. One partition makes the
+benchmark measure the assumption instead of forgiving it.
+
 ## Non-obvious details, learned empirically
 
 - **`SlurmdParameters=config_overrides`**: slurmctld trusts the configuration instead of

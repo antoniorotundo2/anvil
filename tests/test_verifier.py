@@ -1101,3 +1101,64 @@ def test_the_shared_repair_set_carries_no_execution_only_fault():
         for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
     }
     assert "F8" not in categories
+
+
+# ------------------------------- skipped levels: whose limitation is it?
+# A level nobody on this machine could check must not sink every score, or a laptop would
+# report 0.0 for everything. A level that *this artifact* makes unjudgeable is the
+# opposite case, and treating the two alike promoted ten broken repairs to fully correct:
+# they failed under bash and passed strict under real submission, where the job they
+# submit can never start.
+def _levels(*results):
+    from anvil.schema import VerificationResult
+
+    res = VerificationResult(task_id="t", script=GOOD)
+    res.levels.extend(results)
+    return res
+
+
+def test_a_level_no_machine_here_could_check_does_not_sink_the_artifact():
+    from anvil.schema import LevelResult
+
+    res = _levels(
+        LevelResult(Level.SYNTAX, True),
+        LevelResult(Level.SUBMITTABILITY, False, skipped=True),   # no scheduler here
+    )
+    assert res.all_passed
+
+
+def test_a_level_this_artifact_makes_unjudgeable_does_sink_it():
+    from anvil.schema import LevelResult
+
+    res = _levels(
+        LevelResult(Level.SYNTAX, True),
+        LevelResult(Level.FUNCTIONAL, False, skipped=True, skip_scope="artifact"),
+    )
+    assert not res.all_passed
+
+
+def test_an_unplaceable_job_is_charged_to_the_artifact(monkeypatch):
+    """The measured case: a repair whose job can never start used to pass strict."""
+    v = _sbatch_stub(
+        monkeypatch, "unplaceable",
+        [{"JobId": "42", "JobState": "PENDING", "Reason": "DependencyNeverSatisfied"}],
+    )
+    r = v.check_functional(GOOD, SBATCH_TASK)
+    assert r.skipped and r.skip_scope == "artifact"
+
+    res = _levels(v.check_syntax(GOOD), r)
+    assert not res.all_passed, "an unjudgeable job must not certify the artifact"
+
+
+def test_strict_reports_how_many_samples_rest_on_a_skip():
+    """The count beside strict was hardcoded to zero, which hid the whole phenomenon."""
+    from anvil.metrics import aggregate
+    from anvil.schema import LevelResult
+
+    resting = _levels(
+        LevelResult(Level.SYNTAX, True),
+        LevelResult(Level.SUBMITTABILITY, False, skipped=True),
+    )
+    clean = _levels(LevelResult(Level.SYNTAX, True), LevelResult(Level.SUBMITTABILITY, True))
+    summary = aggregate([resting, clean], k=1)
+    assert summary["strict_all_levels"]["n_skipped_samples"] == 1
