@@ -45,9 +45,13 @@ benchmark measure the assumption instead of forgiving it.
 - **`RealMemory` is in MB.** A task requesting `--mem=16G` (16384 MB) does **not** fit a node
   declared with 16000. The first reference cluster was too tight and rejected `t1_gpu_single`:
   the canonical solution was correct, the cluster was not.
-- **`FirstJobId=12345` plus a held placeholder job.** Tasks declaring
+- **`FirstJobId=12345` plus a placeholder job that runs and completes.** Tasks declaring
   `--dependency=afterok:12345` otherwise fail with *"Job dependency problem"*: the job does not
-  exist. The placeholder deterministically takes that id.
+  exist. The placeholder deterministically takes that id. It was held at first, which satisfies
+  `--test-only`, where a dependency is checked for existence and never waited on; under real
+  submission a held job never completes, so `afterok` could not clear and the level was
+  unjudgeable for every artifact, the canonical solution included. `MinJobAge=86400` keeps the
+  finished job resolvable for the length of a sweep.
 - **`cgroup.conf` with `IgnoreSystemd=yes`.** Containers have no systemd: without it slurmd dies
   on *"can't stat /sys/fs/cgroup/systemd/"*, never registers, nodes stay `idle*`, and
   `sbatch --test-only` rejects **every** script.
@@ -97,10 +101,9 @@ this cluster does not configure ("Slurm accounting storage is disabled").
 
 Three details of the reference cluster show up only under real submission:
 
-- **A held placeholder job is not a satisfiable dependency.** The placeholder that gives
-  `--dependency=afterok:12345` something to point at is held, so it never completes. Under
-  `--test-only` the script is accepted; submitted for real the job stays PENDING with
-  `Reason=Dependency` forever, so `functional` is **skipped** for `t1_dependency_chain`, not failed.
+- **A dependency has to be satisfiable, not merely present.** See the placeholder note above: the
+  job it points at now runs and completes, so `afterok` clears and `t1_dependency_chain` is graded
+  like any other task. While it was held, real submission could not judge that task at all.
 - **`--output` directories must exist before submission.** slurmstepd opens that file before the
   script's first command, so a `mkdir -p logs` inside the script comes too late. The harness creates
   them.
@@ -109,8 +112,8 @@ Three details of the reference cluster show up only under real submission:
 
 `make guards-sbatch` is the bracket for this executor: no oracle sample may *fail* `functional`
 under real submission, at least one must actually have run, and the broken model must still score
-0.0 strict. `make docker-guards-sbatch SCHED_IMAGE=<image>` runs it in a container, which needs
-`--privileged --cgroupns=host` (see below) and an image whose scheduler can execute.
+0.0 strict. `make docker-guards-sbatch` runs it in a container, which needs `--privileged
+--cgroupns=host` (see below) and the accounting image, which it builds.
 
 ## Making the container execute, and where it stops
 
