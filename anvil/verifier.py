@@ -475,7 +475,21 @@ def check_functional(script: str, task: Task, timeout: int = 60) -> LevelResult:
 
 
 def _functional_via_bash(script: str, task: Task, timeout: int) -> LevelResult:
+    """Run the payload under bash, in a directory that does not outlive the sample.
+
+    The sandbox used to be left behind. One directory per verified sample is invisible
+    while developing and not while measuring: a single ablation verifies 1560 samples twice,
+    and a development machine had accumulated ten thousand of them. Nothing reads the
+    directory afterwards, since the detail below carries the output.
+    """
     workdir = tempfile.mkdtemp(prefix="anvil_run_")
+    try:
+        return _run_under_bash(workdir, script, task, timeout)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+def _run_under_bash(workdir: str, script: str, task: Task, timeout: int) -> LevelResult:
     script_path = Path(workdir) / "job.sh"
     script_path.write_text(script, encoding="utf-8")
 

@@ -1219,3 +1219,25 @@ def test_a_working_scheduler_that_is_not_the_declared_cluster_skips_the_level(mo
     monkeypatch.setattr(v, "slurm_healthy", lambda force=False: (healthy, why))
     r = v.check_submittability(GOOD)
     assert r.skipped and not r.passed
+
+
+def test_the_bash_sandbox_does_not_outlive_the_sample(monkeypatch):
+    """One directory per verified sample is invisible while developing and not while
+    measuring: an ablation verifies 1560 samples twice, and a development machine had ten
+    thousand of them before this was noticed."""
+    import anvil.verifier as v
+
+    created: list[str] = []
+    real_mkdtemp = v.tempfile.mkdtemp
+
+    def recording(*args, **kwargs):
+        path = real_mkdtemp(*args, **kwargs)
+        created.append(path)
+        return path
+
+    monkeypatch.setattr(v.tempfile, "mkdtemp", recording)
+    monkeypatch.setattr(v, "_executor_override", "bash")
+
+    v.check_functional(GOOD, SBATCH_TASK)
+    assert created, "the bash executor no longer makes a sandbox: this test is watching nothing"
+    assert not [d for d in created if Path(d).exists()]
