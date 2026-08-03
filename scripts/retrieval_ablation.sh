@@ -41,10 +41,17 @@ STRATEGIES="${STRATEGIES:-zero-shot vector vectorless}"
 # measured rather than argued (see DESIGN.md, "What the level breaks on").
 CORPUS="${CORPUS:-}"
 
+# How many documents an arm may attach. Raising it is the way to tell a document's own
+# effect from the effect of the one it displaced: at the default the general slot holds
+# exactly one document, so swapping the corpus order gains one and loses another at the
+# same time, and the two cannot be told apart.
+RETRIEVAL_K="${RETRIEVAL_K:-}"
+
 # A string, not an array: see run_experiments.sh for why (bash 3.2 on macOS).
 FLAGS=""
 [[ "$FOURBIT" == "1" ]] && FLAGS="--load-in-4bit"
 [[ -n "$CORPUS" ]] && FLAGS="$FLAGS --retrieval-corpus $CORPUS"
+[[ -n "$RETRIEVAL_K" ]] && FLAGS="$FLAGS --retrieval-k $RETRIEVAL_K"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
 OUT="${OUT:-results/retrieval_${STAMP}}"
