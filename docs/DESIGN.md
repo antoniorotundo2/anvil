@@ -385,9 +385,13 @@ say so plainly.
         namespaces still allow `apptainer --fakeroot`, and that both strict brackets return the
         same per-level scores as Docker. A runtime that changes the numbers is not a fix, it is a
         second environment to declare
-  - [ ] more families, on borrowed hardware: the open question is whether `submittability` stays
-        flat across model *families* and not only sizes, and one more family costs GPU time this
-        project does not have. The split it already relies on covers it, since only generation
+  - [ ] more families, on borrowed hardware: the second family answered the question this item was
+        written for, and sharpened it. Granite 4.1 3B scores `submittability` above both Qwen sizes
+        and fails it for a different reason, an option SLURM does not have rather than a partition
+        name this cluster does not have, so the level is not flat across families and is not
+        ordered by size either. What a third family would settle is whether that split between
+        invented syntax and invented values is a pattern or a coincidence of two points, and it
+        costs GPU time this project does not have. The split it already relies on covers it, since only generation
         needs an accelerator: generate wherever a free quota is, then verify at home in the
         container. Kaggle is the first choice for its documented quota, around 30 GPU-hours a week
         at roughly 16 GB, which fits a 7B in fp16 or a 30B in 4-bit; Colab's free tier has the same
@@ -460,11 +464,12 @@ Measuring the executor means comparing it with the one it stands beside, not rep
 alone: `scripts/executor_ablation.sh` verifies the same generations twice inside the same image and
 counts the samples on which the two arms part company.
 
-The answer on the current task set is deflationary, and worth stating that way. Across 1560
-artifacts, real submission costs `functional` between 7 and 21 points depending on the cell, and
-moves `strict_all_levels` by nothing at all: the scripts it stops were already failing another
-level, mostly `submittability`, so the executor propagates a verdict rather than producing one.
-Exactly one artifact of the 1560 changes verdict, and it changes in favour of real submission,
+The answer on the current task set is deflationary, and worth stating that way. Across 2340
+artifacts from three models, real submission costs `functional` up to 21 points depending on the
+cell and nothing at all in one of them, and moves `strict_all_levels` by nothing anywhere: the
+scripts it stops were already failing another level, mostly `submittability`, so the executor
+propagates a verdict rather than producing one.
+Exactly one artifact of the 2340 changes verdict, and it changes in favour of real submission,
 which accepts a script the sandbox wrongly rejects. The numbers are in
 [`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-moves-functional-and-barely-touches-the-verdict).
 

@@ -111,6 +111,26 @@ called correct.
 
 ---
 
+## F9: An option this scheduler does not have
+
+```
+sbatch: unrecognized option '--walltime=30'
+```
+
+Granite 4.1 3B on `t1_mpi_multinode`, all fifteen samples, all three seeds, and nowhere else in
+its 780 verdicts. `--walltime` is not a SLURM option. `walltime` is what PBS calls the same
+resource, requested as `-l walltime=hh:mm:ss`, so the artifact carries SLURM's long-option form
+around PBS's parameter name: a blend of two schedulers rather than an error in either. It appears
+on the one multi-node task, which is where published examples are most likely to be PBS.
+
+F7 is a real directive with a value the parser rejects, and a better value would have saved it.
+Here no value exists that would: the option itself is not in the vocabulary. The distinction is
+worth keeping because it is also the distinction between a portable failure and a local one. The
+partition refusals that dominate the Qwen rows depend on which cluster is asked; this one does
+not.
+
+---
+
 ## Two verifications that dry-run cannot do
 
 Both observed in the container, against a live `slurmctld`:
@@ -152,7 +172,7 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 
 ## Multi-seed validation (T1 and T2)
 
-3 seeds (0/1/2), n=5, two model sizes, 4-bit on an RTX 3060. Generated on the experiment
+3 seeds (0/1/2), n=5, three models across two families, 4-bit on an RTX 3060. Generated on the experiment
 machine, **graded inside the container**, which the first version of this table was not: see
 [A table measured against the wrong cluster](#a-table-measured-against-the-wrong-cluster) below.
 Generations in `results/20260802_091236/`, verdicts in `results/executor_20260802_140437/`.
@@ -163,6 +183,7 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 |---|---|---|---|---|---|---|---|
 | Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.375±0.025 | 0.442±0.013 | 0.308±0.025 | 0.308±0.025 |
 | Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 | 0.667±0.025 |
+| granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 | 0.500±0.000 |
 
 **T2 (diagnose-and-repair), same protocol:**
 
@@ -170,29 +191,47 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 |---|---|---|---|---|---|---|---|
 | Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.412±0.014 | 0.291±0.000 | 0.292±0.002 |
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 | 0.824±0.002 |
+| granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 | 0.661±0.009 |
 
 `safety` is 1.000±0.000 everywhere and is left out of both tables.
 
-### `submittability` does not scale with model size
+### `submittability` does not track model size
 
-It falls: 0.842 at 1.5B against 0.792 at 7B on T1, while every other level improves and two of
-them reach 1.000. The mechanism is visible in the refusals. Of 1560 verdicts, 106 were
-`invalid partition specified`, naming `gpu`, `small`, or the placeholder `your_partition_name`
-left in from a template. The reference cluster declares one partition and no task asks for one,
-so a script that volunteers a name is asserting something about a cluster it has not seen, which
-is exactly what gets a job rejected on a real system. The larger model writes better formed
-scripts and volunteers more of them.
+Ordered by the level itself, T1 reads 0.875 for Granite at 3B, 0.842 for Qwen at 1.5B, 0.792 for
+Qwen at 7B; T2 reads 1.000, 0.977 and 0.886, with the 7B second and the 1.5B last. The smallest
+model of the second family leads both, and inside the Qwen family the level falls as size rises
+while every other level improves and two of them reach 1.000. Whatever `submittability` measures,
+parameter count does not order it.
+
+The refusals show why, and they are not the same failure in the two families. Qwen invents
+*values*: of 1560 verdicts, 106 were `invalid partition specified`, naming `gpu`, `small`, or the
+placeholder `your_partition_name` left in from a template. The reference cluster declares one
+partition and no task asks for one, so a script that volunteers a name is asserting something
+about a cluster it has not seen. The larger model writes better formed scripts and volunteers more
+of them.
+
+Granite invents *syntax*. Not one of its refusals names a partition, in T2 it has none at all
+across 660 samples, and its entire T1 deficit is one task failing all fifteen times on an option
+SLURM does not have: F9 below. That difference matters for what the level is worth. A script
+asking for `--partition=gpu` would be accepted on a cluster that happens to have a `gpu`
+partition, so those refusals are site-dependent and a reader may fairly discount them;
+`--walltime` is refused by every SLURM installation there is.
+
+So the level does not rank models by capability. It measures how much each one adds that the
+prompt never asked for, and which scheduler's vocabulary it reaches for when it does. Two
+families, two habits, and a 3B ahead of a 7B.
 
 ### Real submission moves `functional` and barely touches the verdict
 
-`functional` drops under real submission in every cell, by 16 points at 1.5B and 21 at 7B on T1.
-`strict_all_levels` does not move at all: 0.308 against 0.308, 0.667 against 0.667, and the two
-T2 rows agree to within 0.001. Of 1560 artifacts, exactly **one** changes verdict between the two
-executors.
+`functional` drops under real submission in every cell, by 16 points at 1.5B, 21 at 7B and 12 at
+Granite 3B on T1. `strict_all_levels` does not move at all: 0.308 against 0.308, 0.667 against
+0.667, 0.500 against 0.500, and the T2 rows agree to within 0.001. Of 2340 artifacts, exactly
+**one** changes verdict between the two executors.
 
-The reason is that the scripts real submission stops were already failing another level. The 106
-partition refusals fail `submittability` in both arms; the executor only propagates the verdict
-into `functional`. So on these eight tasks the extra strictness of real execution is almost
+The reason is that the scripts real submission stops were already failing another level. All 121
+refusals, the 106 partition names and Granite's 15 unknown options, fail `submittability` in both
+arms; the executor only propagates the verdict into `functional`. So on these eight tasks the
+extra strictness of real execution is almost
 entirely redundant with the static levels, which is worth saying plainly rather than claiming an
 executor earns its keep by itself. Where it does earn it is on a task built to need it: F8 below
 is invisible to every static check and to bash.
@@ -241,20 +280,25 @@ correct one is refused. That environment rewarded the omission F1 and F4 exist t
 
 The canary could not have caught this. It submits a minimal script and asks whether the scheduler
 accepts it, and any scheduler does. What was missing is a check that the scheduler in front of us
-implements the topology this benchmark declares, and it is now the first item under
-[Next measurements needed](#next-measurements-needed).
+implements the topology this benchmark declares. That check is `_topology_healthy`, and the first
+model run after it landed hit it on this same machine: `submittability` was skipped, with
+`Invalid generic resource (gres) specification` given as the reason, rather than scored against a
+cluster that is not the reference one.
 
 ## Next measurements needed
 
-The three gaps named above (multiple seeds, a scheduler-faithful environment, a larger model)
-are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). What remains open:
+The gaps named above are resolved: multiple seeds, a scheduler-faithful environment, a larger
+model, a second family, and both matrices measured under real submission; see
+[Multi-seed validation](#multi-seed-validation-t1-and-t2). So is the topology preflight that the
+wrong-cluster table called for. `_topology_healthy` submits a job asking for the `ANVIL_NODES` and
+`ANVIL_GPUS` the benchmark declares, and on the experiment machine's own SLURM it does what it was
+built to do: `submittability` is skipped with the reason stated, instead of scoring. What remains
+open:
 
-- a preflight that checks the scheduler in front of us against the *declared* topology, not only
-  that it accepts a minimal script. The canary passes on any working SLURM, which is how a whole
-  table came to be measured against a one-node cluster with no GPUs. A second canary requesting
-  what `ANVIL_NODES` and `ANVIL_GPUS` promise would have refused to score at all;
-- more than two model sizes and families, to see where the `submittability` plateau breaks, if
-  it breaks;
+- a third family. Two of them were enough to show that `submittability` is not ordered by size,
+  because the two families fail it for different reasons and one of the reasons is site-dependent
+  while the other is not. Whether "invented values against invented syntax" is a real split or two
+  points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
 - the mechanism behind the `vectorless` `resource_fit` collapse (0.19 against 0.49 zero-shot, see
@@ -264,12 +308,6 @@ are resolved; see [Multi-seed validation](#multi-seed-validation-t1-and-t2). Wha
   What moves the level is therefore still unidentified;
 - the same ablation on a larger model, and a variant that prepends context instead of
   appending it;
-- the T1 and T2 matrices measured again under `--executor sbatch`, to see how far `functional`
-  moves once the requested walltime is enforced and the payload receives the scheduler's own
-  environment instead of three simulated variables. The tooling is in place
-  (`scripts/executor_ablation.sh` against the accounting image), and the one task measured that
-  way so far is the execution set below; the matrices themselves need generations, which the
-  earlier multi-seed run did not save;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
