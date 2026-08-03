@@ -4,6 +4,7 @@
 #
 #   ./scripts/retrieval_ablation.sh
 #   MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_ablation.sh
+#   STRATEGIES=vectorless CORPUS=results/reordered.jsonl ./scripts/retrieval_ablation.sh
 #
 # Every cell also writes its generated scripts beside its scores, so a finished sweep can
 # be handed to crossdist_ablation.sh without spending inference time again.
@@ -33,9 +34,17 @@ SEEDS="${SEEDS:-0 1 2}"
 FOURBIT="${FOURBIT:-1}"
 STRATEGIES="${STRATEGIES:-zero-shot vector vectorless}"
 
+# A corpus other than the default one. What the arms retrieve depends on the order the
+# documents sit in, not only on their content: `vectorless` fills its remaining slots from
+# the documents tagged `general` in corpus order, so the first of them is attached to every
+# task and the rest are never seen. Pointing this at a reordered copy is how that is
+# measured rather than argued (see DESIGN.md, "What the level breaks on").
+CORPUS="${CORPUS:-}"
+
 # A string, not an array: see run_experiments.sh for why (bash 3.2 on macOS).
 FLAGS=""
 [[ "$FOURBIT" == "1" ]] && FLAGS="--load-in-4bit"
+[[ -n "$CORPUS" ]] && FLAGS="$FLAGS --retrieval-corpus $CORPUS"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
 OUT="${OUT:-results/retrieval_${STAMP}}"
