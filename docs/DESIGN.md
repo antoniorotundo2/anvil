@@ -388,9 +388,14 @@ say so plainly.
   - [ ] more families, on borrowed hardware: the open question is whether `submittability` stays
         flat across model *families* and not only sizes, and one more family costs GPU time this
         project does not have. The split it already relies on covers it, since only generation
-        needs an accelerator: generate wherever a free quota is (Kaggle offers around 30 GPU-hours
-        a week, at roughly 16 GB, so a 7B in fp16 or a 30B in 4-bit), then verify at home in the
-        container. A three-seed T1 matrix travels as 200 KB of JSONL, and `--no-exec` keeps the
+        needs an accelerator: generate wherever a free quota is, then verify at home in the
+        container. Kaggle is the first choice for its documented quota, around 30 GPU-hours a week
+        at roughly 16 GB, which fits a 7B in fp16 or a 30B in 4-bit; Colab's free tier has the same
+        hardware but Google states the GPU is not guaranteed, and a sweep interrupted halfway
+        resumes from the missing cells. Paperspace Gradient gives a free GPU with a 5 GB storage
+        cap, which a 7B in fp16 does not fit, and public projects only. Spaces is out, its free
+        hardware being CPU alone, and so is AI Studio, which is an API onto Gemini rather than a
+        machine to compute on. A three-seed T1 matrix travels as 200 KB of JSONL, and `--no-exec` keeps the
         borrowed machine from grading anything: it has no scheduler and whatever coreutils it
         happens to ship. An arm behind an inference API was considered and set aside, free
         endpoints included: they route to whichever provider is cheapest at that moment, so the
