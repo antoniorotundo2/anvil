@@ -8,6 +8,7 @@ report success. This compares the two manifests before any of that matters.
 
     ./scripts/mirror_parity.py
     ./scripts/mirror_parity.py --mirror https://hf-mirror.com Qwen/Qwen2.5-Coder-7B-Instruct
+    ./scripts/mirror_parity.py --local ~/.cache/huggingface/... ibm-granite/granite-4.1-3b
 
 Three things have to match, and the first is the one that answers "is it the same version":
 
@@ -15,17 +16,24 @@ Three things have to match, and the first is the one that answers "is it the sam
   * the file set, since a missing shard fails at load time and a extra one is a question;
   * the sha256 of every file the hub records one for, which is every weight shard.
 
-Exits non-zero on any divergence, so it can gate a sweep rather than only inform one. It
-compares what the two say, not what they send: verifying the bytes on disk after a download
-is a stricter check and a different script.
+Exits non-zero on any divergence, so it can gate a sweep rather than only inform one.
+
+`--local` answers the stricter question, and the one that matters once weights arrive from
+somewhere other than the hub: it hashes the files already on disk and compares them with the
+hub's manifest. That makes any source usable, including ones that speak no hub protocol at
+all, because `transformers` loads from a directory: fetch the files however you like, verify
+them here, then run offline. Without it, a download is only ever checked against the manifest
+of whoever served it.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 DEFAULT_MODELS = [
     "Qwen/Qwen2.5-Coder-1.5B-Instruct",
@@ -84,23 +92,77 @@ def compare(model_id: str, mirror: str) -> list[str]:
     return problems
 
 
+def sha256_of(path: Path, chunk: int = 1 << 20) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while block := handle.read(chunk):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def verify_local(model_id: str, directory: Path) -> list[str]:
+    """Hash what is on disk and hold it against the hub's manifest.
+
+    Only files the hub records a digest for are checked, which is every weight shard; the
+    small text files it does not hash are reported as present or absent and no more. A
+    directory missing a shard is a divergence rather than a warning: `transformers` would
+    fail at load time anyway, and later rather than here.
+    """
+    try:
+        hub = manifest(HUB, model_id)
+    except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+        return [f"{model_id}: the hub is unreachable ({type(exc).__name__}), so nothing on disk "
+                "can be checked against it"]
+
+    hashed = {name: digest for name, (digest, _) in hub["files"].items() if digest}
+    if not hashed:
+        return [f"{model_id}: the hub records no digest for any file, nothing to verify"]
+
+    problems: list[str] = []
+    checked = 0
+    for name, expected in sorted(hashed.items()):
+        # Snapshots keep the repository layout, so a shard sits at the same relative path.
+        local = directory / name
+        if not local.is_file():
+            problems.append(f"{model_id}: {name} is not in {directory}")
+            continue
+        actual = sha256_of(local)
+        checked += 1
+        if actual != expected:
+            problems.append(
+                f"{model_id}: {name} does not match the hub, {actual[:16]} against {expected[:16]}"
+            )
+        else:
+            print(f"    {name:<36} {actual[:16]} ok")
+    print(f"  {model_id:<40} {checked} hashed files verified "
+          f"{'OK' if not problems else 'DIVERGES'}")
+    return problems
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("models", nargs="*", default=DEFAULT_MODELS)
     parser.add_argument("--mirror", default="https://hf-mirror.com")
+    parser.add_argument("--local", type=Path, default=None,
+                        help="verify a downloaded directory against the hub instead of a mirror")
     args = parser.parse_args()
 
+    models = args.models or DEFAULT_MODELS
     print(f"hub    : {HUB}")
-    print(f"mirror : {args.mirror}\n")
-    problems = [p for model_id in (args.models or DEFAULT_MODELS)
-                for p in compare(model_id, args.mirror)]
+    if args.local:
+        print(f"local  : {args.local}\n")
+        problems = [p for model_id in models for p in verify_local(model_id, args.local)]
+    else:
+        print(f"mirror : {args.mirror}\n")
+        problems = [p for model_id in models for p in compare(model_id, args.mirror)]
 
     if problems:
         print(f"\n{len(problems)} divergences:")
         for problem in problems:
             print(f"  {problem}")
         return 1
-    print("\nEvery model matches the hub on revision, file set and digest.")
+    print("\nEverything checked matches the hub." if args.local
+          else "\nEvery model matches the hub on revision, file set and digest.")
     return 0
 
 

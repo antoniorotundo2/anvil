@@ -68,14 +68,18 @@ cheaper answer is still to fetch the model once and then run with `HF_HUB_OFFLIN
 pins the revision for the whole matrix.
 
 A mirror moves the root of trust, since the download is verified against the manifest of whichever
-endpoint served it. Check the two agree before relying on one:
+endpoint served it. Check the two agree before relying on one, and check what actually landed on
+disk afterwards:
 
 ```
 ./scripts/mirror_parity.py --mirror <endpoint>
+./scripts/mirror_parity.py --local <snapshot dir> ibm-granite/granite-4.1-3b
 ```
 
-It compares the repository commit, the file set and the sha256 of every hashed file, and exits
-non-zero on any divergence, so it can gate a sweep rather than only inform one.
+The first compares the repository commit, the file set and the sha256 of every hashed file. The
+second hashes the files on disk and holds them against the hub's manifest, which is what makes any
+source usable: `transformers` loads from a directory, so the weights can come from anywhere as long
+as they are verified before use. Both exit non-zero on divergence, so either can gate a sweep.
 
 **The fallback that needs no third party** is a pinned local copy, and for a sweep it is the better
 answer anyway: one download, one revision for the whole matrix, no rate limit and no mirror.
