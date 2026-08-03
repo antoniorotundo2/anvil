@@ -385,6 +385,17 @@ say so plainly.
         namespaces still allow `apptainer --fakeroot`, and that both strict brackets return the
         same per-level scores as Docker. A runtime that changes the numbers is not a fix, it is a
         second environment to declare
+  - [ ] more families, on borrowed hardware: the open question is whether `submittability` stays
+        flat across model *families* and not only sizes, and one more family costs GPU time this
+        project does not have. The split it already relies on covers it, since only generation
+        needs an accelerator: generate wherever a free quota is (Kaggle offers around 30 GPU-hours
+        a week, at roughly 16 GB, so a 7B in fp16 or a 30B in 4-bit), then verify at home in the
+        container. A three-seed T1 matrix travels as 200 KB of JSONL, and `--no-exec` keeps the
+        borrowed machine from grading anything: it has no scheduler and whatever coreutils it
+        happens to ship. An arm behind an inference API was considered and set aside, free
+        endpoints included: they route to whichever provider is cheapest at that moment, so the
+        revision is not pinned and the seed is not honoured, which is the comparability every
+        table here rests on
   - [ ] QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
 - [ ] **Phase 4**: dataset release, leaderboard, preprint
 
