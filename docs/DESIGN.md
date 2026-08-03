@@ -305,7 +305,10 @@ mistake also cannot recur silently now: `_topology_healthy` skips `submittabilit
 stated when the scheduler in front of it is not the declared one, so this same script on that same
 machine reports a skip instead of a number.
 
-**Retrieval does not help this model, it costs it, and tag-based retrieval costs it most.** Two
+**Retrieval does not help this model, it costs it, and tag-based retrieval costs it most**, as
+these three arms are configured. That last clause carries more than it looks: most of the tag-based
+arm's deficit turns out to be which document its fallback attaches, see
+[What the level breaks on](#what-the-level-breaks-on). Two
 levels separate and they separate together. `resource_fit` falls 0.49, 0.42, 0.19 across the three
 arms and `strict_all_levels` falls with it, 0.31, 0.21, 0.11, both monotone. Strict is the cleaner
 of the two: no two of its ranges touch, so all three arms are separated. In `resource_fit` the
@@ -394,11 +397,36 @@ exposure to the only document that addresses them: 23 samples against 30. Zero-s
 that comparison, with no context and the least damage of the three, so context costs something by
 itself and the fallback ordering costs the rest.
 
-That is a prediction the harness can test rather than a story: reorder the general documents, or
-raise `k` so both fit, and `vectorless` should recover part of the level while the arms that never
-lacked the document stay where they are. It has not been run.
+That prediction was run. A copy of the corpus with the two general documents swapped, passed to
+the same script through `CORPUS=`, same model, same three seeds, same `n`, graded in the same
+container:
 
-One model, one size, 72 samples an arm.
+| `vectorless`, general slot filled by | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
+|---|---|---|---|---|---|
+| `doc_directive_placement` (corpus order) | 0.53±0.02 | 0.79±0.00 | 0.44±0.06 | 0.19±0.04 | 0.11±0.02 |
+| `doc_time_mem` (reordered) | 0.49±0.02 | 0.72±0.04 | 0.43±0.06 | **0.42±0.08** | 0.18±0.06 |
+
+`resource_fit` goes from 0.19 to 0.42 on two swapped lines, ranges nowhere near touching, landing
+on the `vector` arm's 0.42 to the digit. The level that collapsed is the level the document that
+was missing is about.
+
+The other levels move the other way, and that was not predicted. `syntax` slips 4 points and
+`submittability` 7, which is the same swap seen from the other side: it takes
+`doc_directive_placement` away from all eight tasks, and that document is about directives placed
+after the first command, which is what `syntax` checks. Each document moves the level it covers.
+The magnitudes are not comparable, one effect is decisive and the other two sit at the edge of
+their ranges, but the directions are what the contents predict.
+
+So `vectorless` was not bad at retrieving. Its general slot is filled in corpus order, one
+document takes it for every task, and the failures of this benchmark are concentrated in
+`resource_fit`, so which document takes that slot decides most of the arm's score.
+`strict_all_levels` recovers only from 0.11 to 0.18 because the levels now move against each
+other, which is the honest summary of the intervention: an ordering that repairs one level costs a
+little of two others.
+
+One model, one size, 72 samples an arm, one swap. The swap also changes two things at once, a
+document gained and a document lost, so what is measured is the exchange and not either document
+alone. Separating them needs `RETRIEVAL_K=3`, where both fit and nothing is given up.
 
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
 half-ranges are spread, not confidence intervals; one model at one size; `functional` is
@@ -443,7 +471,8 @@ say so plainly.
         `--retrieval` on `anvil run`, `scripts/retrieval_ablation.sh`, see [Retrieval
         ablation](#retrieval-ablation). Generated on the experiment machine across 3 seeds,
         all 9 cells, graded in the container: retrieval does not help this model, `vectorless`
-        costs 30 points of `resource_fit` and 20 of `strict_all_levels`.
+        costs 30 points of `resource_fit` and 20 of `strict_all_levels`, and 22 of those 30 come
+        back by swapping which general document its fallback attaches
 - [ ] **Phase 3**
   - [x] real submission: `--executor sbatch`, opt-in beside the `bash` default, with its own
         preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
