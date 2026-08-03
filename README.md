@@ -54,44 +54,22 @@ To generate scripts with a real model, also install the model extras:
 make install-models
 ```
 
-An unauthenticated sweep can be rate limited by the hub. `ANVIL_HF_ENDPOINT` names a mirror to
-retry against, once, when a download fails; it is unset by default, so nothing here sends model
-downloads to a host you have not chosen. The mirror has to speak the hub's own protocol, since
-`huggingface_hub` performs the download:
-
-```
-ANVIL_HF_ENDPOINT=https://hf-mirror.com make generate MODEL=ibm-granite/granite-4.1-3b
-```
-
-Which endpoint served the weights is printed when it is not the default. For a long sweep the
-cheaper answer is still to fetch the model once and then run with `HF_HUB_OFFLINE=1`, which also
-pins the revision for the whole matrix.
-
-A mirror moves the root of trust, since the download is verified against the manifest of whichever
-endpoint served it. Check the two agree before relying on one, and check what actually landed on
-disk afterwards:
-
-```
-./scripts/mirror_parity.py --mirror <endpoint>
-./scripts/mirror_parity.py --local <snapshot dir> ibm-granite/granite-4.1-3b
-```
-
-The first compares the repository commit, the file set and the sha256 of every hashed file. The
-second hashes the files on disk and holds them against the hub's manifest, which is what makes any
-source usable: `transformers` loads from a directory, so the weights can come from anywhere as long
-as they are verified before use. Both exit non-zero on divergence, so either can gate a sweep.
-
-**The fallback that needs no third party** is a pinned local copy, and for a sweep it is the better
-answer anyway: one download, one revision for the whole matrix, no rate limit and no mirror.
+Models come from the Hugging Face hub, which needs no account for the ones used here. For a sweep,
+fetch each model once at a pinned revision and run offline: `huggingface_hub` verifies every weight
+file against the hub's own manifest as it downloads, and pinning is what keeps a matrix
+reproducible, since a model that moves halfway through a sweep leaves the cells before and after
+answering different questions.
 
 ```
 hf download ibm-granite/granite-4.1-3b --revision c0650403e44e78ec0262dab1c90914c65b196c4e
 HF_HUB_OFFLINE=1 MODELS=ibm-granite/granite-4.1-3b ./scripts/run_experiments.sh
 ```
 
-The revision comes from `./scripts/mirror_parity.py`, which prints the commit each model resolves
-to. Pinning it is what makes a matrix reproducible: without it a model can move under a running
-sweep, and the cells before and after are then not the same experiment.
+The revision of a model is the `sha` its API record reports:
+
+```
+python -c "from huggingface_hub import HfApi; print(HfApi().model_info('ibm-granite/granite-4.1-3b').sha)"
+```
 
 ## Run
 
