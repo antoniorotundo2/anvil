@@ -71,12 +71,23 @@ A mirror moves the root of trust, since the download is verified against the man
 endpoint served it. Check the two agree before relying on one:
 
 ```
-./scripts/mirror_parity.py
+./scripts/mirror_parity.py --mirror <endpoint>
 ```
 
 It compares the repository commit, the file set and the sha256 of every hashed file, and exits
-non-zero on any divergence, so it can gate a sweep. `hf-mirror.com` currently matches the hub on
-all four models used here, revision included.
+non-zero on any divergence, so it can gate a sweep rather than only inform one.
+
+**The fallback that needs no third party** is a pinned local copy, and for a sweep it is the better
+answer anyway: one download, one revision for the whole matrix, no rate limit and no mirror.
+
+```
+hf download ibm-granite/granite-4.1-3b --revision c0650403e44e78ec0262dab1c90914c65b196c4e
+HF_HUB_OFFLINE=1 MODELS=ibm-granite/granite-4.1-3b ./scripts/run_experiments.sh
+```
+
+The revision comes from `./scripts/mirror_parity.py`, which prints the commit each model resolves
+to. Pinning it is what makes a matrix reproducible: without it a model can move under a running
+sweep, and the cells before and after are then not the same experiment.
 
 ## Run
 
