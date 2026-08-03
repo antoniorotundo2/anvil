@@ -61,14 +61,17 @@ reproducible, since a model that moves halfway through a sweep leaves the cells 
 answering different questions.
 
 ```
-hf download ibm-granite/granite-4.1-3b --revision c0650403e44e78ec0262dab1c90914c65b196c4e
+.venv/bin/python -c "from huggingface_hub import snapshot_download; \
+snapshot_download('ibm-granite/granite-4.1-3b', revision='c0650403e44e78ec0262dab1c90914c65b196c4e')"
 HF_HUB_OFFLINE=1 MODELS=ibm-granite/granite-4.1-3b ./scripts/run_experiments.sh
 ```
 
-The revision of a model is the `sha` its API record reports:
+The Python API rather than the `hf` command line, which lives inside the venv and has been renamed
+between versions. The revision of a model is the `sha` its API record reports:
 
 ```
-python -c "from huggingface_hub import HfApi; print(HfApi().model_info('ibm-granite/granite-4.1-3b').sha)"
+.venv/bin/python -c "from huggingface_hub import HfApi; \
+print(HfApi().model_info('ibm-granite/granite-4.1-3b').sha)"
 ```
 
 ## Run
