@@ -129,6 +129,13 @@ worth keeping because it is also the distinction between a portable failure and 
 partition refusals that dominate the Qwen rows depend on which cluster is asked; this one does
 not.
 
+It has no inducer, and that is a decision rather than an omission. `tasks/t2_repair.jsonl` is held
+equal to what the inducers produce by a test, so registering F9 regenerates it, and that file is
+the denominator of every T2 number published here, including the three-model table below. The
+fault it would teach is also close to F7's: both are refused at `submittability`, and the models
+that clear F7 above 0.83 would most likely clear this too. It stays an observed class, and joins
+the induced ones if the T2 set is ever regenerated for an independent reason.
+
 ---
 
 ## Two verifications that dry-run cannot do

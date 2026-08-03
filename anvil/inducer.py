@@ -4,7 +4,12 @@ T2 needs broken scripts with KNOWN ground truth: what is wrong, and what a
 correct repair looks like. Hand-writing these does not scale past a handful of
 tasks, so this module induces them mechanically from the T1 reference
 solutions, anchored to the failure classes observed on a real model
-(docs/OBSERVED_FAILURES.md, F1-F7).
+(docs/OBSERVED_FAILURES.md, F1-F8).
+
+F9, an option the scheduler does not have, is observed on a real model and
+deliberately not induced: registering it would regenerate tasks/t2_repair.jsonl,
+which test_repair.py holds equal to what the inducers produce, and that file is
+the denominator of every published T2 number.
 
 Each inducer takes a KNOWN-GOOD script and its Task and returns a broken
 variant, or `None` if it does not apply (e.g. F6 needs a derived-value payload
