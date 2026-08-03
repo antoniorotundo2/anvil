@@ -379,6 +379,25 @@ than in one identifiable way, is withdrawn. It was what a per-problem count look
 per-sample count was the right one: the damage is confined to the decisions and leaves the
 transcriptions intact. The three mechanisms above stay refuted, and none of them predicted this.
 
+It also puts the copying refutation in its place rather than overturning it. That test measured
+`--array=1-5`, `--nodes=2` and `--output=logs/out_%j`, which are three of the directives that turn
+out not to move at all. It could not have caught this, and it could not have caught it in the
+other direction either: the corpus states no walltime and no memory figure anywhere, so on these
+two directives there is nothing available to copy.
+
+**The corpus has a hand in it.** One document, `doc_time_mem`, says which directives have no
+default and must be declared. Retrieval reaches it on three of the eight tasks under `vector` and
+on none under `vectorless`, which fills its second slot with `doc_directive_placement` for all
+eight, because the general documents are taken in corpus order and that one comes first. Between
+the two arms that receive context, the damage to `--time` and `--mem` ranks inversely with
+exposure to the only document that addresses them: 23 samples against 30. Zero-shot sits outside
+that comparison, with no context and the least damage of the three, so context costs something by
+itself and the fallback ordering costs the rest.
+
+That is a prediction the harness can test rather than a story: reorder the general documents, or
+raise `k` so both fit, and `vectorless` should recover part of the level while the arms that never
+lacked the document stay where they are. It has not been run.
+
 One model, one size, 72 samples an arm.
 
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
