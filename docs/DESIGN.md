@@ -286,28 +286,38 @@ real scheduler and GNU coreutils. Mean pass@1 across seeds, plus half the range:
 
 | strategy | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | strict |
 |---|---|---|---|---|---|---|
-| zero-shot | 0.58±0.04 | n/a | 0.54±0.04 | **0.49±0.02** | 1.00±0.00 | n/a |
-| vector | 0.54±0.04 | n/a | 0.49±0.06 | 0.42±0.08 | 1.00±0.00 | n/a |
-| vectorless | 0.53±0.02 | n/a | 0.44±0.06 | **0.19±0.04** | 1.00±0.00 | n/a |
+| zero-shot | 0.58±0.04 | 0.82±0.02 | 0.54±0.04 | **0.49±0.02** | 1.00±0.00 | **0.31±0.02** |
+| vector | 0.54±0.04 | 0.83±0.04 | 0.49±0.06 | 0.42±0.08 | 1.00±0.00 | 0.21±0.04 |
+| vectorless | 0.53±0.02 | 0.79±0.00 | 0.44±0.06 | **0.19±0.04** | 1.00±0.00 | **0.11±0.02** |
 
-**Two columns are struck, not missing.** `scripts/retrieval_ablation.sh` grades with the
+**Two of these columns were measured twice.** `scripts/retrieval_ablation.sh` grades with the
 project venv against whatever scheduler the machine happens to run, and the machine it ran on has
-one node, no GPUs and no job 12345. That is the environment described in [A table measured against
-the wrong cluster](OBSERVED_FAILURES.md#a-table-measured-against-the-wrong-cluster), where the
-oracle itself scores `submittability` 0.625. The values that stood there, 0.65 / 0.71 / 0.65 and
-0.18 / 0.21 / 0.11, are what a one-node cluster with no GPUs makes of these scripts, so they are
-withdrawn rather than corrected: replacing them means verifying the saved generations again in the
-container. `syntax`,
-`functional` and `resource_fit` do not depend on the scheduler and are unaffected, which is where
-this result lives. The harness no longer allows the mistake to recur silently: `_topology_healthy`
-skips `submittability` with its reason stated when the scheduler in front of it is not the
-declared one, so the same script run on the same machine today reports a skip instead of a number.
+one node, no GPUs and no job 12345, the environment described in [A table measured against the
+wrong cluster](OBSERVED_FAILURES.md#a-table-measured-against-the-wrong-cluster) where the oracle
+itself scores `submittability` 0.625. It reported 0.65 / 0.71 / 0.65 there, and strict
+0.18 / 0.21 / 0.11. The saved generations were verified again inside `anvil:sched`
+(`results/retrieval_regraded/`) and those are the numbers above.
 
-**Retrieval does not help this model, and tag-based retrieval hurts it badly.** The one
-clean effect is `resource_fit`: 0.49 zero-shot against 0.19 vectorless, ranges nowhere near
-touching. Nothing else separates. The single-seed pilot's headline numbers (0.38/0.29/0.21) do not
-reproduce at all: they came from one draw of a quantity whose spread is now visible, and the arm
-ordering it reported was strict, which this run cannot speak to either way.
+The other three levels came back identical to the digit in all nine cells. That is the third
+independent confirmation that `syntax`, `functional` and `resource_fit` do not depend on the
+scheduler, and the first from an experiment outside the campaign the claim was first made on. The
+mistake also cannot recur silently now: `_topology_healthy` skips `submittability` with its reason
+stated when the scheduler in front of it is not the declared one, so this same script on that same
+machine reports a skip instead of a number.
+
+**Retrieval does not help this model, it costs it, and tag-based retrieval costs it most.** Two
+levels separate and they separate together. `resource_fit` falls 0.49, 0.42, 0.19 across the three
+arms and `strict_all_levels` falls with it, 0.31, 0.21, 0.11, monotone, with no two ranges
+touching in either column. `syntax` drifts down inside its ranges, `submittability` and `safety` do
+not move at all: retrieved context does not change whether the scheduler accepts these scripts,
+only whether they ask for the right things.
+
+The correction changed the conclusion, not only the numbers. On the wrong cluster, strict read
+0.18 / 0.21 / 0.11 and put `vector` nominally ahead of zero-shot, so the ordering the single-seed
+pilot had reported (0.38 / 0.29 / 0.21) looked like it had failed to reproduce. Graded against the
+declared topology the pilot's ordering is exactly what comes back, with the arms further apart
+than it saw. The three-seed run was right that the pilot's magnitudes were one draw of a spread;
+it was the grading environment, not the seeds, that inverted the ranking.
 
 ### Two explanations, both tested, both refuted
 
@@ -378,9 +388,9 @@ say so plainly.
         Docker Desktop for Mac (`apptainer run` fails there, see the section above)
   - [x] retrieval ablation: `anvil/retrieval.py` (TF-IDF vector / tag-based vectorless),
         `--retrieval` on `anvil run`, `scripts/retrieval_ablation.sh`, see [Retrieval
-        ablation](#retrieval-ablation). Measured on the experiment machine across 3 seeds,
-        all 9 cells: retrieval does not help this model and `vectorless` costs 30 points of
-        `resource_fit`.
+        ablation](#retrieval-ablation). Generated on the experiment machine across 3 seeds,
+        all 9 cells, graded in the container: retrieval does not help this model, `vectorless`
+        costs 30 points of `resource_fit` and 20 of `strict_all_levels`.
 - [ ] **Phase 3**
   - [x] real submission: `--executor sbatch`, opt-in beside the `bash` default, with its own
         preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
@@ -481,6 +491,7 @@ artifacts from three models, real submission costs `functional` up to 21 points 
 cell and nothing at all in one of them, and moves `strict_all_levels` by nothing anywhere: the
 scripts it stops were already failing another level, mostly `submittability`, so the executor
 propagates a verdict rather than producing one.
+A third run, the nine retrieval cells regraded, adds 216 comparisons and no verdict change at all.
 Exactly one artifact of the 2340 changes verdict, and it changes in favour of real submission,
 which accepts a script the sandbox wrongly rejects. The numbers are in
 [`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-moves-functional-and-barely-touches-the-verdict).
