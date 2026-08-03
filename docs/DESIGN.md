@@ -307,8 +307,11 @@ machine reports a skip instead of a number.
 
 **Retrieval does not help this model, it costs it, and tag-based retrieval costs it most.** Two
 levels separate and they separate together. `resource_fit` falls 0.49, 0.42, 0.19 across the three
-arms and `strict_all_levels` falls with it, 0.31, 0.21, 0.11, monotone, with no two ranges
-touching in either column. `syntax` drifts down inside its ranges, `submittability` and `safety` do
+arms and `strict_all_levels` falls with it, 0.31, 0.21, 0.11, both monotone. Strict is the cleaner
+of the two: no two of its ranges touch, so all three arms are separated. In `resource_fit` the
+`vector` range still overlaps zero-shot's and only `vectorless` stands clear of both, which is the
+same shape the first version of this table reported and the reason its headline named that arm.
+`syntax` drifts down inside its ranges, `submittability` and `safety` do
 not move at all: retrieved context does not change whether the scheduler accepts these scripts,
 only whether they ask for the right things.
 
