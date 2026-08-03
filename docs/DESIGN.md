@@ -322,7 +322,7 @@ declared topology the pilot's ordering is exactly what comes back, with the arms
 than it saw. The three-seed run was right that the pilot's magnitudes were one draw of a spread;
 it was the grading environment, not the seeds, that inverted the ranking.
 
-### Two explanations, both tested, both refuted
+### Three explanations, all tested, all refuted
 
 `scripts/retrieval_copying.py` reads the saved generations and measures each candidate
 mechanism against the zero-shot arm as a control, since a value the model would have written
@@ -343,12 +343,22 @@ the level. But the prediction that follows, that failures shift toward omissions
 hold: omissions are 81% of problems zero-shot, 78% vector, 75% vectorless. Both kinds grow in
 absolute terms and wrong values grow faster (times 2.4 against times 1.7).
 
-**What stands.** The effect is real, monotone across three arms, and confined to one level.
+**Shell expansion in the directive block is refuted as well.** The regrade surfaced
+`sbatch: error: Invalid numeric value "${SLURM_NTASKS:-4}" for --ntasks`, which is the idiom the
+corpus teaches for the payload, appearing where it cannot work: `sbatch` reads the `#SBATCH` lines
+before any shell expands anything, so the directive receives the literal text. A model migrating
+that idiom upward under retrieved context would fail `resource_fit` on a value that looks derived
+and is not. The direction fits and the size does not: zero scripts do it zero-shot, one under
+vector, two under vectorless, out of 72 per arm. `resource_fit` loses about 21 samples of 72
+between the outer arms, and three scripts across two arms cannot carry that.
+
+**What stands.** The effect is real, monotone across three arms, and confined to one level, which
+is enough to pull `strict_all_levels` down with it since strict is the conjunction of all five.
 Under retrieved context the model writes fewer directives *and* gets more of the ones it
 writes wrong. Which is to say its resource-fitting competence degrades broadly rather than
-failing in one identifiable way. No mechanism is established, and two plausible ones are ruled
-out by measurement rather than by argument. A third story invented to fit these numbers would
-be worth exactly as much as the first two were.
+failing in one identifiable way. No mechanism is established, and three plausible ones are ruled
+out by measurement rather than by argument. A fourth story invented to fit these numbers would
+be worth exactly as much as the first three were.
 
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
 half-ranges are spread, not confidence intervals; one model at one size; `functional` is
