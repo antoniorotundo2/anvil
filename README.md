@@ -54,26 +54,6 @@ To generate scripts with a real model, also install the model extras:
 make install-models
 ```
 
-Models come from the Hugging Face hub, which needs no account for the ones used here. For a sweep,
-fetch each model once at a pinned revision and run offline: `huggingface_hub` verifies every weight
-file against the hub's own manifest as it downloads, and pinning is what keeps a matrix
-reproducible, since a model that moves halfway through a sweep leaves the cells before and after
-answering different questions.
-
-```
-.venv/bin/python -c "from huggingface_hub import snapshot_download; \
-snapshot_download('ibm-granite/granite-4.1-3b', revision='c0650403e44e78ec0262dab1c90914c65b196c4e')"
-HF_HUB_OFFLINE=1 MODELS=ibm-granite/granite-4.1-3b ./scripts/run_experiments.sh
-```
-
-The Python API rather than the `hf` command line, which lives inside the venv and has been renamed
-between versions. The revision of a model is the `sha` its API record reports:
-
-```
-.venv/bin/python -c "from huggingface_hub import HfApi; \
-print(HfApi().model_info('ibm-granite/granite-4.1-3b').sha)"
-```
-
 ## Run
 
 To run the project you can use two methods. The first one (recommended) uses Docker, which ships a
