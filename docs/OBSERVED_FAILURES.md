@@ -254,13 +254,62 @@ enforces binding.
 It also settles a question the roadmap had left open. Binding was listed as unobservable until a
 task existed that reads its own affinity. No such task was needed: a model wrote one.
 
-### F1 is the hardest repair category
+### Which fault is hardest depends on the model, and on the level
 
-At 1.5B, `resource_fit` for F1 repairs is 0.0 on all three seeds: the small model never restores
-the missing directive. At 7B `resource_fit` reaches 1.0 while `strict_all_levels` caps at 0.33,
-with `submittability` at 0.33 as the bottleneck: the model now understands what was missing, and
-the resulting script still often fails `sbatch --test-only`. F6 reaches `strict_all_levels` 1.0
-for both models on almost every seed, and is the easy category of the taxonomy.
+Per fault category, `bash` arm, three seeds pooled. F1 applies to three tasks and F6 to one, hence
+the smaller denominators.
+
+| category | 1.5B | 7B | Granite 3B | n per model |
+|---|---|---|---|---|
+| F1 omitted default | 0.000 | 1.000 | 0.356 | 45 |
+| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 120 |
+| F3 prose in a value | 0.542 | 0.875 | 0.800 | 120 |
+| F4 directive absent | 0.000 | 0.750 | 0.742 | 120 |
+| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 120 |
+| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 15 |
+| F7 malformed value | 0.550 | 0.875 | 0.833 | 120 |
+
+`strict_all_levels` pass@1. **F5 is the lowest category for two of the three models and never
+comfortable for any of them**, which no single-model view showed: it is the fault that leaves the
+artifact furthest from a job script, and restoring every directive from the prompt alone is closer
+to writing one than to repairing one. F6 stays the easy category, as it was with two models.
+
+F1 is the one that separates them: 0.000, 0.356, 1.000, the widest spread in the table, on the
+fault this document opens with. A benchmark wants categories like that, and a claim about model
+capability made on F6 would be worth nothing.
+
+An earlier version of this section called F1 the hardest category outright, on the strength of the
+7B capping at 0.33 there with `submittability` as the bottleneck. That number came from the run
+graded against the wrong cluster, and `submittability` collapsing is its signature. Regraded in the
+container, F1 at 7B is 1.000. The correction is recorded rather than quietly dropped because the
+retracted claim is the more interesting one: F1 is not hard for a model that has understood it,
+it is hard to *tell* whether a model has.
+
+Two structural facts hold across all 2340 verdicts. First, `syntax` fails only ever on F2 and F5:
+F1, F3, F4, F6 and F7 are 1.000 for every model without one exception. Those five leave a
+well-formed script behind and the fault surfaces higher up, at `resource_fit` or
+`submittability`; F2 and F5 are the only two that concern whether directives exist and where they
+sit, which is what `syntax` is able to look at. A repair fails at the level its fault lives on.
+
+Second, Granite at 3B is within twelve points of the 7B on F2, F3, F4 and F7, and the whole gap
+between its 0.661 and the 7B's 0.824 comes from F1 and F5. Two categories out of seven account for
+a model of less than half the size trailing.
+
+### Writing a directive and noticing it is missing are different abilities
+
+Granite scores `syntax` 1.000 on T1 and 0.367 on F5 repairs. It writes correct `#SBATCH` blocks
+whenever a prompt asks for a script, 120 samples out of 120, and hands back a plain shell script
+still missing every directive on 75 of the 120 repairs where the fault is that they were removed.
+
+The comparison rules out the obvious explanation. The 1.5B scores 0.575 and 0.375, low in both:
+it is simply weak. The 7B scores 1.000 and 0.908, high in both. Granite is the only cell where the
+two diverge, and the divergence is not a general weakness, since its `syntax` is 1.000 on five of
+the seven repair categories and 0.875 on the sixth.
+
+This is the clearest evidence so far that T2 measures something T1 does not, and the reason it is
+a separate task set rather than a variant. Until now that separation rested on the scores moving;
+here one model has the generation ability at ceiling and the recognition ability at floor, on the
+same level and the same metric.
 
 ### A table measured against the wrong cluster
 
