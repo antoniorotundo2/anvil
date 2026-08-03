@@ -348,7 +348,10 @@ model, a second family, and both matrices measured under real submission; see
 [Multi-seed validation](#multi-seed-validation-t1-and-t2). So is the topology preflight that the
 wrong-cluster table called for. `_topology_healthy` submits a job asking for the `ANVIL_NODES` and
 `ANVIL_GPUS` the benchmark declares, and on the experiment machine's own SLURM it does what it was
-built to do: `submittability` is skipped with the reason stated, instead of scoring. What remains
+built to do: `submittability` is skipped with the reason stated, instead of scoring. So is the
+mechanism behind the `vectorless` `resource_fit` collapse, after three refuted candidates: the
+damage is confined to `--time` and `--mem`, the two directives these tasks state as a bound rather
+than a figure, see [What the level breaks on](DESIGN.md#what-the-level-breaks-on). What remains
 open:
 
 - a third family. Two of them were enough to show that `submittability` is not ordered by size,
@@ -357,11 +360,6 @@ open:
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- the mechanism behind the `vectorless` `resource_fit` collapse (0.19 against 0.49 zero-shot, see
-  [DESIGN.md](DESIGN.md#retrieval-ablation)). Two candidates were measured with
-  `scripts/retrieval_copying.py` and both are refuted: the arm that collapses reproduces the
-  corpus values *least*, and the share of failures that are omissions falls instead of rising.
-  What moves the level is therefore still unidentified;
 - the same ablation on a larger model, and a variant that prepends context instead of
   appending it;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a

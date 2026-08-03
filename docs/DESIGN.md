@@ -352,13 +352,34 @@ and is not. The direction fits and the size does not: zero scripts do it zero-sh
 vector, two under vectorless, out of 72 per arm. `resource_fit` loses about 21 samples of 72
 between the outer arms, and three scripts across two arms cannot carry that.
 
-**What stands.** The effect is real, monotone across three arms, and confined to one level, which
-is enough to pull `strict_all_levels` down with it since strict is the conjunction of all five.
-Under retrieved context the model writes fewer directives *and* gets more of the ones it
-writes wrong. Which is to say its resource-fitting competence degrades broadly rather than
-failing in one identifiable way. No mechanism is established, and three plausible ones are ruled
-out by measurement rather than by argument. A fourth story invented to fit these numbers would
-be worth exactly as much as the first three were.
+### What the level breaks on
+
+The three refutations above all ask *how* the model writes. The regraded results answer a
+different question, *where* it fails, counted per sample rather than per problem:
+
+| | zero-shot | vector | vectorless |
+|---|---|---|---|
+| `resource_fit` passes | 35 | 30 | 14 |
+| fails on `--time` or `--mem` alone | 5 | 23 | 30 |
+| fails on something else as well | 32 | 19 | 28 |
+
+72 samples per arm. The bottom row is flat, 32 against 28 between the outer arms. The passes fall
+by 21 and the samples that fail on nothing but `--time` and `--mem` rise by 25, which is the whole
+of it. Per directive the picture is the same: `--cpus-per-task` accounts for nine failing samples
+in every arm and `--nodes` and `--ntasks` for six to nine, unchanged, while the counts for `--time`
+and `--mem` triple and sextuple across the three arms.
+
+Those two are the only directives SLURM has no default for, and they are also the two these tasks
+state as a bound rather than a figure: a maximum walltime, a minimum memory. Everything the prompt
+gives as an exact number survives retrieval untouched. What degrades is the part the model has to
+decide.
+
+So the earlier reading of this table, that resource-fitting competence degrades broadly rather
+than in one identifiable way, is withdrawn. It was what a per-problem count looks like when a
+per-sample count was the right one: the damage is confined to the decisions and leaves the
+transcriptions intact. The three mechanisms above stay refuted, and none of them predicted this.
+
+One model, one size, 72 samples an arm.
 
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
 half-ranges are spread, not confidence intervals; one model at one size; `functional` is
