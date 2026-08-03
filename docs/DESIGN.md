@@ -286,16 +286,28 @@ real scheduler and GNU coreutils. Mean pass@1 across seeds, plus half the range:
 
 | strategy | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | strict |
 |---|---|---|---|---|---|---|
-| zero-shot | 0.58±0.04 | 0.65±0.06 | 0.54±0.04 | **0.49±0.02** | 1.00±0.00 | 0.18±0.02 |
-| vector | 0.54±0.04 | 0.71±0.04 | 0.49±0.06 | 0.42±0.08 | 1.00±0.00 | 0.21±0.04 |
-| vectorless | 0.53±0.02 | 0.65±0.02 | 0.44±0.06 | **0.19±0.04** | 1.00±0.00 | 0.11±0.02 |
+| zero-shot | 0.58±0.04 | n/a | 0.54±0.04 | **0.49±0.02** | 1.00±0.00 | n/a |
+| vector | 0.54±0.04 | n/a | 0.49±0.06 | 0.42±0.08 | 1.00±0.00 | n/a |
+| vectorless | 0.53±0.02 | n/a | 0.44±0.06 | **0.19±0.04** | 1.00±0.00 | n/a |
+
+**Two columns are struck, not missing.** `scripts/retrieval_ablation.sh` grades with the
+project venv against whatever scheduler the machine happens to run, and the machine it ran on has
+one node, no GPUs and no job 12345. That is the environment described in [A table measured against
+the wrong cluster](OBSERVED_FAILURES.md#a-table-measured-against-the-wrong-cluster), where the
+oracle itself scores `submittability` 0.625. The values that stood there, 0.65 / 0.71 / 0.65 and
+0.18 / 0.21 / 0.11, are what a one-node cluster with no GPUs makes of these scripts, so they are
+withdrawn rather than corrected: replacing them means verifying the saved generations again in the
+container. `syntax`,
+`functional` and `resource_fit` do not depend on the scheduler and are unaffected, which is where
+this result lives. The harness no longer allows the mistake to recur silently: `_topology_healthy`
+skips `submittability` with its reason stated when the scheduler in front of it is not the
+declared one, so the same script run on the same machine today reports a skip instead of a number.
 
 **Retrieval does not help this model, and tag-based retrieval hurts it badly.** The one
 clean effect is `resource_fit`: 0.49 zero-shot against 0.19 vectorless, ranges nowhere near
-touching. Nothing else separates. `strict_all_levels` puts vector nominally ahead (0.21 vs
-0.18) but the ranges overlap, so the ordering the single-seed pilot reported does not
-survive three seeds, and that pilot's headline numbers (0.38/0.29/0.21) do not reproduce at
-all: they came from one draw of a quantity whose spread is now visible.
+touching. Nothing else separates. The single-seed pilot's headline numbers (0.38/0.29/0.21) do not
+reproduce at all: they came from one draw of a quantity whose spread is now visible, and the arm
+ordering it reported was strict, which this run cannot speak to either way.
 
 ### Two explanations, both tested, both refuted
 
