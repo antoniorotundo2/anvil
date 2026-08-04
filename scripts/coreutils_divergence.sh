@@ -8,7 +8,7 @@
 # that number is only as strong as the tasks behind it: none of the eight touches a place
 # where the two implementations part company, so the agreement measures the task set as
 # much as the toolchains. This script asks the question directly, with no tasks and no
-# model in the way: run the same 73 invocations in both images and diff the output.
+# model in the way: run the same 101 invocations in both images and diff the output.
 #
 # It is evidence for a claim, not part of the bracket. Nothing here touches the verifier.
 
@@ -101,6 +101,47 @@ run "sort inherited locale"   "sort f.txt | tr '\n' ' '"
 run "numfmt --grouping C"     "LC_ALL=C numfmt --grouping 1234567"
 run "numfmt --grouping en_US" "LC_ALL=en_US.UTF-8 numfmt --grouping 1234567"
 run "ls --version"            "ls --version | head -1"
+
+# A third family, chosen differently from the first two. Those were picked blind, for
+# being what job scripts do, and turned up nothing behavioural. These were picked to
+# hunt, after the first sweep: byte-versus-character width, number formatting, and the
+# newer digest and slicing flags, which is where two independent implementations of the
+# same tools have room to disagree without either being wrong.
+printf 'caf\xc3\xa9 na\xc3\xafve\n' > u.txt
+
+run "wc -m utf8"              "wc -m < u.txt"
+run "wc -c utf8"              "wc -c < u.txt"
+run "cut -c2-4 utf8"          "cut -c2-4 u.txt"
+run "cut -b2-4 utf8"          "cut -b2-4 u.txt | od -An -tx1"
+run "fold -w3 utf8"           "fold -w3 u.txt | head -1 | od -An -tx1"
+run "tr class utf8"           "tr '[:lower:]' '[:upper:]' < u.txt"
+run "expand -t4 before utf8"  "printf 'caf\xc3\xa9\tx\n' | expand -t4 | cat -A"
+run "sort accents LC_ALL=C"   "printf 'e\n\xc3\xa9\nf\n' | LC_ALL=C sort | od -An -tx1 | tr '\n' '~'"
+run "numfmt --to=si"          "numfmt --to=si 1536"
+run "numfmt --from=auto"      "numfmt --from=auto 1.5K"
+run "numfmt --to=iec --format" "numfmt --to=iec --format='%8.2f' 1536"
+run "seq -f %03g"             "seq -f '%03g' 1 3 | tr '\n' ' '"
+run "sort -g"                 "printf '1e3\n5\n2e1\n' | sort -g | tr '\n' ' '"
+run "sort -n signed"          "printf '+2\n-1\n 3\n' | sort -n | tr '\n' '~'"
+run "sort -h negative"        "printf -- '-1K\n2K\n-3M\n' | sort -h | tr '\n' ' '"
+run "sort -k2.2,2.3"          "printf 'x abcd\nx abzz\n' | sort -k2.2,2.3 | tr '\n' '~'"
+run "printf %5.2f"            "printf '%5.2f' 3.14159"
+run "printf %d hex"           "printf '%d' 0x1f"
+run "md5sum --tag"            "md5sum --tag f.txt | cut -c1-12"
+run "cksum -a sha256"         "cksum -a sha256 f.txt 2>&1 | cut -c1-20"
+run "b2sum"                   "b2sum f.txt 2>&1 | cut -c1-12"
+run "basenc --base32"         "printf abc | basenc --base32 2>&1"
+run "ls -v"                   "touch v1 v10 v2; ls -v v1 v10 v2 | tr '\n' ' '"
+run "head -n -1"              "head -n -1 f.txt | tr '\n' ' '"
+run "uniq --all-repeated"     "printf 'a\na\nb\n' | uniq --all-repeated=separate | tr '\n' '~'"
+run "split -n l/2"            "printf 'a\nb\nc\nd\n' > s2.txt; split -n l/2 s2.txt L_ && head -c 4 L_aa | tr '\n' ' '"
+run "join -a1 -e X -o"        "printf '1 a\n2 b\n' > k1; printf '1 x\n' > k2; join -a1 -e X -o 0,1.2,2.2 k1 k2 | tr '\n' '~'"
+run "date +%q"                "TZ=UTC date -u -d @0 +%q 2>&1"
+
+# Not coreutils, and here on purpose: the images differ in bash as well (5.2 against
+# 5.3), so a divergence found by this script is only attributable to coreutils if the
+# shell is ruled out. This one is the shell.
+run "bash: printf overflow"   "printf '%d' 99999999999999999999; echo rc=\$?"
 PROBE_END
 
 work="$(dirname "$PROBE")"

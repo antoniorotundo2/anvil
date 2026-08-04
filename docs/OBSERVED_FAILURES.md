@@ -365,7 +365,10 @@ that does not know the rule and minus 6 to the one that does. See
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
-- a T1 task that depends on a coreutils corner where `uutils` and GNU are known to differ
-  (`stat`, `sort`, `date` formatting, flag-level behaviour). The cross-distribution ablation
-  now agrees across 3 seeds and 360 level comparisons, but none of the eight current tasks
-  reaches those corners, so the agreement measures the tasks as much as the toolchains.
+- a T1 task that depends on a coreutils corner where `uutils` and GNU differ. The corners are no
+  longer hypothetical: `wc -m` and `expand` on a non-ASCII payload, and `numfmt --to=si`, part
+  company in the environment the containers already run in, with no locale involved, see
+  [Where the two implementations do differ](DESIGN.md#where-the-two-implementations-do-differ).
+  The cross-distribution ablation agrees across 3 seeds and 360 level comparisons because none of
+  the eight current tasks reaches them, so that agreement still measures the tasks as much as the
+  toolchains.

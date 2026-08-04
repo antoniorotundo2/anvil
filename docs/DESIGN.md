@@ -220,18 +220,24 @@ the same eight prompts probe the same operations more times, not more operations
 ### Where the two implementations do differ
 
 That argument was worth settling directly rather than assuming, so
-`scripts/coreutils_divergence.sh` asks the question with no tasks and no model in the way: 73
-invocations chosen for what a job script does with its results and what a careful one does around
-them, run in both images, diffed.
+`scripts/coreutils_divergence.sh` asks the question with no tasks and no model in the way: 101
+invocations run in both images and diffed. The first 73 were chosen blind, for being what a job
+script does with its results and what a careful one does around them. They turned up nothing
+behavioural, so a third family of 28 was chosen to hunt rather than to survey, aimed at
+byte-versus-character width, number formatting, and the newer digest and slicing flags, which is
+where two independent implementations have room to disagree without either being wrong.
 
-**Fifty-one of the fifty-one work invocations agree**, exactly, output for output: sorting,
-counting, cutting, hashing, `stat -c`, `du`, `df`, `seq`, `numfmt --to=iec`, `date` in four
-formats, `split`, `join`, `comm`, `od`, `base64`. So does every exit code, including the ones a
-careful script checks: a missing file, a bad flag, an expired `timeout`, `timeout
---preserve-status`. On this evidence `uutils` 0.8.0 is a faithful stand-in for GNU coreutils 9.4
-for what these scripts do.
+**Ninety-one of the 101 agree**, exactly, output for output: sorting, counting, cutting, hashing,
+`stat -c`, `du`, `df`, `seq`, `numfmt --to=iec`, `date` in five formats, `split`, `join`, `comm`,
+`od`, `base64`, `basenc`, `cksum -a`, `b2sum`, `ls -v`. So does every exit code, including the ones
+a careful script checks: a missing file, a bad flag, an expired `timeout`, `timeout
+--preserve-status`.
 
-Four divergences remain, and they fall into two kinds.
+Two of the ten that differ are there to be read rather than counted. `ls --version` says which
+toolchain answered. `printf` overflow belongs to bash and not to coreutils, and sits in the probe
+because the images differ in the shell as well, 5.2 against 5.3, so nothing found here is
+attributable to coreutils until the shell is ruled out. The remaining eight fall into three kinds,
+and only two of those kinds were known before the third family was added.
 
 **Error text, not behaviour.** `mkdir`, `stat` and `ls` word their failures differently, and
 `uutils` drops the `Try 'ls --help'` line and adds `(os error 2)`. Exit codes match, so only a
@@ -250,10 +256,35 @@ anyway:
 
 A cluster whose login profile sets a locale that the compute nodes do not generate is not a
 contrived situation, and there the same script produces a different ordering depending on which
-coreutils the node runs. This is the corner a distribution-sensitive task would have to sit in,
-and pinning `LC_ALL=C` before sorting is the practice that makes an artifact portable across it.
-Whether a model does that is unmeasured: exercising it needs the execution environment to declare
-a locale, which is a change to the reference environment and not to a task file.
+coreutils the node runs.
+
+**Character width, which needs no locale at all.** `café naïve` is ten characters and twelve
+bytes, and the two implementations answer differently about it in the environment these containers
+already run in:
+
+| `LC_ALL` | GNU 9.4 `wc -m` | uutils 0.8.0 `wc -m` |
+|---|---|---|
+| `C` | 13 | 11 |
+| `C.utf8` | 11 | 11 |
+
+GNU answers the question the locale asks, and under `C` a character is a byte. `uutils` counts
+codepoints whichever locale it is handed. `expand` divides the same way, padding to the byte column
+under GNU and to the character column under `uutils`, so a table built around a non-ASCII field
+comes out misaligned on one of them. And `numfmt --to=si 1536` is `1.6K` from GNU and `1.6k` from
+`uutils`: one character, in the value a script prints or a downstream tool parses.
+
+This is a more comfortable corner for a distribution-sensitive task than the locale one, because it
+needs no misconfigured environment at all, only a payload that is not pure ASCII or a number
+formatted in SI. It is also where the usual portability advice backfires. Pinning `LC_ALL=C` is
+what makes a sort order reproducible across machines, and it is exactly what makes `wc -m` disagree
+across these two toolchains.
+
+So `uutils` 0.8.0 is a faithful stand-in for GNU coreutils 9.4 for what the eight current tasks do,
+and that is a narrower statement than it looked before this family was added. What it is not is a
+drop-in replacement in general. Whether a model writes artifacts that survive the difference is
+unmeasured, and measuring it now needs only a task whose payload counts characters or formats a
+number. `tasks/t1_slurm.jsonl` is not where such a task would go: those eight are the denominator
+of every published T1 number.
 
 ## Retrieval ablation
 
