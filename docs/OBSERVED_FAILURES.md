@@ -365,8 +365,8 @@ that does not know the rule and minus 6 to the one that does. See
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
-- the toolchain-sensitive task measured on a real model. `tasks/t1_coreutils.jsonl` exists and
-  `make docker-guards-coreutils` shows it returns two different verdicts for the same script on
-  GNU coreutils and on `uutils`, see [A task that can tell the two
-  apart](DESIGN.md#a-task-that-can-tell-the-two-apart). What no model has been asked yet is
-  whether it writes the portable form, which is the measurement the task was built for.
+- the toolchain-sensitive task on a model that can reach the question. `tasks/t1_coreutils.jsonl`
+  splits the two implementations by construction, and the 1.5B fails it on both for a reason that
+  has nothing to do with either: a here-string newline its count includes. Fifteen samples, no
+  divergence, no locale pinned once, see [A task that can tell the two
+  apart](DESIGN.md#a-task-that-can-tell-the-two-apart). The larger model is the one to ask;

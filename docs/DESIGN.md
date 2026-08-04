@@ -308,7 +308,27 @@ It does not run under `make guards`. The ground truth is defined in the declared
 on the BSD userland of a developer machine the reference counts bytes and pads its output, neither
 of which is a defect in it.
 
-Whether a model writes the portable form is unmeasured. The task is now there to ask.
+**First model measured, and it never reaches the question.** Qwen2.5-Coder-1.5B-Instruct, 3 seeds,
+n=5, generated on the development machine and verified in both images: 15 samples, 75 level
+comparisons, **no divergence anywhere**. `functional` fails on all fifteen in both, `syntax` passes
+14, `resource_fit` 12, `submittability` 8. Not one of the fifteen pins a locale.
+
+The reason the divergence never surfaces is worth more than the agreement. The dominant shape is
+
+```bash
+echo "CHARS=$(wc -m <<< "café naïve")"
+```
+
+and a here-string appends a newline, so the count is 13 under GNU and 11 under `uutils`. Neither is
+10, so the sample fails in both images and the two agree. Without that newline the same script
+would read 12 against 10, which is exactly the split the task exists to produce. A second error,
+unrelated to the first, suppressed it.
+
+So this run measures the model rather than the environments, and the cross-distribution agreement
+it reports is worth nothing about the toolchains. That is the honest reading of every agreement
+this ablation has produced so far, and here the mechanism is visible instead of assumed. A larger
+model, which clears `syntax` and `resource_fit` on the eight-task set, is the one worth asking
+next.
 
 ## Retrieval ablation
 
