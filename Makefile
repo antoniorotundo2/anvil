@@ -18,6 +18,7 @@ RECIPE_TASKS ?= tasks/t3_apptainer.jsonl
 # repair variants induced from it. Kept apart from the shared T1/T2 files on purpose,
 # so that adding it changes no digest and no published number.
 EXEC_TASKS ?= tasks/t1_exec.jsonl
+COREUTILS_TASKS ?= tasks/t1_coreutils.jsonl
 EXEC_REFERENCE ?= tasks/t1_exec_reference.jsonl
 EXEC_REPAIR_TASKS ?= tasks/t2_exec_repair.jsonl
 MODEL      ?= Qwen/Qwen2.5-Coder-1.5B-Instruct
@@ -54,7 +55,7 @@ DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
 .PHONY: help install install-models test lint doctor run verify guards guards-sbatch docker-guards-sbatch docker-build-sched \
-        induce-exec docker-guards-enforcement \
+        induce-exec docker-guards-enforcement docker-guards-coreutils \
         induce-t2 repair guards-t2 generate-repair \
         docker-build docker-test docker-run docker-verify docker-repair \
         docker-verify-repair generate \
@@ -81,6 +82,8 @@ help:
 	@echo "                       which adds the accounting the scheduler needs to run jobs)"
 	@echo "  make docker-guards-enforcement  a memory under-request must be OOM-killed:"
 	@echo "                       the bracket for cgroup enforcement ($(EXEC_TASKS))"
+	@echo "  make docker-guards-coreutils  one task must be judged differently by GNU"
+	@echo "                       coreutils and by uutils ($(COREUTILS_TASKS))"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
 	@echo "  make docker-verify   verify those scripts against a real scheduler"
 	@echo "                       -> $(VERIFY_OUT) (summary + environment + elapsed_s)"
@@ -193,6 +196,15 @@ print('sbatch guards OK in the container: %d functional samples ran for real, %d
 induce-exec: docker-build-sched
 	$(DOCKER_RUN_SCHED) python -m anvil.cli induce --tasks $(EXEC_TASKS) \
 		--reference $(EXEC_REFERENCE) --out $(EXEC_REPAIR_TASKS) --executor sbatch
+
+# The bracket for toolchain sensitivity. Every other T1 task returns the same verdict on
+# GNU coreutils and on uutils, which is what the cross-distribution ablation reports and
+# is only as strong as the tasks behind it. This one is built to return two, and the
+# target fails if it ever stops doing so. It lives here rather than in `guards` because
+# the ground truth is defined in the declared environment: on a BSD userland the
+# reference solution counts bytes and pads its output, and neither is a defect in it.
+docker-guards-coreutils:
+	./scripts/coreutils_task_check.sh
 
 # The bracket for cgroup enforcement. Its last assertion is the one that matters: the
 # no-op repair of the F8 task must FAIL `functional`, and it can only fail there by being

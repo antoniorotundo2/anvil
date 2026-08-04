@@ -281,10 +281,34 @@ across these two toolchains.
 
 So `uutils` 0.8.0 is a faithful stand-in for GNU coreutils 9.4 for what the eight current tasks do,
 and that is a narrower statement than it looked before this family was added. What it is not is a
-drop-in replacement in general. Whether a model writes artifacts that survive the difference is
-unmeasured, and measuring it now needs only a task whose payload counts characters or formats a
-number. `tasks/t1_slurm.jsonl` is not where such a task would go: those eight are the denominator
-of every published T1 number.
+drop-in replacement in general.
+
+### A task that can tell the two apart
+
+`tasks/t1_coreutils.jsonl` sits in that corner deliberately. It asks for the character count of
+`café naïve`, ten characters and twelve bytes, and states that the count must be characters rather
+than bytes and must come out the same whichever implementation the compute node ships. It lives in
+its own file for the same reason `tasks/t1_exec.jsonl` does: the eight in `tasks/t1_slurm.jsonl`
+are the denominator of every published T1 number.
+
+The point is not that a script can get it wrong. It is that the same script gets two verdicts:
+
+| | `LC_ALL=C.utf8` (the reference) | `LC_ALL=C` |
+|---|---|---|
+| GNU coreutils 9.4 | `CHARS=10`, passes | `CHARS=12`, fails |
+| `uutils` 0.8.0 | `CHARS=10`, passes | `CHARS=10`, passes |
+
+`make docker-guards-coreutils` asserts both rows. The reference has to pass in both images, since a
+task whose own solution is environment-dependent is defective rather than sensitive, and the
+`LC_ALL=C` variant has to be judged differently in the two, since that is the only reason the task
+exists. The variant is derived from the reference by substituting one line rather than written out,
+so the two cannot drift into a comparison of two unrelated scripts.
+
+It does not run under `make guards`. The ground truth is defined in the declared environment, and
+on the BSD userland of a developer machine the reference counts bytes and pads its output, neither
+of which is a defect in it.
+
+Whether a model writes the portable form is unmeasured. The task is now there to ask.
 
 ## Retrieval ablation
 
