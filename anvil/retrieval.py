@@ -121,12 +121,29 @@ STRATEGIES = {
 }
 
 
-def build_prompt_with_context(task_prompt: str, docs: list[Document]) -> str:
-    """Always starts with `task_prompt` verbatim, context (if any) appended
-    after: this keeps oracle/broken prompt-matching (which checks
-    `prompt.startswith(task.prompt)`) working unchanged regardless of which
-    retrieval strategy produced the augmented prompt."""
+POSITIONS = ("append", "prepend")
+
+
+def build_prompt_with_context(
+    task_prompt: str, docs: list[Document], position: str = "append"
+) -> str:
+    """Put the retrieved documents after the task, or before it.
+
+    `append` is the default and the position every published arm was measured at.
+    `prepend` exists because where the context sits is a variable in its own right:
+    the same documents read as background when they come first and as an afterthought
+    when they come last, and the arms cannot tell those apart while only one is
+    available.
+
+    Appending used to be a requirement rather than a default. Oracle and broken model
+    prompt-matching checked `prompt.startswith(task.prompt)`, which prepending breaks,
+    so `models.OracleModel` now matches the task prompt anywhere in what it receives.
+    """
+    if position not in POSITIONS:
+        raise ValueError(f"position must be one of {POSITIONS}, got {position!r}")
     if not docs:
         return task_prompt
     context = "\n\n".join(f"[{d.id}]\n{d.text}" for d in docs)
+    if position == "prepend":
+        return f"Reference material:\n{context}\n\n{task_prompt}"
     return f"{task_prompt}\n\nReference material:\n{context}"

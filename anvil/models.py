@@ -58,11 +58,17 @@ class OracleModel(Model):
                     self._prompt_to_id[rec["prompt"]] = rec["id"]
 
     def generate(self, prompt: str, n: int = 1, seed: int | None = None) -> list[str]:
-        # startswith, not exact equality: the retrieval ablation appends
-        # reference material after the task prompt (see
-        # retrieval.build_prompt_with_context), so the prompt the oracle
-        # actually receives may be longer than the one it was indexed under.
-        tid = next((i for p, i in self._prompt_to_id.items() if prompt.startswith(p)), None)
+        # Containment, not equality and no longer startswith: the retrieval ablation
+        # wraps the task prompt in reference material, after it under `append` and
+        # before it under `prepend` (see retrieval.build_prompt_with_context), so the
+        # indexed prompt can sit anywhere inside what the oracle receives. The longest
+        # match wins, so that a task prompt contained in another task's prompt cannot
+        # answer for it.
+        tid = None
+        longest = -1
+        for p, i in self._prompt_to_id.items():
+            if p in prompt and len(p) > longest:
+                tid, longest = i, len(p)
         script = self._by_id.get(tid, "") if tid else ""
         return [f"```bash\n{script}```" for _ in range(n)]
 

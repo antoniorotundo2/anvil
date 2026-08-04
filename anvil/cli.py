@@ -29,7 +29,7 @@ from .repair import (
     induce_t2_tasks,
     verify_repair,
 )
-from .retrieval import STRATEGIES, Document, build_prompt_with_context
+from .retrieval import POSITIONS, STRATEGIES, Document, build_prompt_with_context
 from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task
 from .verifier import (
     FUNCTIONAL_EXECUTORS,
@@ -164,7 +164,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     t0 = time.time()
     for task in tasks:
         docs = retrieve(task, corpus, k=args.retrieval_k)
-        prompt = build_prompt_with_context(task.prompt, docs)
+        prompt = build_prompt_with_context(task.prompt, docs, args.retrieval_position)
         raw_outputs = model.generate(prompt, n=args.n, seed=args.seed)
         first = len(results)
         for sample_idx, raw in enumerate(raw_outputs):
@@ -176,6 +176,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "seed": args.seed,
                 "tasks_sha": tasks_sha,
                 "retrieval": args.retrieval,
+                "retrieval_position": args.retrieval_position,
                 "retrieved_docs": [d.id for d in docs],
                 "script": script,
             })
@@ -645,6 +646,7 @@ def _report(
             payload["by_category"] = by_category
         if getattr(args, "retrieval", None):
             payload["retrieval"] = args.retrieval
+            payload["retrieval_position"] = getattr(args, "retrieval_position", "append")
         Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Full results written to {args.out}")
 
@@ -706,6 +708,9 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--retrieval-corpus", default="tasks/retrieval_corpus.jsonl")
     r.add_argument("--retrieval-k", type=int, default=2,
                    help="max documents retrieved per task (ignored for zero-shot)")
+    r.add_argument("--retrieval-position", choices=list(POSITIONS), default="append",
+                   help="where the retrieved documents go relative to the task prompt "
+                   "(ignored for zero-shot); every published arm used append")
     _add_executor_flag(r)
     r.set_defaults(func=cmd_run)
 

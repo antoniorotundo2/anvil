@@ -47,11 +47,17 @@ CORPUS="${CORPUS:-}"
 # same time, and the two cannot be told apart.
 RETRIEVAL_K="${RETRIEVAL_K:-}"
 
+# Where the retrieved documents sit relative to the task. Every published arm used the
+# default, `append`, which is also the only position the oracle could resolve before
+# `models.OracleModel` learned to find the task prompt anywhere in what it receives.
+RETRIEVAL_POSITION="${RETRIEVAL_POSITION:-}"
+
 # A string, not an array: see run_experiments.sh for why (bash 3.2 on macOS).
 FLAGS=""
 [[ "$FOURBIT" == "1" ]] && FLAGS="--load-in-4bit"
 [[ -n "$CORPUS" ]] && FLAGS="$FLAGS --retrieval-corpus $CORPUS"
 [[ -n "$RETRIEVAL_K" ]] && FLAGS="$FLAGS --retrieval-k $RETRIEVAL_K"
+[[ -n "$RETRIEVAL_POSITION" ]] && FLAGS="$FLAGS --retrieval-position $RETRIEVAL_POSITION"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
 OUT="${OUT:-results/retrieval_${STAMP}}"

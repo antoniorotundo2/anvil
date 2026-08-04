@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from anvil.retrieval import (
     Document,
     build_prompt_with_context,
@@ -121,6 +123,48 @@ def test_build_prompt_with_context_starts_with_original_prompt():
     assert augmented.startswith("write a script")
     assert "some reference text" in augmented
     assert "d1" in augmented
+
+
+# ---------------------------------------------------------------- context position
+def test_append_is_unchanged():
+    """Every published arm was measured at `append`, so this is a regression test on the
+    exact bytes and not merely on the ordering."""
+    docs = [Document(id="d1", text="reference text", tags=[])]
+    assert build_prompt_with_context("write a script", docs) == (
+        "write a script\n\nReference material:\n[d1]\nreference text"
+    )
+
+
+def test_prepend_puts_the_context_first_and_the_task_last():
+    docs = [Document(id="d1", text="reference text", tags=[])]
+    augmented = build_prompt_with_context("write a script", docs, "prepend")
+    assert augmented.startswith("Reference material:")
+    assert augmented.endswith("write a script")
+    assert "reference text" in augmented
+
+
+def test_position_is_validated():
+    docs = [Document(id="d1", text="reference text", tags=[])]
+    with pytest.raises(ValueError):
+        build_prompt_with_context("write a script", docs, "middle")
+
+
+def test_oracle_resolves_the_task_under_either_position():
+    """The oracle indexes tasks by prompt. Appending left the prompt at the front, which
+    `startswith` was enough for; prepending does not, and a benchmark whose upper bound
+    silently returns empty scripts under one arm measures nothing."""
+    from anvil.models import OracleModel  # noqa: PLC0415
+
+    tasks = Task.load_jsonl(ROOT / "tasks" / "t1_slurm.jsonl")
+    oracle = OracleModel(ROOT / "tasks" / "t1_reference.jsonl", ROOT / "tasks" / "t1_slurm.jsonl")
+    corpus = Document.load_jsonl(CORPUS)
+    for task in tasks:
+        docs = retrieve_vectorless(task, corpus)
+        plain = oracle.generate(task.prompt)[0]
+        assert "ANVIL_OK" in plain or plain.strip() != "```bash\n```", task.id
+        for position in ("append", "prepend"):
+            augmented = build_prompt_with_context(task.prompt, docs, position)
+            assert oracle.generate(augmented)[0] == plain, (task.id, position)
 
 
 # ---------------------------------------------------------------- intervention corpora

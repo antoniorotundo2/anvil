@@ -477,7 +477,16 @@ real documents. Each was plausible, each was cheap to test, and none survived.
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
 half-ranges are spread, not confidence intervals; one model family at two sizes; the 7B
 `resource_fit` dip is about four samples of 72, small and present on every seed; the off-topic
-controls are two texts, not a distribution of texts. A prepend variant remains worth measuring.
+controls are two texts, not a distribution of texts.
+
+Every condition above puts the documents after the task. Where they sit is a variable of its own,
+since the same paragraph reads as background when it comes first and as an afterthought when it
+comes last, and `--retrieval-position prepend` now exists to measure that. It is unrun. What made
+it awkward until now was the upper bound rather than the model: the oracle indexed tasks by prompt
+and matched with `startswith`, which appending happens to preserve, so a prepend arm would have
+scored a benchmark whose own reference solutions had gone missing. It matches the task prompt
+anywhere in what it receives instead, and `tests/test_retrieval.py` checks the oracle returns the
+same script under both positions for all eight tasks.
 
 ## Limitations
 
