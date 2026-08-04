@@ -7,6 +7,7 @@ actually differ where it matters, not just that they run without crashing.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from anvil.retrieval import (
@@ -120,3 +121,70 @@ def test_build_prompt_with_context_starts_with_original_prompt():
     assert augmented.startswith("write a script")
     assert "some reference text" in augmented
     assert "d1" in augmented
+
+
+# ---------------------------------------------------------------- intervention corpora
+# The seven-condition series in DESIGN.md rests on one precondition: the document a
+# variant promotes must actually reach every task. It is a property of corpus order and
+# of nothing else, so it breaks silently if a document is ever added to the corpus above
+# the general block, and the table would then describe an experiment nobody ran.
+def _variants() -> dict[str, list[dict]]:
+    from scripts.corpus_variants import build_variants  # noqa: PLC0415
+
+    return build_variants()
+
+
+def _attached(rows: list[dict]) -> set[str]:
+    corpus = [Document(**row) for row in rows]
+    tasks = Task.load_jsonl(ROOT / "tasks" / "t1_slurm.jsonl")
+    return {docs[-1].id for t in tasks if (docs := retrieve_vectorless(t, corpus))}
+
+
+def test_each_variant_puts_its_document_in_front_of_every_task():
+    expected = {
+        "timemem_first": "doc_time_mem",
+        "control_offtopic": "doc_control_offtopic",
+        "control_offtopic2": "doc_control_offtopic2",
+    }
+    variants = _variants()
+    assert set(variants) == set(expected)
+    for name, doc_id in expected.items():
+        assert _attached(variants[name]) == {doc_id}, name
+
+
+def test_default_corpus_attaches_the_incumbent_instead():
+    """The baseline the variants are measured against: without the intervention the
+    fallback slot goes to the document that comes first in corpus order."""
+    rows = [
+        json.loads(line)
+        for line in CORPUS.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert _attached(rows) == {"doc_directive_placement"}
+
+
+def test_controls_match_the_length_of_the_document_they_displace():
+    """Relevance is the variable under test, so the text either side of it is the same
+    size. The id also reaches the prompt and is not length-matched, which is recorded in
+    the script rather than fixed."""
+    variants = _variants()
+    subject = next(
+        json.loads(line)
+        for line in CORPUS.read_text(encoding="utf-8").splitlines()
+        if line.strip() and json.loads(line)["id"] == "doc_time_mem"
+    )
+    for name in ("control_offtopic", "control_offtopic2"):
+        control = variants[name][0]
+        assert len(control["text"]) == len(subject["text"]), name
+
+
+def test_variants_never_drop_a_document():
+    """A control displaces `doc_time_mem` from the fallback slot without removing it: a
+    corpus that is also smaller would confound the comparison."""
+    ids = {
+        json.loads(line)["id"]
+        for line in CORPUS.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    for name, rows in _variants().items():
+        assert ids <= {row["id"] for row in rows}, name

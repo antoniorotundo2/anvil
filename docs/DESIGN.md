@@ -402,7 +402,15 @@ That is a claim the harness can test rather than a story, and `CORPUS=` and `RET
 seeds, same `n`, all graded in `anvil:sched`. The off-topic controls are passages about coastal
 tides and about sourdough, with no term in common with the domain, each cut to exactly the 309
 characters of `doc_time_mem` and placed first among the general documents so they take the same
-slot. Against the real documents the only variable is relevance.
+slot. Against the real documents the variable is relevance, give or take the eight characters by
+which a control's id outruns `doc_time_mem`'s in the `[id]` line that precedes every document in
+the prompt.
+
+`scripts/corpus_variants.py` builds all three variant corpora from the default one and prints, for
+each, the document `vectorless` ends up attaching to each of the eight tasks. That listing is the
+experimental precondition, and `tests/test_retrieval.py` asserts it: a document added to the corpus
+above the general block would quietly send a different one to every task, and the table below would
+then describe a run nobody performed.
 
 Qwen2.5-Coder-1.5B-Instruct:
 
