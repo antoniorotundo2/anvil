@@ -305,10 +305,10 @@ mistake also cannot recur silently now: `_topology_healthy` skips `submittabilit
 stated when the scheduler in front of it is not the declared one, so this same script on that same
 machine reports a skip instead of a number.
 
-**Retrieval does not help this model, it costs it, and tag-based retrieval costs it most**, as
-these three arms are configured. That last clause carries more than it looks: most of the tag-based
-arm's deficit turns out to be which document its fallback attaches, see
-[What the level breaks on](#what-the-level-breaks-on). Two
+**Retrieval does not help this model, it costs it, and tag-based retrieval costs it most.** The
+intervention series below takes that apart: most of the cost is paid for having anything attached
+at all, whatever it says, and the arms differ by whether what they attach happens to teach the rule
+the model is missing. Two
 levels separate and they separate together. `resource_fit` falls 0.49, 0.42, 0.19 across the three
 arms and `strict_all_levels` falls with it, 0.31, 0.21, 0.11, both monotone. Strict is the cleaner
 of the two: no two of its ranges touch, so all three arms are separated. In `resource_fit` the
@@ -388,59 +388,88 @@ out not to move at all. It could not have caught this, and it could not have cau
 other direction either: the corpus states no walltime and no memory figure anywhere, so on these
 two directives there is nothing available to copy.
 
-**The corpus has a hand in it.** One document, `doc_time_mem`, says which directives have no
-default and must be declared. Retrieval reaches it on three of the eight tasks under `vector` and
-on none under `vectorless`, which fills its second slot with `doc_directive_placement` for all
-eight, because the general documents are taken in corpus order and that one comes first. Between
-the two arms that receive context, the damage to `--time` and `--mem` ranks inversely with
-exposure to the only document that addresses them: 23 samples against 30. Zero-shot sits outside
-that comparison, with no context and the least damage of the three, so context costs something by
-itself and the fallback ordering costs the rest.
+### The intervention series
 
-That prediction was run. A copy of the corpus with the two general documents swapped, passed to
-the same script through `CORPUS=`, same model, same three seeds, same `n`, graded in the same
-container:
+`--time` and `--mem` are the subject of exactly one corpus document, `doc_time_mem`, which states
+that they have no SLURM-wide default and must be declared. `vectorless` fills its remaining slots
+from the documents tagged `general` in corpus order, so one of them is attached to all eight tasks
+and the rest are never seen, and the one that wins that slot by default is
+`doc_directive_placement`. The arm whose `resource_fit` collapses is therefore the arm that never
+meets the document about the two directives it fails on.
 
-| `vectorless`, general slot filled by | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
+That is a claim the harness can test rather than a story, and `CORPUS=` and `RETRIEVAL_K=` on
+`scripts/retrieval_ablation.sh` exist to test it. Seven conditions were run, same tasks, same three
+seeds, same `n`, all graded in `anvil:sched`. The off-topic controls are passages about coastal
+tides and about sourdough, with no term in common with the domain, each cut to exactly the 309
+characters of `doc_time_mem` and placed first among the general documents so they take the same
+slot. Against the real documents the only variable is relevance.
+
+Qwen2.5-Coder-1.5B-Instruct:
+
+| general slot | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
 |---|---|---|---|---|---|
-| `doc_directive_placement`, k=2 (corpus order) | 0.53±0.02 | 0.79±0.00 | 0.44±0.06 | 0.19±0.04 | 0.11±0.02 |
-| `doc_time_mem`, k=2 (reordered) | 0.49±0.02 | 0.72±0.04 | 0.43±0.06 | **0.42±0.08** | 0.18±0.06 |
+| nothing (zero-shot) | 0.58±0.04 | 0.82±0.02 | 0.54±0.04 | 0.49±0.02 | 0.31±0.02 |
+| `doc_directive_placement` | 0.53±0.02 | 0.79±0.00 | 0.44±0.06 | 0.19±0.04 | 0.11±0.02 |
+| `doc_time_mem` | 0.49±0.02 | 0.72±0.04 | 0.43±0.06 | **0.42±0.08** | 0.18±0.06 |
 | both, k=3 | 0.50±0.06 | 0.72±0.08 | 0.35±0.06 | **0.40±0.08** | 0.13±0.04 |
+| off-topic, tides | 0.50±0.00 | 0.83±0.04 | 0.43±0.02 | 0.21±0.06 | 0.03±0.04 |
 
-`resource_fit` goes from 0.19 to 0.42 on two swapped lines, ranges nowhere near touching, landing
-on the `vector` arm's 0.42 to the digit. The level that collapsed is the level the document that
-was missing is about.
+Qwen2.5-Coder-7B-Instruct:
 
-The third row separates the document from what it displaced. At `k=3` both general documents fit
-and nothing is given up, and `resource_fit` holds at 0.40. The recovery follows `doc_time_mem`
-wherever it goes and owes nothing to the document it pushed out, which is what the swap alone
-could not establish.
+| general slot | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
+|---|---|---|---|---|---|
+| nothing (zero-shot) | 1.00±0.00 | 0.79±0.00 | 0.88±0.00 | 1.00±0.00 | 0.67±0.00 |
+| `doc_directive_placement` | 0.82±0.02 | 0.88±0.00 | 0.69±0.02 | 1.00±0.00 | 0.57±0.02 |
+| `doc_time_mem` | 0.83±0.00 | 0.78±0.02 | 0.71±0.00 | **0.94±0.02** | 0.58±0.00 |
+| off-topic, tides | 1.00±0.00 | 0.93±0.06 | 0.88±0.00 | 1.00±0.00 | 0.81±0.06 |
+| off-topic, sourdough | 1.00±0.00 | 0.93±0.06 | 0.88±0.00 | 1.00±0.00 | 0.81±0.06 |
 
-The same row withdraws the other half of that reading. The swap had also cost `syntax` 4 points
-and `submittability` 7, which looked like `doc_directive_placement` being taken away from the
-levels it covers. Handing it back at `k=3` does not hand them back: 0.50 and 0.72, against 0.53
-and 0.79 under the original ordering. Whatever moves those two levels, it is not the presence of
-that document, and the symmetry is dropped rather than kept in a weaker form.
+### Two factors account for all of it
 
-What the third row does add is a cost of the budget itself. `functional` falls to 0.35 with three
-documents attached, against 0.44 and 0.43 with two, and its range clears the original's. More
-retrieved context, worse payload, independently of which documents are in it.
+**Whether a model can ignore what does not concern it.** The 1.5B cannot. A paragraph about tides
+takes its `resource_fit` from 0.49 to 0.21, which is the 0.19 of the real document that does not
+address that level: an irrelevant passage costs it as much as an unhelpful relevant one. The 7B
+can. Two unrelated off-topic passages leave its `syntax`, `functional` and `resource_fit` on their
+zero-shot values to the digit, while the two real documents cost it 18 points of `syntax`. So the
+loss is not the extra text in the prompt for one model and is exactly that for the other, and what
+separates them is capacity, not the corpus.
 
-So `vectorless` was not bad at retrieving. Its general slot is filled in corpus order, one
-document takes it for every task, and the failures of this benchmark are concentrated in
-`resource_fit`, so which document takes that slot decides most of that column. It decides much
-less of the verdict: `strict_all_levels` reads 0.11, 0.18, 0.13 down the three rows, and what each
-intervention wins at one level it returns at another. That is the flatter result the
-`resource_fit` column on its own would hide.
+**What `doc_time_mem` is worth, which depends on what the model already knows.** At 1.5B it is
+worth about 21 points of `resource_fit`: the two conditions carrying it read 0.42 and 0.40, the two
+without it 0.21 and 0.19. At 7B the same document costs 5.6 points, 1.00 falling to 0.94, per seed
+0.958, 0.917 and 0.958 against three exact 1.000s in every other condition. It teaches the model
+that does not know these two directives have no default, and gets in the way of the one that does.
 
-One model, one size, 72 samples a row.
+The two compose, and together they read the 1.5B column off: 0.49 with no context, about 0.20 once
+anything is attached, back to 0.42 when what is attached is the document that teaches the missing
+rule. The corpus ordering matters because it decides whether that recovery happens, not because
+ordering is what damages the level.
+
+`functional` is conditional on passing `syntax`, which is why 9 to 12 of its 24 samples are skipped
+per cell and why its column tracks the syntax column rather than moving on its own.
+
+### Observed, replicated, unexplained
+
+At 7B an off-topic passage raises `submittability` from 0.79 to 0.93 and `strict_all_levels` from
+0.67 to 0.81, the best of the five conditions. Two unrelated control texts give identical
+aggregates, so it is not the text, and at 1.5B the same passage leaves `submittability` flat, 0.83
+against 0.82, so it is not the design either. It fits what that level was shown to measure
+elsewhere in this project, how much a model volunteers that nothing asked for, and an irrelevant
+passage may hold it closer to the prompt. No mechanism is established and none is proposed here.
+
+### What the series retired
+
+Three readings written while it ran, each refuted by the run made to test it. That
+`doc_directive_placement` costs `syntax` because it is the document about directive placement:
+displacing it at 7B leaves `syntax` at 0.83 against 0.82. That the loss on `syntax` and
+`functional` is independent of content: at 7B the off-topic controls cost nothing at all. That it
+is therefore a content effect at both sizes: at 1.5B the off-topic control is as damaging as the
+real documents. Each was plausible, each was cheap to test, and none survived.
 
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
-half-ranges are spread, not confidence intervals; one model at one size; `functional` is
-conditional on passing `syntax`, which is why 9 to 12 of its 24 samples are skipped per cell
-and why its column tracks the syntax column. A larger model and a prepend variant remain
-worth measuring, but the vectorless `resource_fit` collapse is now a result rather than an
-observation.
+half-ranges are spread, not confidence intervals; one model family at two sizes; the 7B
+`resource_fit` dip is about four samples of 72, small and present on every seed; the off-topic
+controls are two texts, not a distribution of texts. A prepend variant remains worth measuring.
 
 ## Limitations
 

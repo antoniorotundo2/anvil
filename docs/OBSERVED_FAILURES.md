@@ -349,10 +349,12 @@ model, a second family, and both matrices measured under real submission; see
 wrong-cluster table called for. `_topology_healthy` submits a job asking for the `ANVIL_NODES` and
 `ANVIL_GPUS` the benchmark declares, and on the experiment machine's own SLURM it does what it was
 built to do: `submittability` is skipped with the reason stated, instead of scoring. So is the
-mechanism behind the `vectorless` `resource_fit` collapse, after three refuted candidates: the
-damage is confined to `--time` and `--mem`, the two directives these tasks state as a bound rather
-than a figure, see [What the level breaks on](DESIGN.md#what-the-level-breaks-on). What remains
-open:
+mechanism behind the `vectorless` `resource_fit` collapse, after three refuted candidates and a
+seven-condition intervention series across two model sizes: the damage is confined to `--time` and
+`--mem`, most of it is the toll a small model pays for any attached text whatever it says, and the
+rest is the one corpus document that addresses those two directives, worth 21 points to the model
+that does not know the rule and minus 6 to the one that does. See
+[What the level breaks on](DESIGN.md#what-the-level-breaks-on). What remains open:
 
 - a third family. Two of them were enough to show that `submittability` is not ordered by size,
   because the two families fail it for different reasons and one of the reasons is site-dependent
