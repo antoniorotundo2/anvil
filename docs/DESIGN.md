@@ -403,30 +403,37 @@ container:
 
 | `vectorless`, general slot filled by | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
 |---|---|---|---|---|---|
-| `doc_directive_placement` (corpus order) | 0.53±0.02 | 0.79±0.00 | 0.44±0.06 | 0.19±0.04 | 0.11±0.02 |
-| `doc_time_mem` (reordered) | 0.49±0.02 | 0.72±0.04 | 0.43±0.06 | **0.42±0.08** | 0.18±0.06 |
+| `doc_directive_placement`, k=2 (corpus order) | 0.53±0.02 | 0.79±0.00 | 0.44±0.06 | 0.19±0.04 | 0.11±0.02 |
+| `doc_time_mem`, k=2 (reordered) | 0.49±0.02 | 0.72±0.04 | 0.43±0.06 | **0.42±0.08** | 0.18±0.06 |
+| both, k=3 | 0.50±0.06 | 0.72±0.08 | 0.35±0.06 | **0.40±0.08** | 0.13±0.04 |
 
 `resource_fit` goes from 0.19 to 0.42 on two swapped lines, ranges nowhere near touching, landing
 on the `vector` arm's 0.42 to the digit. The level that collapsed is the level the document that
 was missing is about.
 
-The other levels move the other way, and that was not predicted. `syntax` slips 4 points and
-`submittability` 7, which is the same swap seen from the other side: it takes
-`doc_directive_placement` away from all eight tasks, and that document is about directives placed
-after the first command, which is what `syntax` checks. Each document moves the level it covers.
-The magnitudes are not comparable, one effect is decisive and the other two sit at the edge of
-their ranges, but the directions are what the contents predict.
+The third row separates the document from what it displaced. At `k=3` both general documents fit
+and nothing is given up, and `resource_fit` holds at 0.40. The recovery follows `doc_time_mem`
+wherever it goes and owes nothing to the document it pushed out, which is what the swap alone
+could not establish.
+
+The same row withdraws the other half of that reading. The swap had also cost `syntax` 4 points
+and `submittability` 7, which looked like `doc_directive_placement` being taken away from the
+levels it covers. Handing it back at `k=3` does not hand them back: 0.50 and 0.72, against 0.53
+and 0.79 under the original ordering. Whatever moves those two levels, it is not the presence of
+that document, and the symmetry is dropped rather than kept in a weaker form.
+
+What the third row does add is a cost of the budget itself. `functional` falls to 0.35 with three
+documents attached, against 0.44 and 0.43 with two, and its range clears the original's. More
+retrieved context, worse payload, independently of which documents are in it.
 
 So `vectorless` was not bad at retrieving. Its general slot is filled in corpus order, one
 document takes it for every task, and the failures of this benchmark are concentrated in
-`resource_fit`, so which document takes that slot decides most of the arm's score.
-`strict_all_levels` recovers only from 0.11 to 0.18 because the levels now move against each
-other, which is the honest summary of the intervention: an ordering that repairs one level costs a
-little of two others.
+`resource_fit`, so which document takes that slot decides most of that column. It decides much
+less of the verdict: `strict_all_levels` reads 0.11, 0.18, 0.13 down the three rows, and what each
+intervention wins at one level it returns at another. That is the flatter result the
+`resource_fit` column on its own would hide.
 
-One model, one size, 72 samples an arm, one swap. The swap also changes two things at once, a
-document gained and a document lost, so what is measured is the exchange and not either document
-alone. Separating them needs `RETRIEVAL_K=3`, where both fit and nothing is given up.
+One model, one size, 72 samples a row.
 
 Caveats that belong next to the numbers: three seeds and 24 verifications per cell, so the
 half-ranges are spread, not confidence intervals; one model at one size; `functional` is
@@ -472,7 +479,7 @@ say so plainly.
         ablation](#retrieval-ablation). Generated on the experiment machine across 3 seeds,
         all 9 cells, graded in the container: retrieval does not help this model, `vectorless`
         costs 30 points of `resource_fit` and 20 of `strict_all_levels`, and 22 of those 30 come
-        back by swapping which general document its fallback attaches
+        back by attaching one different document, without the verdict moving with them
 - [ ] **Phase 3**
   - [x] real submission: `--executor sbatch`, opt-in beside the `bash` default, with its own
         preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
