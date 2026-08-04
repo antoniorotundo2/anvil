@@ -479,14 +479,33 @@ half-ranges are spread, not confidence intervals; one model family at two sizes;
 `resource_fit` dip is about four samples of 72, small and present on every seed; the off-topic
 controls are two texts, not a distribution of texts.
 
-Every condition above puts the documents after the task. Where they sit is a variable of its own,
-since the same paragraph reads as background when it comes first and as an afterthought when it
-comes last, and `--retrieval-position prepend` now exists to measure that. It is unrun. What made
-it awkward until now was the upper bound rather than the model: the oracle indexed tasks by prompt
-and matched with `startswith`, which appending happens to preserve, so a prepend arm would have
-scored a benchmark whose own reference solutions had gone missing. It matches the task prompt
-anywhere in what it receives instead, and `tests/test_retrieval.py` checks the oracle returns the
-same script under both positions for all eight tasks.
+### Where the context sits
+
+Every condition above puts the documents after the task. Position is a variable of its own, since
+the same paragraph reads as background when it comes first and as an afterthought when it comes
+last. `--retrieval-position prepend` moves them, on the same corpus, model, seeds and `n`, so the
+only difference from the second 7B row is the order:
+
+| 7B, `doc_directive_placement` | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
+|---|---|---|---|---|---|
+| appended | 0.82±0.02 | 0.88±0.00 | 0.69±0.02 | 1.00±0.00 | 0.57±0.02 |
+| prepended | **0.75±0.00** | **0.99±0.02** | 0.62±0.00 | 0.92±0.08 | 0.57±0.06 |
+
+Both directions at once. `syntax` falls a further 7 points with no overlap between the ranges, so
+the 18 points the document costs when appended are not the whole price: some of the damage is the
+content being there and some is it arriving first. `submittability` goes the other way and further,
+to one refusal in 72 samples against twenty four under the same document appended, the highest this
+level reaches on any 7B condition measured here. `strict_all_levels` is unchanged, 0.57 either way,
+because the two cancel.
+
+`resource_fit` reads 0.92 and should not be read: the seeds are 0.833, 0.917 and 1.000, so the
+range touches the ceiling it sits at in every other condition with this document.
+
+What makes it awkward is the upper bound rather than the model. The oracle indexes tasks by prompt
+and used to match with `startswith`, which appending happens to preserve, so a prepend arm would
+have scored a benchmark whose own reference solutions had quietly gone missing. It matches the task
+prompt anywhere in what it receives instead, and `tests/test_retrieval.py` checks that the oracle
+returns the same script under both positions for all eight tasks.
 
 ## Limitations
 
@@ -626,9 +645,10 @@ artifacts from three models, real submission costs `functional` up to 21 points 
 cell and nothing at all in one of them, and moves `strict_all_levels` by nothing anywhere: the
 scripts it stops were already failing another level, mostly `submittability`, so the executor
 propagates a verdict rather than producing one.
-A third run, the nine retrieval cells regraded, adds 216 comparisons and no verdict change at all.
 Exactly one artifact of the 2340 changes verdict, and it changes in favour of real submission,
-which accepts a script the sandbox wrongly rejects. The numbers are in
+which accepts a script the sandbox wrongly rejects. The nine runs of the retrieval intervention
+series were graded the same way and add 864 comparisons without a single further disagreement,
+which puts the count at one artifact of 3204. The numbers are in
 [`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-moves-functional-and-barely-touches-the-verdict).
 
 That is a statement about these eight tasks, not about the executor. A task built to need real

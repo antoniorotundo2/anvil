@@ -362,9 +362,6 @@ that does not know the rule and minus 6 to the one that does. See
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- the retrieval ablation with the context prepended rather than appended. The larger model is
-  measured, see [The intervention series](DESIGN.md#the-intervention-series);
-  `--retrieval-position prepend` is implemented and tested and has not been run;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
