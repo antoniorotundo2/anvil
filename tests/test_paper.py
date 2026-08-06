@@ -71,10 +71,20 @@ def test_every_citation_resolves_to_the_bibliography():
             assert key in keys, key
 
 
-def test_the_bibliography_holds_only_what_can_be_followed():
-    """The related-work section is unwritten on purpose. A plausible reference added to
-    fill it would cost this paper the one thing it offers, so the sweep in
-    `scripts/litsweep.py` is the only way entries get in."""
+def test_every_reference_can_be_followed():
+    """The one claim this paper has is that its claims can be checked, and a reference
+    without an identifier cannot be. Entries come from the sweep in `scripts/litsweep.py`,
+    whose output is committed under `sweep/`, and each carries the DOI that sweep found."""
     bib = BIB.read_text(encoding="utf-8")
-    assert re.findall(r"arXiv:(\d{4}\.\d{4,5})", bib) == ["2107.03374"]
-    assert len(re.findall(r"^@\w+\{", bib, re.M)) == 1
+    entries = re.split(r"^@\w+\{", bib, flags=re.M)[1:]
+    assert entries, "the bibliography is empty"
+    for entry in entries:
+        key = entry.split(",", 1)[0].strip()
+        assert re.search(r"^\s*doi\s*=", entry, re.M), f"{key} has no DOI"
+
+
+def test_the_sweep_behind_the_bibliography_is_committed():
+    """Related work says the selection can be audited. That is only true while the records
+    it was selected from are in the repository."""
+    for name in ("results.csv", "results.md", "by_query.json"):
+        assert (ROOT / "sweep" / name).is_file(), name

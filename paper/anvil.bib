@@ -1,8 +1,7 @@
-% The bibliography is deliberately short. `scripts/litsweep.py` is a reproducible sweep
-% over OpenAlex, Crossref, DBLP and arXiv; running it and citing its output is the
-% remaining work on this manuscript. Entries are added from that sweep and from nowhere
-% else, because a plausible reference nobody can follow would cost this paper the only
-% thing it has to offer.
+% Every entry here was surfaced by `scripts/litsweep.py` and carries a DOI, so a reader
+% can follow it. The sweep's full output is committed under `sweep/`, which is what makes
+% this section auditable rather than asserted: 761 records over fourteen queries and four
+% open scholarly APIs, from which these were selected.
 
 @article{chen2021codex,
   title   = {Evaluating Large Language Models Trained on Code},
@@ -10,5 +9,86 @@
              Pinto, Henrique Ponde de Oliveira and Kaplan, Jared and Edwards, Harri and
              Burda, Yuri and Joseph, Nicholas and Brockman, Greg and others},
   journal = {arXiv preprint arXiv:2107.03374},
-  year    = {2021}
+  year    = {2021},
+  doi     = {10.48550/arXiv.2107.03374}
+}
+
+@inproceedings{zheng2026comparative,
+  title     = {A Comparative Study on {LLM}-enabled {HPC} User Support},
+  author    = {Zheng, Mingkai and Linghu, Fangru and Li, Sikan and
+               Kandes, Marty Charles and Gaffney, Niall},
+  booktitle = {Practice and Experience in Advanced Research Computing (PEARC)},
+  year      = {2026},
+  doi       = {10.1145/3785462.3815796}
+}
+
+@inproceedings{pasupuleti2025chatbot,
+  title     = {{LLM} Chatbot for Autonomous User Support in High-Performance Computing},
+  author    = {Pasupuleti, Rajesh and Vadapalli, Ravi and Mader, Christopher and
+               Shakoor, Subhan},
+  booktitle = {International Conference on Machine Learning and Applications (ICMLA)},
+  year      = {2025},
+  doi       = {10.1109/icmla66185.2025.00226}
+}
+
+@techreport{biggs2024gateway,
+  title       = {Outcomes of {HPC} User Support using a Science Gateway {AI} Assistant},
+  author      = {Biggs, Brandon S. and Dalton, Kaylee},
+  institution = {Idaho National Laboratory},
+  year        = {2024},
+  doi         = {10.2172/2352719}
+}
+
+@inproceedings{shao2022nersc,
+  title     = {{NERSC} Job Script Generator},
+  author    = {Shao, Robin and Kruth, Thorsten and Zhao, Zhengji},
+  booktitle = {IEEE/ACM International Workshop on HPC User Support Tools (HUST)},
+  year      = {2022},
+  doi       = {10.1109/hust56722.2022.00010}
+}
+
+@article{doosthosseini2024chatai,
+  title   = {Chat {AI}: A Seamless Slurm-Native Solution for {HPC}-Based Services},
+  author  = {Doosthosseini, Ali and Decker, Jonathan and Nolte, Hendrik and Kunkel, Julian},
+  journal = {arXiv preprint arXiv:2407.00110},
+  year    = {2024},
+  doi     = {10.48550/arXiv.2407.00110}
+}
+
+@article{nichols2023hpccoder,
+  title   = {{HPC}-Coder: Modeling Parallel Programs using Large Language Models},
+  author  = {Nichols, Daniel and Marathe, Aniruddha and Menon, Harshitha and
+             Gamblin, Todd and Bhatele, Abhinav},
+  journal = {arXiv preprint arXiv:2306.17281},
+  year    = {2023},
+  doi     = {10.48550/arXiv.2306.17281}
+}
+
+@article{mahmud2023autoparllm,
+  title   = {{AutoParLLM}: {GNN}-guided Context Generation for Zero-Shot Code
+             Parallelization using {LLMs}},
+  author  = {Mahmud, Quazi Ishtiaque and TehraniJamsaz, Ali and Phan, Hung and
+             Chen, Le and Capota, Mihai},
+  journal = {arXiv preprint arXiv:2310.04047},
+  year    = {2023},
+  doi     = {10.48550/arXiv.2310.04047}
+}
+
+@inproceedings{valerolara2026chatmpi,
+  title     = {{ChatMPI}: {LLM}-Driven {MPI} Code Generation for {HPC} Workloads},
+  author    = {Valero-Lara, Pedro and Young, Aaron and Naughton III, Thomas and
+               Engelmann, Christian and Geist, Al},
+  booktitle = {Supercomputing Asia},
+  year      = {2026},
+  doi       = {10.1145/3773656.3773659}
+}
+
+@inproceedings{santos2026terraform,
+  title     = {Can Language Models Generate Secure {Terraform} Code? A Security-Focused
+               Benchmark Using Static Analysis},
+  author    = {Santos Vargas, Francis Luis and Mansilha, Rodrigo Brand{\~a}o and
+               Kreutz, Diego},
+  booktitle = {Workshop on Cloud Computing Research},
+  year      = {2026},
+  doi       = {10.5753/pesquisanuvem.2026.23954}
 }

@@ -256,7 +256,7 @@ def sweep(queries: list[str], email: str, since: int, limit: int,
         print(f"\n» {q}")
         for name in sources:
             recs = SOURCES[name](q, email, since, limit)
-            print(f"    {name:<10} {len(recs):>3} risultati")
+            print(f"    {name:<10} {len(recs):>3} results")
             for r in recs:
                 if not r.title:
                     continue

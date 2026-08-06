@@ -91,14 +91,35 @@ it says about itself.
 
 \section{Related work}
 
-\emph{This section is not written.} The repository ships \texttt{scripts/litsweep.py}, a
-reproducible sweep over OpenAlex, Crossref, DBLP and arXiv, so that the review can be regenerated
-and cited rather than asserted. Running it and citing its output is the remaining work on this
-manuscript. No references are given here rather than plausible ones: a citation nobody can follow
-would compromise the only thing this paper offers, which is that its claims can be checked.
+The works below were selected from a sweep of fourteen queries against OpenAlex, Crossref, DBLP
+and arXiv, run by \texttt{scripts/litsweep.py} and returning $761$ unique records. Its full output
+is committed with this manuscript, so the selection can be audited rather than taken on trust.
 
-The single prior result the method depends on directly is the unbiased $\mathrm{pass}@k$ estimator
-of \citet{chen2021codex}, used unchanged.
+\paragraph{Assistants for HPC users, and how they are judged.} Support assistants for
+supercomputer users are being built and deployed: a chatbot for autonomous user support
+\citep{pasupuleti2025chatbot}, a science-gateway assistant whose outcomes were reported from a
+national laboratory \citep{biggs2024gateway}, and a Slurm-native serving infrastructure for running
+such models on the cluster itself \citep{doosthosseini2024chatai}. \citet{zheng2026comparative}
+compare several of these approaches. The task predates the models: the NERSC job script generator
+\citep{shao2022nersc} produced batch scripts from a form, with correctness guaranteed by
+construction rather than measured. What is missing across this line is an execution-grounded way to
+say whether the artifacts these systems emit would run, which is the gap this work addresses.
+
+\paragraph{Language models for HPC code.} A parallel line targets the source code rather than the
+operational artifacts around it: modelling parallel programs \citep{nichols2023hpccoder}, zero-shot
+parallelization guided by graph neural networks \citep{mahmud2023autoparllm}, and MPI code
+generation for HPC workloads \citep{valerolara2026chatmpi}. These evaluate a kernel that compiles
+and runs. A batch script is judged by a scheduler instead, and fails in ways a compiler has no
+opinion about: a directive after the first command is accepted and ignored, and an omitted one is
+not an absent request but a different one.
+
+\paragraph{Execution-grounded evaluation elsewhere.} Outside HPC, execution is the norm.
+\citet{chen2021codex} established the unbiased $\mathrm{pass}@k$ estimator this work uses
+unchanged. Infrastructure-as-code is the closest neighbour and shows the constraint: unable to
+execute a plan cheaply, \citet{santos2026terraform} benchmark generated Terraform through static
+analysis. HPC operational artifacts do not share that constraint. \texttt{sbatch -{}-test-only}
+costs milliseconds and the job really runs, which is why the ground truth here can be objective
+where theirs cannot.
 
 \section{The benchmark}
 

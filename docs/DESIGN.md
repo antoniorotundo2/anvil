@@ -709,13 +709,13 @@ say so plainly.
         `leaderboard/entries/` by `scripts/leaderboard.py` and held to them by a test, so
         the page cannot drift from the runs it claims to summarise. An entry graded
         against an older task digest is shown as stale rather than ranked
-  - [x] preprint: `paper/anvil.tex`, complete except for related work. Its tables and the
+  - [x] preprint: `paper/anvil.tex`, compiled to `paper/anvil.pdf`. Its tables and the
         data behind its figures are emitted from `leaderboard/entries/` by
         `scripts/paper_data.py`, so the manuscript cannot quote a run that has since been
         re-imported, and `tests/test_paper.py` checks that plus the structure a compiler
-        would catch. The bibliography holds one entry and stays that way until
-        `scripts/litsweep.py` has been run: a plausible citation nobody can follow would
-        cost the paper the only thing it offers
+        would catch. Related work is written from `scripts/litsweep.py`, 761 records over
+        fourteen queries and four open APIs, with the sweep committed under `sweep/` so the
+        selection can be audited; every entry carries a DOI, which a test enforces
   - [ ] one external user. It is the only item here that cannot be built, and the only one that
         decides whether any of the others mattered
 
