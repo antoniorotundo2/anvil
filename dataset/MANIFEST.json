@@ -1,0 +1,72 @@
+{
+  "dataset": "anvil",
+  "version": "0.1.0",
+  "files": [
+    {
+      "path": "tasks/t1_slurm.jsonl",
+      "sha256": "bbc74707a0306f0cbd5836377bd2fb097305a6c8f009442060086db762469c35",
+      "bytes": 4273,
+      "records": 8
+    },
+    {
+      "path": "tasks/t1_reference.jsonl",
+      "sha256": "43fe9bf2ac9a0a43339c4ef2798db1d91a5b8e58aa0e591cbfd64a2ab49006e2",
+      "bytes": 1938,
+      "records": 8
+    },
+    {
+      "path": "tasks/t2_repair.jsonl",
+      "sha256": "723aa7ec446323387206b3add684d083138444c5a6d47391bdd2f15c1eeb2a43",
+      "bytes": 15591,
+      "records": 44
+    },
+    {
+      "path": "tasks/t3_apptainer.jsonl",
+      "sha256": "ed9dda3a2453eaa23a354d603fa7ee7fb25e8a2183becc2a9663a9e3e191b952",
+      "bytes": 1306,
+      "records": 3
+    },
+    {
+      "path": "tasks/t3_reference.jsonl",
+      "sha256": "36a612152eba0051eb08338cc01ac80c552ee081a46f354a907aaf7435fce1af",
+      "bytes": 471,
+      "records": 3
+    },
+    {
+      "path": "tasks/t1_exec.jsonl",
+      "sha256": "9d7bcd7b93c7733d89c194ab2e870358e9182da79989202458ba42e50a4c204a",
+      "bytes": 547,
+      "records": 1
+    },
+    {
+      "path": "tasks/t1_exec_reference.jsonl",
+      "sha256": "14d876972174fb77dfdc6ff40806006d4609a05c70e6746a2c3cca0b458e1173",
+      "bytes": 264,
+      "records": 1
+    },
+    {
+      "path": "tasks/t2_exec_repair.jsonl",
+      "sha256": "6e08c39f0df141846cebbb1c6a71a067607b216e0e88d684170692f3c012b455",
+      "bytes": 1862,
+      "records": 5
+    },
+    {
+      "path": "tasks/t1_coreutils.jsonl",
+      "sha256": "426c46d55ee1eff94fc18241e4de3f9bad4af02856d93ed3a6a613ce011255d1",
+      "bytes": 650,
+      "records": 1
+    },
+    {
+      "path": "tasks/t1_coreutils_reference.jsonl",
+      "sha256": "d45d7625ef58f8944fabd33d8e2055c360426c87c413dadf29892eb8c4602ed5",
+      "bytes": 775,
+      "records": 1
+    },
+    {
+      "path": "tasks/retrieval_corpus.jsonl",
+      "sha256": "2abb995b260d790b355e01c00bb553f57370baa8380a1eb3268a0c9a22a52d05",
+      "bytes": 3441,
+      "records": 8
+    }
+  ]
+}

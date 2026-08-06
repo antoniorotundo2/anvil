@@ -702,7 +702,10 @@ say so plainly.
   - [x] published results, as a page rather than a table buried in these documents:
         [RESULTS.md](RESULTS.md), which carries every figure with its provenance, the four findings
         they support, and a section on what they are not
-  - [ ] dataset release, leaderboard, preprint
+  - [x] dataset release: [DATASET.md](DATASET.md) and `dataset/MANIFEST.json`, which ties
+        every published figure to the digest of the files it was measured against. The
+        upload to a hosting platform needs the author's account and has not been done
+  - [ ] leaderboard, preprint
   - [ ] one external user. It is the only item here that cannot be built, and the only one that
         decides whether any of the others mattered
 

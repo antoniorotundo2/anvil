@@ -391,6 +391,7 @@ charged to the model.
 - [`docs/DESIGN.md`](docs/DESIGN.md): why execution-based verification, the five levels, the preflight
 - [`docs/REFERENCE_CLUSTER.md`](docs/REFERENCE_CLUSTER.md): the declared topology and its non-obvious details
 - [`docs/RESULTS.md`](docs/RESULTS.md): every measured number, with what it is and what it is not
+- [`docs/DATASET.md`](docs/DATASET.md): the task files, their schemas, and how to tell which copy you have
 - [`docs/OBSERVED_FAILURES.md`](docs/OBSERVED_FAILURES.md): failure classes observed on a real model
 - [`docs/HARDWARE.md`](docs/HARDWARE.md): development machine vs experiment machine
 
