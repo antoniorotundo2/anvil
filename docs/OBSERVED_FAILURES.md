@@ -366,7 +366,8 @@ that does not know the rule and minus 6 to the one that does. See
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
 - the toolchain-sensitive task on a model that can reach the question. `tasks/t1_coreutils.jsonl`
-  splits the two implementations by construction, and the 1.5B fails it on both for a reason that
-  has nothing to do with either: a here-string newline its count includes. Fifteen samples, no
-  divergence, no locale pinned once, see [A task that can tell the two
-  apart](DESIGN.md#a-task-that-can-tell-the-two-apart). The larger model is the one to ask;
+  splits the two implementations by construction, and both Qwen sizes fail it on both images for
+  reasons that have nothing to do with either: a here-string newline at 1.5B, a missing output
+  prefix at 7B. Thirty samples, no divergence, and not one pins a locale, see [A task that can tell
+  the two apart](DESIGN.md#a-task-that-can-tell-the-two-apart). What would answer it is a model
+  that clears the payload, which neither of these does;

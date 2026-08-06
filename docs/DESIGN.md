@@ -308,27 +308,35 @@ It does not run under `make guards`. The ground truth is defined in the declared
 on the BSD userland of a developer machine the reference counts bytes and pads its output, neither
 of which is a defect in it.
 
-**First model measured, and it never reaches the question.** Qwen2.5-Coder-1.5B-Instruct, 3 seeds,
-n=5, generated on the development machine and verified in both images: 15 samples, 75 level
-comparisons, **no divergence anywhere**. `functional` fails on all fifteen in both, `syntax` passes
-14, `resource_fit` 12, `submittability` 8. Not one of the fifteen pins a locale.
+**Two models measured, and neither reaches the question.** Qwen2.5-Coder at 1.5B and 7B, 3 seeds
+each, n=5, verified in both images: 30 samples, 150 level comparisons, **no divergence anywhere**.
+`functional` fails on all thirty in both images. **Not one of the thirty pins a locale.**
 
-The reason the divergence never surfaces is worth more than the agreement. The dominant shape is
+That last number is the measurement the task was built for, and it is the same at both sizes.
+
+Why the divergence never surfaces is worth more than the agreement, and the two models fail
+differently. The 1.5B passes `syntax` 14 of 15 and `resource_fit` 12, and its dominant shape is
 
 ```bash
 echo "CHARS=$(wc -m <<< "café naïve")"
 ```
 
-and a here-string appends a newline, so the count is 13 under GNU and 11 under `uutils`. Neither is
-10, so the sample fails in both images and the two agree. Without that newline the same script
-would read 12 against 10, which is exactly the split the task exists to produce. A second error,
-unrelated to the first, suppressed it.
+where a here-string appends a newline, so the count is 13 under GNU and 11 under `uutils`. Neither
+is 10. Without that newline the same script would read 12 against 10, which is exactly the split
+the task exists to produce: a second error, unrelated to the first, suppressed it.
 
-So this run measures the model rather than the environments, and the cross-distribution agreement
-it reports is worth nothing about the toolchains. That is the honest reading of every agreement
-this ablation has produced so far, and here the mechanism is visible instead of assumed. A larger
-model, which clears `syntax` and `resource_fit` on the eight-task set, is the one worth asking
-next.
+The 7B passes `syntax` and `resource_fit` 15 of 15, writes better formed scripts than the smaller
+model on every level the scheduler can see, and fails the payload for reasons that are not about
+counting at all. One shape prints the count with no `CHARS=` prefix; the other pipes the prefix
+itself into the counter, `echo -n "CHARS=" | wc -m`, and counts that. Both are wrong identically
+on GNU and on `uutils`.
+
+So the task splits the two implementations by construction, `make docker-guards-coreutils` proves
+it, and no model has yet written an artifact good enough for the split to decide anything. The
+cross-distribution agreement these runs report is a statement about the models, not the
+environments. That has been the honest reading of every agreement this ablation has produced, and
+here it is demonstrated rather than conceded: on a task built to diverge, the divergence is still
+out of reach.
 
 ## Retrieval ablation
 
