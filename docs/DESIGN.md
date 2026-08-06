@@ -699,8 +699,9 @@ say so plainly.
         the opposite way from `resource_fit`, which is the whole distinction between a task spec
         and a site rule: one fails a script that asks for too little, the other one that asks for
         too much
-  - [ ] published results, as a page rather than a table buried in these documents, so a reader can
-        cite where the models stand without running anything
+  - [x] published results, as a page rather than a table buried in these documents:
+        [RESULTS.md](RESULTS.md), which carries every figure with its provenance, the four findings
+        they support, and a section on what they are not
   - [ ] dataset release, leaderboard, preprint
   - [ ] one external user. It is the only item here that cannot be built, and the only one that
         decides whether any of the others mattered

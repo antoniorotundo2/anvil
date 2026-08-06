@@ -1,0 +1,124 @@
+# Results
+
+Every measured number this project stands behind, on one page, so it can be read and cited without
+running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
+[OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
+
+## How to read them
+
+`pass@1` with the unbiased estimator (Chen et al., 2021), per level, plus `strict_all_levels`,
+which requires every level either to pass or to be out of the machine's reach. A skipped level is
+never a passed one.
+
+The `±` is **half the range across three seeds, not a confidence interval**. Three draws say
+whether an effect survives reseeding; they do not support a significance claim, and none is made
+here. Where two arms differ by less than their ranges, this page says they do not separate.
+
+## Environment
+
+All figures below were graded inside the container: Ubuntu 24.04, GNU coreutils 9.4, bash 5.2, a
+live `slurmctld` on the declared reference topology. Generation ran on the experiment machine, an
+RTX 3060 12 GB, every model in 4-bit NF4. Generating where the accelerator is and grading where the
+scheduler is is a deliberate split, not a convenience: see
+[HARDWARE.md](HARDWARE.md).
+
+Numbers produced outside the container are not on this page. One earlier table was, and it was
+wrong; that correction is recorded in
+[A table measured against the wrong cluster](OBSERVED_FAILURES.md#a-table-measured-against-the-wrong-cluster).
+
+## T1: writing a job script from scratch
+
+Eight tasks, 3 seeds (0/1/2), n=5, three models across two families.
+
+| model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict |
+|---|---|---|---|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.375±0.025 | 0.442±0.013 | 0.308±0.025 |
+| Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 |
+| granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 |
+
+`strict` is identical under both executors for every model. `safety` is 1.000±0.000 everywhere and
+is left out.
+
+## T2: diagnosing and repairing a broken one
+
+Induced faults from the same eight tasks, same protocol, 220 repairs per seed.
+
+| model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict |
+|---|---|---|---|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.412±0.014 | 0.291±0.000 |
+| Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 |
+| granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 |
+
+Per fault category, `strict_all_levels`, three seeds pooled. F1 applies to three tasks and F6 to
+one, hence the smaller denominators.
+
+| category | 1.5B | 7B | Granite 3B | n per model |
+|---|---|---|---|---|
+| F1 omitted default | 0.000 | 1.000 | 0.356 | 45 |
+| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 120 |
+| F3 prose in a value | 0.542 | 0.875 | 0.800 | 120 |
+| F4 directive absent | 0.000 | 0.750 | 0.742 | 120 |
+| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 120 |
+| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 15 |
+| F7 malformed value | 0.550 | 0.875 | 0.833 | 120 |
+
+## Four findings
+
+**`submittability` is not ordered by model size.** T1 reads 0.875 for Granite at 3B, 0.842 for Qwen
+at 1.5B, 0.792 for Qwen at 7B; T2 reads 1.000, 0.977 and 0.886. The smallest model of the second
+family leads both, and inside the Qwen family the level falls as size rises while every other level
+improves. The two families also fail it differently: Qwen invents partition names, which a
+different cluster might have, and Granite invents an option SLURM does not have, which no cluster
+has. See [`submittability` does not track model
+size](OBSERVED_FAILURES.md#submittability-does-not-track-model-size).
+
+**Real submission changes almost nothing on this task set.** `scripts/executor_ablation.sh` grades
+the same generations twice in the same image, once through the `bash` sandbox and once through real
+`sbatch`. Across **3204 artifacts, exactly one changes verdict**, and it changes in favour of real
+submission, which accepts a script the sandbox wrongly rejects. The scripts real submission stops
+were already failing another level. This is a statement about these eight tasks, not about the
+executor: a task built to need it does need it, and F8 is invisible to every static level and to
+bash.
+
+**Retrieval costs this model family, and the sign depends on what the model already knows.** Seven
+conditions across two sizes. Any attached text costs the 1.5B about 28 points of `resource_fit`,
+whether it is SLURM documentation or a passage about coastal tides; the 7B pays no such toll and
+two off-topic controls leave it on its zero-shot values to the digit. The one document that
+addresses `--time` and `--mem` is worth +21 points to the model that does not know the rule and
+-6 to the one that does. See [The intervention
+series](DESIGN.md#the-intervention-series).
+
+**Two coreutils implementations are not interchangeable, and no model has reached the difference.**
+101 invocations run in Ubuntu 24.04 (GNU 9.4) and 26.04 (`uutils` 0.8.0): 91 agree exactly. Of the
+rest, three are behavioural and need no misconfigured locale, `wc -m` and `expand` on a non-ASCII
+payload and `numfmt --to=si`. `tasks/t1_coreutils.jsonl` sits in that corner deliberately and
+`make docker-guards-coreutils` proves the same script gets two verdicts. Asked to solve it, three
+models produced 45 samples, **none pinning a locale and none diverging**: each fails on both
+implementations for a reason that precedes the difference.
+
+## Reproducing
+
+Generation needs an accelerator, grading needs the container, and the two are separate commands on
+purpose.
+
+```
+MODELS="Qwen/Qwen2.5-Coder-7B-Instruct" SEEDS="0 1 2" N=5 ./scripts/run_experiments.sh
+./scripts/executor_ablation.sh results/<the directory it printed>
+```
+
+The brackets that must hold before any of the above means anything:
+
+```
+make guards && make guards-t2 && make docker-guards-enforcement && make docker-guards-coreutils
+```
+
+## What these numbers are not
+
+Three seeds and 24 to 220 verifications per cell. Two model families at three sizes, all quantized
+to 4 bit, none of them large. Eight T1 tasks, which is a small denominator and makes each task
+worth 0.125 of every T1 figure on this page. One reference topology, declared rather than borrowed
+from a real centre. Nothing here has been replicated by anybody else.
+
+Every figure moved at least once while being measured, and the corrections are recorded next to the
+findings rather than folded away. That is the reason to trust the current values, not a reason to
+treat them as settled.
