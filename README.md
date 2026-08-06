@@ -138,6 +138,28 @@ The set lives in its own file so that adding it changes no digest: `tasks/t1_slu
 CPU and GPU binding remain outside this level: a job is confined to its cores, but no task asks
 what it was given.
 
+## Checking a script you already have
+
+Everything above measures a model. If instead you have a job script that an assistant wrote and
+you want to know whether it will hold up, `anvil check` answers that with no task file, no model
+and no benchmark run:
+
+```
+anvil check job.sh
+```
+
+`syntax`, `safety` and `submittability` need nothing but the script and, for the last one, a
+scheduler to ask. `resource_fit` and `functional` compare against a spec, so without one they are
+reported as not checked rather than passed. Give the script a task to be graded against and all
+five run:
+
+```
+anvil check job.sh --task t1_mpi_multinode
+```
+
+The exit code is 0 when every level that ran is satisfied and 1 otherwise, which is what makes it
+usable from a pre-submission hook or a CI step. `--json` prints the same verdict for a machine.
+
 ## Development
 
 ### Tests

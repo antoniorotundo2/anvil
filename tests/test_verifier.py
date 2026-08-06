@@ -1272,3 +1272,65 @@ def test_output_paths_tolerate_a_command_without_them(tmp_path):
     _prepare_output_paths(Namespace(out=None, save_generations=None))
     _prepare_output_paths(Namespace(out=str(tmp_path / "only.json")))
     assert tmp_path.is_dir()
+
+
+# ---------------------------------------------------------------- anvil check
+# The command exists so that someone holding a script, and no benchmark, can get a
+# verdict. Its exit code is the contract: a hook or a CI step reads that and nothing else.
+def _check(tmp_path, script: str, **kw):
+    from argparse import Namespace  # noqa: PLC0415
+
+    from anvil.cli import cmd_check  # noqa: PLC0415
+
+    path = tmp_path / "artifact.sh"
+    path.write_text(script, encoding="utf-8")
+    args = Namespace(
+        scripts=[str(path)],
+        task=kw.get("task"),
+        tasks=str(ROOT / "tasks" / "t1_slurm.jsonl"),
+        no_exec=kw.get("no_exec", False),
+        json=kw.get("json", False),
+        executor="bash",
+    )
+    return cmd_check(args)
+
+
+def test_check_accepts_a_sound_script(tmp_path):
+    assert _check(tmp_path, "#!/bin/bash\n#SBATCH --time=00:10:00\necho ANVIL_OK\n") == 0
+
+
+def test_check_rejects_a_dangerous_one(tmp_path):
+    assert _check(tmp_path, "#!/bin/bash\nrm -rf /\n") == 1
+
+
+def test_check_rejects_a_script_with_no_shebang(tmp_path):
+    assert _check(tmp_path, "#SBATCH --time=00:10:00\necho ANVIL_OK\n") == 1
+
+
+def test_check_without_a_task_does_not_pretend_to_judge_the_request(tmp_path):
+    """`resource_fit` and `functional` need a spec. Reporting them as passed when there is
+    nothing to compare against is the surface-form scoring this project exists to avoid."""
+    from argparse import Namespace  # noqa: PLC0415
+
+    from anvil.cli import cmd_check  # noqa: PLC0415
+    from anvil.schema import Level  # noqa: PLC0415
+    from anvil.verifier import check_safety, check_syntax  # noqa: PLC0415
+
+    script = "#!/bin/bash\n#SBATCH --time=00:10:00\necho ANVIL_OK\n"
+    path = tmp_path / "a.sh"
+    path.write_text(script, encoding="utf-8")
+    args = Namespace(scripts=[str(path)], task=None, tasks="", no_exec=False,
+                     json=False, executor="bash")
+    assert cmd_check(args) == 0
+    assert check_syntax(script).passed and check_safety(script).passed
+    assert Level.RESOURCE_FIT.value == "resource_fit"
+
+
+def test_check_grades_the_reference_solution_against_its_task(tmp_path):
+    ref = json.loads((ROOT / "tasks" / "t1_reference.jsonl").read_text(
+        encoding="utf-8").splitlines()[0])
+    assert _check(tmp_path, ref["script"], task=ref["id"]) == 0
+
+
+def test_check_reports_an_unknown_task_rather_than_grading_nothing(tmp_path):
+    assert _check(tmp_path, "#!/bin/bash\necho ANVIL_OK\n", task="no_such_task") == 2

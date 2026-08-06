@@ -30,9 +30,12 @@ from .repair import (
     verify_repair,
 )
 from .retrieval import POSITIONS, STRATEGIES, Document, build_prompt_with_context
-from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task
+from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task, _satisfied
 from .verifier import (
     FUNCTIONAL_EXECUTORS,
+    check_safety,
+    check_submittability,
+    check_syntax,
     functional_executor,
     sbatch_execution_healthy,
     set_functional_executor,
@@ -210,6 +213,83 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     _report(model.name, args.tasks, tasks, results, args, elapsed)
     return 0
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    """Judge artifacts that were never part of a benchmark run.
+
+    Everything else in this CLI answers "how good is this model", which needs tasks, an
+    oracle and pass@k. This answers "will this script hold up", which needs none of them,
+    and it is the question anyone generating job scripts with an LLM actually has. The
+    verifier already knew how; what was missing was a way in that did not require
+    inventing a task and wrapping the script in a generations file.
+
+    Three of the five levels never needed a task: `syntax` reads the script, `safety`
+    reads the script, and `submittability` asks the scheduler. Those run on anything.
+    `resource_fit` and `functional` compare against a spec, so without `--task` they are
+    reported as not checked rather than passed, on the same principle that keeps a
+    skipped level from counting as a passed one.
+
+    The exit code is what makes it composable: 0 when every level that ran is satisfied,
+    1 otherwise, so it drops into a pre-submission hook or a CI step without parsing.
+    """
+    set_functional_executor(getattr(args, "executor", None) or "bash")
+
+    task = None
+    if args.task:
+        tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
+        task = tasks.get(args.task)
+        if task is None:
+            print(f"no task '{args.task}' in {args.tasks}. Known: {', '.join(sorted(tasks))}",
+                  file=sys.stderr)
+            return 2
+
+    reports = []
+    worst = 0
+    for path in args.scripts:
+        script = Path(path).read_text(encoding="utf-8")
+        if task is not None:
+            result = verify(script, task, run_functional=not args.no_exec)
+            levels = result.levels
+            satisfied = result.all_passed
+        else:
+            levels = [check_syntax(script), check_safety(script)]
+            # Order matters for a reader: an unsafe script is not submitted anywhere, and
+            # saying so before the scheduler's opinion is clearer than after it.
+            if levels[0].passed and levels[1].passed:
+                levels.insert(1, check_submittability(script))
+            satisfied = all(_satisfied(lr) for lr in levels)
+        worst |= 0 if satisfied else 1
+        reports.append((path, levels, satisfied))
+
+    if args.json:
+        print(json.dumps([
+            {
+                "script": path,
+                "task": args.task,
+                "satisfied": satisfied,
+                "levels": [lr.to_dict() for lr in levels],
+            }
+            for path, levels, satisfied in reports
+        ], indent=2))
+        return worst
+
+    unchecked = [] if task is not None else [
+        ("resource_fit", "no --task, so there is nothing to compare the request against"),
+        ("functional", "no --task, so there is nothing to expect the payload to print"),
+    ]
+    for path, levels, satisfied in reports:
+        print(path)
+        for lr in levels:
+            state = "pass" if lr.passed else ("skip" if lr.skipped else "FAIL")
+            line = f"  {lr.level.value:<16} {state}"
+            if lr.detail and lr.detail != "ok" and state != "pass":
+                line += f"   {' '.join(lr.detail.split())[:96]}"
+            print(line)
+        for level, why in unchecked:
+            print(f"  {level:<16} n/a    {why}")
+        print(f"  -> {'satisfied' if satisfied else 'NOT satisfied'}\n")
+    return worst
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
@@ -735,6 +815,22 @@ def main(argv: list[str] | None = None) -> int:
                    "(ignored for zero-shot); every published arm used append")
     _add_executor_flag(r)
     r.set_defaults(func=cmd_run)
+
+    c = sub.add_parser(
+        "check",
+        help="judge one or more scripts, with no task file and no model",
+        description="Will this script hold up? Exits 0 when every level that ran is satisfied.",
+    )
+    c.add_argument("scripts", nargs="+", metavar="SCRIPT", help="paths to shell scripts")
+    c.add_argument("--task", metavar="ID",
+                   help="grade against a benchmark task as well, which activates resource_fit "
+                        "and functional; without it those two are reported as not checked")
+    c.add_argument("--tasks", default="tasks/t1_slurm.jsonl",
+                   help="where --task is looked up")
+    c.add_argument("--no-exec", action="store_true", help="skip the functional level")
+    c.add_argument("--json", action="store_true", help="machine-readable output")
+    _add_executor_flag(c)
+    c.set_defaults(func=cmd_check)
 
     v = sub.add_parser(
         "verify",
