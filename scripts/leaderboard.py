@@ -72,10 +72,16 @@ def cmd_import(args: argparse.Namespace) -> int:
         "base_image": cells[0]["environment"].get("base_image", "unknown"),
         "quantization": args.quantization,
         "source": args.source or "",
+        # Six decimals stored, three displayed. Rounding at import and rounding again at
+        # render are not the same operation: a half-range of 0.004583 stored as 0.0045
+        # renders as 0.004, while `executor_ablation.sh` prints 0.005 from the same run.
+        # The same measurement showing two values in one repository is the defect this
+        # whole page exists to prevent, and it appeared the first time the entries were
+        # imported rather than transcribed.
         "scores": {
             level: {
-                "mean": round(sum(v) / len(v), 4),
-                "half_range": round((max(v) - min(v)) / 2, 4),
+                "mean": round(sum(v) / len(v), 6),
+                "half_range": round((max(v) - min(v)) / 2, 6),
                 "cells": len(v),
             }
             for level, v in scores.items() if v
@@ -84,7 +90,7 @@ def cmd_import(args: argparse.Namespace) -> int:
     ENTRIES.mkdir(parents=True, exist_ok=True)
     path = ENTRIES / f"{_slug(entry['model'])}__{Path(entry['tasks_file']).stem}.json"
     path.write_text(json.dumps(entry, indent=2) + "\n", encoding="utf-8")
-    print(f"{path.relative_to(ROOT)}")
+    print(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)
     return 0
 
 

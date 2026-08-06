@@ -48,3 +48,34 @@ def test_the_ranking_column_is_present_for_every_entry():
     """A row with no `strict_all_levels` would sort as zero and read as a bad model."""
     for entry in _load_entries():
         assert "strict_all_levels" in entry["scores"], entry["model"]
+
+
+def test_import_keeps_more_precision_than_it_displays(tmp_path):
+    """A half-range of 0.004583 stored as 0.0045 renders as 0.004, while the ablation
+    prints 0.005 from the same run. Storing four decimals and displaying three made the
+    same measurement show two values."""
+    import leaderboard as lb  # noqa: PLC0415
+
+    cells = []
+    for pass1 in (0.6595833, 0.6641666, 0.6687499):
+        path = tmp_path / f"cell_{pass1}.json"
+        path.write_text(json.dumps({
+            "model": "m/x",
+            "tasks_file": "tasks/t1_slurm.jsonl",
+            "environment": {"functional_executor": "bash", "base_image": "ubuntu:24.04"},
+            "summary": {"strict_all_levels": {"pass@1": pass1}},
+        }), encoding="utf-8")
+        cells.append(str(path))
+
+    from argparse import Namespace  # noqa: PLC0415
+
+    entries_dir, lb.ENTRIES = lb.ENTRIES, tmp_path / "entries"
+    try:
+        lb.cmd_import(Namespace(results=cells, seeds=[0, 1, 2], n=5,
+                                quantization="4-bit", source="test"))
+        written = json.loads(next((tmp_path / "entries").glob("*.json")).read_text())
+    finally:
+        lb.ENTRIES = entries_dir
+
+    half = written["scores"]["strict_all_levels"]["half_range"]
+    assert f"{half:.3f}" == "0.005", half
