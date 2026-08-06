@@ -775,15 +775,15 @@ Measuring the executor means comparing it with the one it stands beside, not rep
 alone: `scripts/executor_ablation.sh` verifies the same generations twice inside the same image and
 counts the samples on which the two arms part company.
 
-The answer on the current task set is deflationary, and worth stating that way. Across 2340
-artifacts from three models, real submission costs `functional` up to 21 points depending on the
+The answer on the current task set is deflationary, and worth stating that way. Across 3120
+artifacts from four models, real submission costs `functional` up to 21 points depending on the
 cell and nothing at all in one of them, and moves `strict_all_levels` by nothing anywhere: the
 scripts it stops were already failing another level, mostly `submittability`, so the executor
 propagates a verdict rather than producing one.
-Exactly one artifact of the 2340 changes verdict, and it changes in favour of real submission,
+Exactly one artifact of the 3120 changes verdict, and it changes in favour of real submission,
 which accepts a script the sandbox wrongly rejects. The nine runs of the retrieval intervention
 series were graded the same way and add 864 comparisons without a single further disagreement,
-which puts the count at one artifact of 3204. The numbers are in
+which puts the count at one artifact of 3984. The numbers are in
 [`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-moves-functional-and-barely-touches-the-verdict).
 
 That is a statement about these eight tasks, not about the executor. A task built to need real

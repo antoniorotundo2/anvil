@@ -131,7 +131,7 @@ not.
 
 It has no inducer, and that is a decision rather than an omission. `tasks/t2_repair.jsonl` is held
 equal to what the inducers produce by a test, so registering F9 regenerates it, and that file is
-the denominator of every T2 number published here, including the three-model table below. The
+the denominator of every T2 number published here, including the tables below. The
 fault it would teach is also close to F7's: both are refused at `submittability`, and the models
 that clear F7 above 0.83 would most likely clear this too. It stays an observed class, and joins
 the induced ones if the T2 set is ever regenerated for an independent reason.
@@ -179,7 +179,7 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 
 ## Multi-seed validation (T1 and T2)
 
-3 seeds (0/1/2), n=5, three models across two families, 4-bit on an RTX 3060. Generated on the experiment
+3 seeds (0/1/2), n=5, four models across three families, 4-bit on an RTX 3060. Generated on the experiment
 machine, **graded inside the container**, which the first version of this table was not: see
 [A table measured against the wrong cluster](#a-table-measured-against-the-wrong-cluster) below.
 Generations in `results/20260802_091236/`, verdicts in `results/executor_20260802_140437/`.
@@ -191,6 +191,7 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 | Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.375±0.025 | 0.442±0.013 | 0.308±0.025 | 0.308±0.025 |
 | Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 | 0.667±0.025 |
 | granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 | 0.500±0.000 |
+| gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.742±0.013 | 0.917±0.050 | 0.658±0.062 | 0.658±0.062 |
 
 **T2 (diagnose-and-repair), same protocol:**
 
@@ -199,16 +200,22 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 | Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.412±0.014 | 0.291±0.000 | 0.292±0.002 |
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 | 0.824±0.002 |
 | granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 | 0.661±0.009 |
+| gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.938±0.002 | 0.732±0.000 | 0.732±0.000 |
 
 `safety` is 1.000±0.000 everywhere and is left out of both tables.
 
 ### `submittability` does not track model size
 
-Ordered by the level itself, T1 reads 0.875 for Granite at 3B, 0.842 for Qwen at 1.5B, 0.792 for
-Qwen at 7B; T2 reads 1.000, 0.977 and 0.886, with the 7B second and the 1.5B last. The smallest
-model of the second family leads both, and inside the Qwen family the level falls as size rises
-while every other level improves and two of them reach 1.000. Whatever `submittability` measures,
-parameter count does not order it.
+On T1 the level reads 0.875 for Granite at 3B, 0.867 for Gemma at 12B, 0.842 for Qwen at 1.5B and
+0.792 for Qwen at 7B. **The largest model in the set and the smallest of another family sit
+together at the top, and the 7B is alone at the bottom**, while inside the Qwen family the level
+falls as size rises and every other level improves. Parameter count does not order it, and with a
+third family the shortfall is no longer attributable to one model's quirk: two families out of
+three are above Qwen, across a range from 3B to 12B.
+
+T2 does not repeat the ordering, and the section would be overclaiming if it said otherwise:
+Granite 1.000, Qwen 7B 0.977, Qwen 1.5B 0.886, Gemma 0.876. Every model sits between 0.88 and
+1.00 there, which leaves little room to separate them, and the family that leads T1 is last.
 
 The refusals show why, and they are not the same failure in the two families. Qwen invents
 *values*: of 1560 verdicts, 106 were `invalid partition specified`, naming `gpu`, `small`, or the
@@ -216,6 +223,10 @@ placeholder `your_partition_name` left in from a template. The reference cluster
 partition and no task asks for one, so a script that volunteers a name is asserting something
 about a cluster it has not seen. The larger model writes better formed scripts and volunteers more
 of them.
+
+Gemma sits with Granite without sharing its mechanism, which is what a third family was for: it
+names no impossible option, and its T1 shortfall is spread across tasks rather than concentrated in
+one.
 
 Granite invents *syntax*. Not one of its refusals names a partition, in T2 it has none at all
 across 660 samples, and its entire T1 deficit is one task failing all fifteen times on an option
@@ -230,14 +241,13 @@ families, two habits, and a 3B ahead of a 7B.
 
 ### Real submission moves `functional` and barely touches the verdict
 
-`functional` drops under real submission in every cell, by 16 points at 1.5B, 21 at 7B and 12 at
-Granite 3B on T1. `strict_all_levels` does not move at all: 0.308 against 0.308, 0.667 against
-0.667, 0.500 against 0.500, and the T2 rows agree to within 0.001. Of 2340 artifacts, exactly
-**one** changes verdict between the two executors.
+`functional` drops under real submission in every cell, by 16 points at 1.5B, 21 at 7B, 12 at
+Granite 3B and 13 at Gemma 12B on T1. `strict_all_levels` does not move at all: 0.308 against 0.308, 0.667 against
+0.667, 0.500 against 0.500, 0.658 against 0.658, and the T2 rows agree to within 0.001. Of 3120
+artifacts, exactly **one** changes verdict between the two executors.
 
-The reason is that the scripts real submission stops were already failing another level. All 121
-refusals, the 106 partition names and Granite's 15 unknown options, fail `submittability` in both
-arms; the executor only propagates the verdict into `functional`. So on these eight tasks the
+The reason is that the scripts real submission stops were already failing another level. All 218
+refusals fail `submittability` in both arms; the executor only propagates the verdict into `functional`. So on these eight tasks the
 extra strictness of real execution is almost
 entirely redundant with the static levels, which is worth saying plainly rather than claiming an
 executor earns its keep by itself. Where it does earn it is on a task built to need it: F8 below
@@ -264,7 +274,9 @@ task existed that reads its own affinity. No such task was needed: a model wrote
 ### Which fault is hardest depends on the model, and on the level
 
 Per fault category, `bash` arm, three seeds pooled. F1 applies to three tasks and F6 to one, hence
-the smaller denominators.
+the smaller denominators. Gemma 4 12B is absent from this table and present in the ones above: its
+per-category breakdown has not been extracted yet, and inventing a column would be worse than
+missing one.
 
 | category | 1.5B | 7B | Granite 3B | n per model |
 |---|---|---|---|---|
@@ -292,7 +304,7 @@ container, F1 at 7B is 1.000. The correction is recorded rather than quietly dro
 retracted claim is the more interesting one: F1 is not hard for a model that has understood it,
 it is hard to *tell* whether a model has.
 
-Two structural facts hold across all 2340 verdicts. First, `syntax` fails only ever on F2 and F5:
+Two structural facts hold across all 3120 verdicts. First, `syntax` fails only ever on F2 and F5:
 F1, F3, F4, F6 and F7 are 1.000 for every model without one exception. Those five leave a
 well-formed script behind and the fault surfaces higher up, at `resource_fit` or
 `submittability`; F2 and F5 are the only two that concern whether directives exist and where they

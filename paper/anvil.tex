@@ -20,13 +20,14 @@
 \definecolor{anvilA}{HTML}{4C6EB1}
 \definecolor{anvilB}{HTML}{C9772E}
 \definecolor{anvilC}{HTML}{3F7D5A}
+\definecolor{anvilD}{HTML}{8A5A9E}
 
 \pgfplotsset{
   anvilbar/.style={
     ybar,
     width=\linewidth,
     height=6.2cm,
-    bar width=6pt,
+    bar width=4.5pt,
     ymin=0, ymax=1.05,
     ytick={0,0.25,0.5,0.75,1.0},
     ymajorgrids=true,
@@ -55,10 +56,11 @@ metrics, because no benchmark verifies whether the artifacts they produce actual
 verifies them by execution against a declared reference cluster: five levels covering syntax,
 submittability, execution, effective resource fit and safety, bracketed by an oracle that must
 score $1.0$ and a deliberately faulty model that must score $0.0$. On eight from-scratch tasks and
-$220$ induced repair tasks we measure three models across two families, and report four results,
+$220$ induced repair tasks we measure four models across three families, and report four results,
 two of them deflationary about the benchmark's own machinery. Submittability is not ordered by
-model size: a 3B model of one family beats a 7B of another, and within one family the level falls
-as size rises. Real job submission changes exactly one verdict in $3204$ artifacts against a
+model size: on the from-scratch set a 3B model of one family and a 12B of another lead it while a
+7B trails both, and within one family the level falls as size rises. Real job submission changes
+exactly one verdict in $3984$ artifacts against a
 \texttt{bash} sandbox, so the most expensive component of the harness is nearly redundant on this
 task set. Retrieved documentation costs the smaller model $28$ points of resource fit whatever the
 text says, while the larger one is unaffected by irrelevant text and loses $6$ points to the one
@@ -86,7 +88,7 @@ on graph edit distance or model judges, these artifacts are directly checkable.
 \verb|sbatch --test-only| costs milliseconds, the job really runs, and the ground truth is
 objective. The empty slot is not a hard problem; it is an unoccupied one.
 
-This paper reports what the resulting instrument says about three models and, with more care, what
+This paper reports what the resulting instrument says about four models and, with more care, what
 it says about itself.
 
 \section{Related work}
@@ -221,31 +223,38 @@ model & syntax & submit. & functional & res. fit & strict \\
 ]
 \addplot[fill=anvilA] table[x=idx, y=m0] {data/t1_slurm.dat};
 \addplot[fill=anvilB] table[x=idx, y=m1] {data/t1_slurm.dat};
-\addplot[fill=anvilC] table[x=idx, y=m2] {data/t1_slurm.dat};
-\legend{Qwen2.5-Coder 1.5B, Granite 4.1 3B, Qwen2.5-Coder 7B}
+\addplot[fill=anvilD] table[x=idx, y=m2] {data/t1_slurm.dat};
+\addplot[fill=anvilC] table[x=idx, y=m3] {data/t1_slurm.dat};
+\legend{Qwen2.5-Coder 1.5B, Granite 4.1 3B, Gemma 4 12B, Qwen2.5-Coder 7B}
 \end{axis}
 \end{tikzpicture}
-\caption{T1 per level. Every level rises with capability except submittability, where the 3B model
-leads and the 7B trails both others.}
+\caption{T1 per level. Every level rises with capability except submittability, where the 3B and
+the 12B lead and the 7B trails all three.}
 \label{fig:t1}
 \end{figure}
 
 \subsection{Submittability is not ordered by size}
 
-On T1 the level reads $0.875$ for a 3B model, $0.842$ for a 1.5B and $0.792$ for a 7B; on T2,
-$1.000$, $0.977$ and $0.886$. The smallest model of the second family leads both, and within the
-Qwen family the level falls as size rises while every other level improves, which
-Figure~\ref{fig:t1} shows as the one bar group running against the others.
+On T1 the level reads $0.875$ for a 3B model, $0.867$ for a 12B, $0.842$ for a 1.5B and $0.792$ for
+a 7B. The largest model in the set and the smallest of another family sit together at the top and
+the 7B is alone at the bottom, while within the Qwen family the level falls as size rises and every
+other level improves, which Figure~\ref{fig:t1} shows as the one bar group running against the
+others. Two families of three are above Qwen across a range from 3B to 12B, so the shortfall is not
+one model's quirk.
 
-The two families also fail it differently. One invents partition names, which a different cluster
-might genuinely have; the other invents an option SLURM does not have, which no cluster has. The
+T2 does not repeat that ordering, and it would be overclaiming to say otherwise: there every model
+sits between $0.876$ and $1.000$, which leaves little room to separate them, and the family that
+leads T1 is last.
+
+The families also fail the level differently. One invents partition names, which a different cluster
+might genuinely have; another invents an option SLURM does not have, which no cluster has. The
 level measures how much a model volunteers that nothing asked for, and whose vocabulary it reaches
 for when it does.
 
 \subsection{Real submission is nearly redundant here}
 
 Grading the same generations twice inside the same image, once through a \texttt{bash} sandbox and
-once through real \texttt{sbatch}, exactly one artifact of $3204$ changes verdict, and it changes in
+once through real \texttt{sbatch}, exactly one artifact of $3984$ changes verdict, and it changes in
 favour of real submission, which accepts a script the sandbox wrongly rejects. Every script real
 submission stopped was already failing another level.
 
@@ -320,8 +329,8 @@ them. The fourth was found only by counting per sample instead of per problem.
 \section{Threats to validity}
 
 Eight T1 tasks, which makes each one worth $0.125$ of every T1 figure. Three seeds, so the ranges
-are spread rather than intervals. Two model families at three sizes, all quantized to 4 bit, none
-large. One reference topology, declared by this work rather than borrowed from a centre in
+are spread rather than intervals. Three model families at four sizes, from 1.5B to 12B, all
+quantized to 4 bit. One reference topology, declared by this work rather than borrowed from a centre in
 production. All prompts written by one author, in one language and one style. No result here has
 been replicated independently.
 

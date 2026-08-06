@@ -28,13 +28,14 @@ wrong; that correction is recorded in
 
 ## T1: writing a job script from scratch
 
-Eight tasks, 3 seeds (0/1/2), n=5, three models across two families.
+Eight tasks, 3 seeds (0/1/2), n=5, four models across three families.
 
 | model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict |
 |---|---|---|---|---|---|---|
 | Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.375±0.025 | 0.442±0.013 | 0.308±0.025 |
 | Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 |
 | granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 |
+| gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.742±0.013 | 0.917±0.050 | 0.658±0.062 |
 
 `strict` is identical under both executors for every model. `safety` is 1.000±0.000 everywhere and
 is left out.
@@ -48,6 +49,7 @@ Induced faults from the same eight tasks, same protocol, 220 repairs per seed.
 | Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.412±0.014 | 0.291±0.000 |
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 |
 | granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 |
+| gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.938±0.002 | 0.732±0.000 |
 
 Per fault category, `strict_all_levels`, three seeds pooled. F1 applies to three tasks and F6 to
 one, hence the smaller denominators.
@@ -64,17 +66,21 @@ one, hence the smaller denominators.
 
 ## Four findings
 
-**`submittability` is not ordered by model size.** T1 reads 0.875 for Granite at 3B, 0.842 for Qwen
-at 1.5B, 0.792 for Qwen at 7B; T2 reads 1.000, 0.977 and 0.886. The smallest model of the second
-family leads both, and inside the Qwen family the level falls as size rises while every other level
-improves. The two families also fail it differently: Qwen invents partition names, which a
-different cluster might have, and Granite invents an option SLURM does not have, which no cluster
-has. See [`submittability` does not track model
+**`submittability` is not ordered by model size.** T1 reads 0.875 for Granite at 3B, 0.867 for
+Gemma at 12B, 0.842 for Qwen at 1.5B and 0.792 for Qwen at 7B: the largest model in the set and the
+smallest of another family sit together at the top, the 7B is alone at the bottom, and inside the
+Qwen family the level falls as size rises while every other level improves. Two families of three
+are above Qwen, from 3B to 12B, so the shortfall is not one model's quirk. T2 does not repeat the
+ordering, where every model sits between 0.876 and 1.000 and Gemma is last.
+
+The families also fail the level differently. Qwen invents partition names, which a different
+cluster might genuinely have; Granite invents an option SLURM does not have, which no cluster has.
+See [`submittability` does not track model
 size](OBSERVED_FAILURES.md#submittability-does-not-track-model-size).
 
 **Real submission changes almost nothing on this task set.** `scripts/executor_ablation.sh` grades
 the same generations twice in the same image, once through the `bash` sandbox and once through real
-`sbatch`. Across **3204 artifacts, exactly one changes verdict**, and it changes in favour of real
+`sbatch`. Across **3984 artifacts, exactly one changes verdict**, and it changes in favour of real
 submission, which accepts a script the sandbox wrongly rejects. The scripts real submission stops
 were already failing another level. This is a statement about these eight tasks, not about the
 executor: a task built to need it does need it, and F8 is invisible to every static level and to
@@ -114,8 +120,8 @@ make guards && make guards-t2 && make docker-guards-enforcement && make docker-g
 
 ## What these numbers are not
 
-Three seeds and 24 to 220 verifications per cell. Two model families at three sizes, all quantized
-to 4 bit, none of them large. Eight T1 tasks, which is a small denominator and makes each task
+Three seeds and 24 to 220 verifications per cell. Three model families at four sizes, from 1.5B to
+12B, all quantized to 4 bit. Eight T1 tasks, which is a small denominator and makes each task
 worth 0.125 of every T1 figure on this page. One reference topology, declared rather than borrowed
 from a real centre. Nothing here has been replicated by anybody else.
 
