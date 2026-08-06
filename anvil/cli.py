@@ -142,7 +142,23 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+def _prepare_output_paths(args: argparse.Namespace) -> None:
+    """Create the directories every output path needs, before anything expensive runs.
+
+    Both files are written after the last sample is generated, so a missing directory
+    used to surface as a traceback with the whole run already spent: three seeds of a 7B
+    were generated and thrown away that way, and nothing about the failure said the fix
+    was one `mkdir`. Creating the parents up front turns the same mistake into no
+    mistake, and an unwritable path into a failure that costs a second.
+    """
+    for attr in ("out", "save_generations"):
+        path = getattr(args, attr, None)
+        if path:
+            Path(path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+
+
 def cmd_run(args: argparse.Namespace) -> int:
+    _prepare_output_paths(args)
     tasks = Task.load_jsonl(args.tasks)
     model_kw: dict = {}
     if args.model not in ("oracle", "broken"):
@@ -204,6 +220,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     generate once and verify anywhere, including across several base images, to
     test whether artifact correctness is portable between distributions.
     """
+    _prepare_output_paths(args)
     tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
 
     _warn_about_skipped_levels()
@@ -260,6 +277,7 @@ def cmd_induce(args: argparse.Namespace) -> int:
     (see anvil/inducer.py) and keep only the variants that actually fail
     verification. An inducer that produces an accidentally-valid script is a
     bug in the inducer, not a fault worth teaching a model to repair."""
+    _prepare_output_paths(args)
     # The induced task set is part of the benchmark definition, so it must not depend on
     # whichever executor happens to be selected: a fault that survives bash but is caught
     # by a real submission would silently drop out of t2_repair.jsonl. Pinned unless the
@@ -294,6 +312,7 @@ def cmd_induce(args: argparse.Namespace) -> int:
 
 
 def cmd_repair(args: argparse.Namespace) -> int:
+    _prepare_output_paths(args)
     t1_tasks = Task.load_jsonl(args.tasks)
     tasks_by_id = {t.id: t for t in t1_tasks}
     repair_tasks = RepairTask.load_jsonl(args.repair_tasks)
@@ -364,6 +383,7 @@ def cmd_repair(args: argparse.Namespace) -> int:
 
 def cmd_verify_repair(args: argparse.Namespace) -> int:
     """Verify previously generated repairs. No model, no GPU."""
+    _prepare_output_paths(args)
     t1_tasks = {t.id: t for t in Task.load_jsonl(args.tasks)}
     repair_tasks = {rt.id: rt for rt in RepairTask.load_jsonl(args.repair_tasks)}
 
@@ -426,6 +446,7 @@ def cmd_verify_repair(args: argparse.Namespace) -> int:
 
 def cmd_recipe(args: argparse.Namespace) -> int:
     """T3: write an Apptainer definition file from scratch."""
+    _prepare_output_paths(args)
     tasks = RecipeTask.load_jsonl(args.tasks)
     model_kw: dict = {}
     if args.model not in ("oracle", "broken"):
@@ -479,6 +500,7 @@ def cmd_recipe(args: argparse.Namespace) -> int:
 def cmd_verify_recipe(args: argparse.Namespace) -> int:
     """Verify previously generated recipes. No model, no GPU, no apptainer
     needed unless you want the 'buildable'/'functional' levels active."""
+    _prepare_output_paths(args)
     tasks = {t.id: t for t in RecipeTask.load_jsonl(args.tasks)}
 
     if not apptainer_available():

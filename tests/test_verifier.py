@@ -1241,3 +1241,34 @@ def test_the_bash_sandbox_does_not_outlive_the_sample(monkeypatch):
     v.check_functional(GOOD, SBATCH_TASK)
     assert created, "the bash executor no longer makes a sandbox: this test is watching nothing"
     assert not [d for d in created if Path(d).exists()]
+
+
+# ---------------------------------------------------------------- output paths
+# Both output files are written after the last sample, so a missing directory used to
+# surface as a traceback with the whole run already spent. Three seeds of a 7B were
+# generated and discarded that way, and the fix was one `mkdir`.
+def test_output_directories_are_created_before_the_run(tmp_path):
+    from argparse import Namespace  # noqa: PLC0415
+
+    from anvil.cli import _prepare_output_paths  # noqa: PLC0415
+
+    args = Namespace(
+        out=str(tmp_path / "a" / "b" / "results.json"),
+        save_generations=str(tmp_path / "c" / "gen.jsonl"),
+    )
+    _prepare_output_paths(args)
+    assert (tmp_path / "a" / "b").is_dir()
+    assert (tmp_path / "c").is_dir()
+
+
+def test_output_paths_tolerate_a_command_without_them(tmp_path):
+    """`verify-recipe` and friends carry only some of these flags, and a command that
+    writes nowhere must not be the one that raises."""
+    from argparse import Namespace  # noqa: PLC0415
+
+    from anvil.cli import _prepare_output_paths  # noqa: PLC0415
+
+    _prepare_output_paths(Namespace())
+    _prepare_output_paths(Namespace(out=None, save_generations=None))
+    _prepare_output_paths(Namespace(out=str(tmp_path / "only.json")))
+    assert tmp_path.is_dir()
