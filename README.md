@@ -331,6 +331,13 @@ charged to the model.
 - [`docs/OBSERVED_FAILURES.md`](docs/OBSERVED_FAILURES.md): failure classes observed on a real model
 - [`docs/HARDWARE.md`](docs/HARDWARE.md): development machine vs experiment machine
 
+## Sponsorship
+
+Anvil is developed on one desktop with a single consumer GPU, which is what bounds the
+measurements: two model families at two sizes, three seeds, and a roadmap item that reads "more
+families, on borrowed hardware". Sponsorship goes to compute, so those arms stop being roadmap
+items. [Sponsor this project](https://github.com/sponsors/antoniorotundo2).
+
 ## License
 
 MIT.
