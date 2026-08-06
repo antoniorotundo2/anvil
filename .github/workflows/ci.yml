@@ -46,6 +46,47 @@ jobs:
       - name: Guards (T3 recipes, lenient)
         run: make guards-t3
 
+  # Everything above runs from a checkout, where `tasks/` sits in the working directory.
+  # A reader who installs the package has no checkout, and the README promises the
+  # command works anyway: the task files are mapped into the wheel and resolved by
+  # `anvil/resources.py`. Nothing in the suite exercises that, because the suite always
+  # runs from the repository, so this job installs the built wheel into a clean
+  # environment and works from a directory that has no repository in it.
+  installed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --quiet build
+          python -m build --wheel --outdir dist
+
+      - name: Install it somewhere else entirely
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --quiet dist/*.whl
+
+      - name: The command works with no checkout around it
+        run: |
+          mkdir -p /tmp/elsewhere && cd /tmp/elsewhere
+          printf '#!/bin/bash\n#SBATCH --time=00:10:00\n#SBATCH --mem=512M\necho ANVIL_OK\n' > job.sh
+          /tmp/clean/bin/anvil check job.sh
+
+      # What is under test is that the packaged task file was found, not that this toy
+      # script satisfies the task: it does not, and a verdict of 1 is the right answer.
+      # Exit 2 is the failure that matters here, since it is what the command returns
+      # when the task cannot be looked up at all.
+      - name: The packaged task files are found without a checkout
+        run: |
+          cd /tmp/elsewhere
+          /tmp/clean/bin/anvil check job.sh --task t1_hello_serial || test $? -eq 1
+          /tmp/clean/bin/anvil run --model oracle --no-exec
+
   container:
     runs-on: ubuntu-latest
     steps:
