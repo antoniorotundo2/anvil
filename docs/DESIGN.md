@@ -308,11 +308,13 @@ It does not run under `make guards`. The ground truth is defined in the declared
 on the BSD userland of a developer machine the reference counts bytes and pads its output, neither
 of which is a defect in it.
 
-**Two models measured, and neither reaches the question.** Qwen2.5-Coder at 1.5B and 7B, 3 seeds
-each, n=5, verified in both images: 30 samples, 150 level comparisons, **no divergence anywhere**.
-`functional` fails on all thirty in both images. **Not one of the thirty pins a locale.**
+**Three models measured, and none reaches the question.** Qwen2.5-Coder at 1.5B and 7B and
+Granite 4.1 3B, 3 seeds each, n=5, verified in both images: 45 samples, 225 level comparisons,
+**no divergence anywhere**. `functional` fails on all forty five in both images. **Not one of the
+forty five pins a locale.**
 
-That last number is the measurement the task was built for, and it is the same at both sizes.
+That last number is the measurement the task was built for, and it is the same at every size and
+in both families.
 
 Why the divergence never surfaces is worth more than the agreement, and the two models fail
 differently. The 1.5B passes `syntax` 14 of 15 and `resource_fit` 12, and its dominant shape is
@@ -330,6 +332,18 @@ model on every level the scheduler can see, and fails the payload for reasons th
 counting at all. One shape prints the count with no `CHARS=` prefix; the other pipes the prefix
 itself into the counter, `echo -n "CHARS=" | wc -m`, and counts that. Both are wrong identically
 on GNU and on `uutils`.
+
+Granite 4.1 3B also passes `syntax` and `resource_fit` 15 of 15, and removes the divergence
+outright:
+
+```bash
+CHARS=$(echo "caf\u00e9 na\u00efve" | wc -m)
+```
+
+It emits the escape sequences as literal text rather than the characters they stand for, so the
+payload it counts is twenty ASCII characters and a newline. The answer is 21 and it is 21 on both
+implementations, because a string with nothing above U+007F in it cannot make two coreutils
+disagree. Asked to count non-ASCII characters, the model wrote a script with no non-ASCII in it.
 
 So the task splits the two implementations by construction, `make docker-guards-coreutils` proves
 it, and no model has yet written an artifact good enough for the split to decide anything. The
@@ -665,7 +679,26 @@ say so plainly.
         revision is not pinned and the seed is not honoured, which is the comparability every
         table here rests on
   - [ ] QLoRA reference model; state-space arm; hybrid classical-quantum artifacts
-- [ ] **Phase 4**: dataset release, leaderboard, preprint
+- [ ] **Phase 4: from a benchmark into something people run.** Everything above measures models,
+      which is an audience of the few people studying those models. The verifier inside is useful
+      to a much larger one, anybody generating HPC artifacts with an LLM who needs to know whether
+      they will hold up before they are submitted. That audience needs no tasks, no oracle and no
+      pass@k, only a verdict on the artifact in front of it, and almost all of the code it needs is
+      already written.
+  - [x] `anvil check`: a verdict on one artifact, with no task file, no model and no generations
+        wrapper. Exit codes usable from a shell, so it composes into a hook or a CI step. This is
+        the piece that turns the verifier from something the benchmark calls into something a user
+        calls
+  - [ ] an installable distribution, so using it does not start with cloning this repository
+  - [ ] a submit-time policy check. The five levels map almost onto what a site's submit filter
+        does, with one difference: the constraints would come from a site policy rather than from a
+        task. A centre whose users have started submitting generated scripts has that problem now
+        and no tool for it, and `check_safety` and `check_resource_fit` are most of the answer
+  - [ ] published results, as a page rather than a table buried in these documents, so a reader can
+        cite where the models stand without running anything
+  - [ ] dataset release, leaderboard, preprint
+  - [ ] one external user. It is the only item here that cannot be built, and the only one that
+        decides whether any of the others mattered
 
 ### Real submission (the sbatch executor)
 
