@@ -55,7 +55,7 @@ DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
 	-v "$(PWD)":/work -w /work $(APPTAINER_IMAGE)
 
 .PHONY: help install install-models test lint doctor run verify guards guards-sbatch docker-guards-sbatch docker-build-sched \
-        induce-exec docker-guards-enforcement docker-guards-coreutils \
+        induce-exec docker-guards-enforcement docker-guards-coreutils paper \
         induce-t2 repair guards-t2 generate-repair \
         docker-build docker-test docker-run docker-verify docker-repair \
         docker-verify-repair generate \
@@ -82,6 +82,7 @@ help:
 	@echo "                       which adds the accounting the scheduler needs to run jobs)"
 	@echo "  make docker-guards-enforcement  a memory under-request must be OOM-killed:"
 	@echo "                       the bracket for cgroup enforcement ($(EXEC_TASKS))"
+	@echo "  make paper           regenerate the figures' data and build the preprint"
 	@echo "  make docker-guards-coreutils  one task must be judged differently by GNU"
 	@echo "                       coreutils and by uutils ($(COREUTILS_TASKS))"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
@@ -405,6 +406,16 @@ docker-verify-recipe: docker-build-apptainer
 	  echo "ERROR: $(RECIPE_GENERATIONS) does not exist. Run: make generate-recipe"; exit 1; }
 	$(DOCKER_RUN_APPTAINER) python -m anvil.cli verify-recipe \
 		--generations $(RECIPE_GENERATIONS) --tasks $(RECIPE_TASKS) -v --out $(RECIPE_VERIFY_OUT)
+
+# The tables and the plotted data come from leaderboard/entries/, so the manuscript cannot
+# quote a run that has since been re-imported. latexmk is not a dependency of this project:
+# the target says so plainly rather than failing with a shell error nobody can read.
+paper:
+	./scripts/paper_data.py
+	@command -v latexmk >/dev/null 2>&1 || { \
+		echo "latexmk not found: the manuscript needs a TeX installation."; \
+		echo "The generated data in paper/data/ is up to date regardless."; exit 1; }
+	cd paper && latexmk -pdf anvil.tex
 
 clean:
 	rm -rf .pytest_cache .ruff_cache build dist *.egg-info

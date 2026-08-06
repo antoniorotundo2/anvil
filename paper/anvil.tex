@@ -1,0 +1,311 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{pgfplots}
+\usepackage[numbers]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+
+\pgfplotsset{compat=1.18}
+
+% One visual language for every figure: no vertical rules, no chartjunk, a faint
+% horizontal grid, and the same three-colour ramp everywhere so a model keeps its colour
+% from one plot to the next.
+\definecolor{anvilA}{HTML}{4C6EB1}
+\definecolor{anvilB}{HTML}{C9772E}
+\definecolor{anvilC}{HTML}{3F7D5A}
+
+\pgfplotsset{
+  anvilbar/.style={
+    ybar,
+    width=\linewidth,
+    height=6.2cm,
+    bar width=6pt,
+    ymin=0, ymax=1.05,
+    ytick={0,0.25,0.5,0.75,1.0},
+    ymajorgrids=true,
+    grid style={gray!25},
+    axis lines*=left,
+    tick align=outside,
+    enlarge x limits=0.10,
+    legend style={draw=none, fill=none, font=\small, at={(0.5,1.06)},
+                  anchor=south, legend columns=-1, /tikz/every even column/.append style={column sep=10pt}},
+    every axis plot/.append style={draw=none},
+    x tick label style={font=\small},
+    y tick label style={font=\small},
+  }
+}
+
+\title{Anvil: executable verification of LLM-generated\\HPC operational artifacts}
+\author{Antonio Rotundo\\\small \texttt{antonio.rotundo2@studio.unibo.it}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Assistants that write SLURM job scripts for supercomputer users are evaluated with similarity
+metrics, because no benchmark verifies whether the artifacts they produce actually work. Anvil
+verifies them by execution against a declared reference cluster: five levels covering syntax,
+submittability, execution, effective resource fit and safety, bracketed by an oracle that must
+score $1.0$ and a deliberately faulty model that must score $0.0$. On eight from-scratch tasks and
+$220$ induced repair tasks we measure three models across two families, and report four results,
+two of them deflationary about the benchmark's own machinery. Submittability is not ordered by
+model size: a 3B model of one family beats a 7B of another, and within one family the level falls
+as size rises. Real job submission changes exactly one verdict in $3204$ artifacts against a
+\texttt{bash} sandbox, so the most expensive component of the harness is nearly redundant on this
+task set. Retrieved documentation costs the smaller model $28$ points of resource fit whatever the
+text says, while the larger one is unaffected by irrelevant text and loses $6$ points to the one
+document that addresses the level it concerns. A task built so that GNU coreutils and
+\texttt{uutils} must judge it differently is failed by all three models for reasons that precede
+the difference. We also report, rather than conceal, three measurement faults found and corrected
+during the work, one of which had already been published.
+\end{abstract}
+
+\section{Introduction}
+
+A wrong \verb|--mem| does not look wrong. It looks plausible, and the job dies at hour six.
+
+Operational HPC artifacts, batch scripts and container recipes, sit in a gap. Execution-based
+evaluation is standard for program synthesis and increasingly common for infrastructure code, yet
+the assistants appearing for HPC user support are still scored by how closely their output
+resembles a reference answer. Resemblance is the wrong instrument here for a specific reason: the
+failures that matter are invisible in the text. A directive placed after the first command is
+silently ignored by the scheduler. An omitted \verb|--ntasks| is not an absent request but a
+request for a different number. A memory figure one factor too small parses, submits, and runs
+until it does not.
+
+Unlike cloud infrastructure code, where a plan cannot be executed cheaply and evaluation falls back
+on graph edit distance or model judges, these artifacts are directly checkable.
+\verb|sbatch --test-only| costs milliseconds, the job really runs, and the ground truth is
+objective. The empty slot is not a hard problem; it is an unoccupied one.
+
+This paper reports what the resulting instrument says about three models and, with more care, what
+it says about itself.
+
+\section{Related work}
+
+\emph{This section is not written.} The repository ships \texttt{scripts/litsweep.py}, a
+reproducible sweep over OpenAlex, Crossref, DBLP and arXiv, so that the review can be regenerated
+and cited rather than asserted. Running it and citing its output is the remaining work on this
+manuscript. No references are given here rather than plausible ones: a citation nobody can follow
+would compromise the only thing this paper offers, which is that its claims can be checked.
+
+The single prior result the method depends on directly is the unbiased $\mathrm{pass}@k$ estimator
+of \citet{chen2021codex}, used unchanged.
+
+\section{The benchmark}
+
+\paragraph{T1, writing from scratch.} Eight tasks, each a support request in ordinary words paired
+with a machine-readable specification: node and task counts, walltime and memory bounds, GPUs,
+directives the task demands explicitly, and strings the script must print when it runs.
+
+\paragraph{T2, diagnosing and repairing.} $220$ tasks derived mechanically from the T1 canonical
+solutions by seven fault injectors, anchored to classes observed on a real model rather than
+invented: an omitted directive whose SLURM default hides it, a misplaced directive, prose leaking
+into a value, an absent no-default directive, a script stripped of every directive, a payload that
+no longer matches its own specification, and a value the scheduler rejects. Induction keeps only
+the variants that actually fail verification, since an injector producing an accidentally valid
+script is a bug in the injector and not a fault worth teaching a model to repair. Repairs are
+graded by the same verifier as T1, with no partial credit for being closer to correct.
+
+\section{Method}
+
+\paragraph{Five levels.} \emph{syntax} (shebang, \verb|bash -n|, misplaced directives),
+\emph{submittability} (\verb|sbatch --test-only|), \emph{functional} (the script runs and exits
+zero), \emph{resource fit} (the \emph{effective} request against the specification, applying
+SLURM's documented defaults), and \emph{safety} (destructive-pattern probes, which gate execution).
+The strict metric requires all five.
+
+\paragraph{A skipped level is never a passed one.} Without a scheduler, submittability is skipped
+and scored as not passed. One refinement was forced by measurement: a level skipped because
+\emph{this machine} lacks a capability is pass-through, since every artifact is skipped alike,
+whereas a level skipped because \emph{this artifact} cannot be judged anywhere is a failure. Before
+the distinction existed, ten repairs of a dependency task passed strict by being unjudgeable.
+
+\paragraph{Effective requests, not string presence.} A serial script omitting \verb|--nodes| still
+requests one node and is correct. An early version checked for the string and failed scripts the
+scheduler accepts, which is precisely the surface-form matching this work exists to replace.
+
+\paragraph{Both bounds shipped.} An oracle returning canonical solutions must score $1.0$ or the
+benchmark is defective; a broken model returning faulty artifacts must score $0.0$ strict, and its
+sampling is arranged so the destructive flavour is always drawn, because a guard that never fires
+is decoration.
+
+\paragraph{A declared reference cluster.} Four nodes, sixteen cores and one GPU each, in a
+container running a live \texttt{slurmctld}, so that scores do not depend on the hardware of
+whoever runs the benchmark. Two preflights protect it: a canary that distinguishes a failing
+scheduler from a failing model, and a topology canary that refuses to score submittability when the
+scheduler in front of it is not the declared cluster.
+
+\paragraph{Generation and verification are separate.} Generation needs an accelerator; faithful
+grading needs the scheduler and GNU coreutils. Generations travel as JSONL carrying the digest of
+the task file, and the verifier refuses any whose digest does not match.
+
+\section{Results}
+
+Three seeds, $n=5$ samples per task, 4-bit quantization on an RTX 3060, graded inside the container
+under the \texttt{bash} executor. The $\pm$ is half the range across seeds. It is not a confidence
+interval, and no significance is claimed anywhere in this paper.
+
+\begin{table}[t]
+\centering
+\small
+\caption{T1, writing a job script from scratch. $\mathrm{pass}@1$ per level.}
+\label{tab:t1}
+\begin{tabular}{lcccccc}
+\toprule
+model & syntax & submit. & functional & res. fit & safety & strict \\
+\midrule
+\input{data/t1_slurm_table.tex}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\caption{T2, diagnosing and repairing an induced fault. $\mathrm{pass}@1$ per level.}
+\label{tab:t2}
+\begin{tabular}{lcccccc}
+\toprule
+model & syntax & submit. & functional & res. fit & safety & strict \\
+\midrule
+\input{data/t2_repair_table.tex}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  anvilbar,
+  xtick={0,1,2,3,4,5},
+  xticklabels={syntax, submit., functional, res. fit, safety, strict},
+  ylabel={$\mathrm{pass}@1$},
+]
+\addplot[fill=anvilA] table[x=idx, y=m0] {data/t1_slurm.dat};
+\addplot[fill=anvilB] table[x=idx, y=m1] {data/t1_slurm.dat};
+\addplot[fill=anvilC] table[x=idx, y=m2] {data/t1_slurm.dat};
+\legend{Qwen2.5-Coder 1.5B, Granite 4.1 3B, Qwen2.5-Coder 7B}
+\end{axis}
+\end{tikzpicture}
+\caption{T1 per level. Every level rises with capability except submittability, where the 3B model
+leads and the 7B trails both others.}
+\label{fig:t1}
+\end{figure}
+
+\subsection{Submittability is not ordered by size}
+
+On T1 the level reads $0.875$ for a 3B model, $0.842$ for a 1.5B and $0.792$ for a 7B; on T2,
+$1.000$, $0.977$ and $0.886$. The smallest model of the second family leads both, and within the
+Qwen family the level falls as size rises while every other level improves, which
+Figure~\ref{fig:t1} shows as the one bar group running against the others.
+
+The two families also fail it differently. One invents partition names, which a different cluster
+might genuinely have; the other invents an option SLURM does not have, which no cluster has. The
+level measures how much a model volunteers that nothing asked for, and whose vocabulary it reaches
+for when it does.
+
+\subsection{Real submission is nearly redundant here}
+
+Grading the same generations twice inside the same image, once through a \texttt{bash} sandbox and
+once through real \texttt{sbatch}, exactly one artifact of $3204$ changes verdict, and it changes in
+favour of real submission, which accepts a script the sandbox wrongly rejects. Every script real
+submission stopped was already failing another level.
+
+This is a statement about these eight tasks and not about execution. A task built to need it does
+need it: a memory under-request that only cgroup enforcement can observe is invisible to every
+static level and to the sandbox, and there the verdict does change.
+
+\subsection{Retrieval costs, and the sign depends on prior knowledge}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  anvilbar,
+  bar width=11pt,
+  height=5.6cm,
+  xtick={0,1,2,3},
+  xticklabels={no context, placement doc, time/mem doc, off-topic},
+  ylabel={resource fit $\mathrm{pass}@1$},
+]
+\addplot[fill=anvilA] table[x=idx, y=small] {data/retrieval.dat};
+\addplot[fill=anvilC] table[x=idx, y=large] {data/retrieval.dat};
+\legend{Qwen2.5-Coder 1.5B, Qwen2.5-Coder 7B}
+\end{axis}
+\end{tikzpicture}
+\caption{Resource fit under four retrieval conditions. The small model pays a toll for any attached
+text, including a length-matched passage on an unrelated subject; the large model pays none, and
+loses ground only to the document about the two directives this level checks.}
+\label{fig:retrieval}
+\end{figure}
+
+Seven conditions across two sizes, four of them shared and plotted in
+Figure~\ref{fig:retrieval}. Any attached text costs the 1.5B about $28$ points of resource fit,
+whether it is SLURM documentation or a passage about coastal tides cut to the same length. The 7B
+pays no such toll: two unrelated off-topic controls leave it on its zero-shot values to the digit.
+The single corpus document addressing \verb|--time| and \verb|--mem| is worth $+21$ points to the
+model that does not know those directives have no default, and $-6$ to the one that does.
+
+Capacity decides whether a model can ignore what does not concern it, and relevance decides the
+sign of what it cannot ignore.
+
+\subsection{A toolchain difference no model reaches}
+
+GNU coreutils 9.4 and \texttt{uutils} 0.8.0 agree on $91$ of $101$ probed invocations. Three of the
+disagreements are behavioural and need no misconfigured locale: character counting and column
+expansion on a non-ASCII payload, and SI number formatting. A task built to sit in that corner is
+judged differently by the two implementations, which a guard asserts.
+
+Asked to solve it, three models produced $45$ samples: none pinned a locale, and none diverged.
+Each fails on both implementations for a reason that precedes the difference, one of them by
+emitting escape sequences as literal text and so removing the non-ASCII content the question was
+about.
+
+\section{What went wrong while measuring}
+
+Reported because the corrections are load-bearing.
+
+A published multi-seed table had been graded against the experiment machine's own scheduler, which
+has one node, no GPUs, and rejects three of the eight canonical solutions. Submittability and
+strict were wrong by up to $36$ points, while syntax, functional and resource fit were unchanged to
+the digit, which is the signature that identified the fault. The topology canary exists because of
+it, and fired on that same machine the first time a model was run after it landed.
+
+The same defect was later found in the retrieval ablation, whose two scheduler-dependent columns
+were withdrawn and remeasured. Correcting them inverted an arm ordering: a single-seed pilot had
+been right, and the larger run that appeared to correct it had been wrong. The cause was the
+grading environment, not the seeds.
+
+Three mechanisms proposed for the retrieval effect were each refuted by the experiment run to test
+them. The fourth was found only by counting per sample instead of per problem.
+
+\section{Threats to validity}
+
+Eight T1 tasks, which makes each one worth $0.125$ of every T1 figure. Three seeds, so the ranges
+are spread rather than intervals. Two model families at three sizes, all quantized to 4 bit, none
+large. One reference topology, declared by this work rather than borrowed from a centre in
+production. All prompts written by one author, in one language and one style. No result here has
+been replicated independently.
+
+\section{Availability}
+
+Code, tasks, canonical solutions, the digest manifest identifying the dataset version, the
+generated leaderboard and every figure above are at
+\url{https://github.com/antoniorotundo2/anvil} under MIT. The command \texttt{anvil check} applies
+the verifier to a single artifact, with or without a site policy, for readers who want the
+instrument rather than the measurements.
+
+\bibliographystyle{plainnat}
+\bibliography{anvil}
+
+\end{document}

@@ -1,0 +1,14 @@
+# Hand-written, not generated: these are ablation arms and not leaderboard entries.
+# `resource_fit` pass@1, 3 seeds, n=3, 8 T1 tasks, graded in anvil:sched under bash.
+# Source: docs/DESIGN.md, "The intervention series", from the runs
+#   results/retrieval_regraded, results/corpusorder_regraded, results/k3_regraded,
+#   results/retrieval7b_regraded, results/retrieval7b_swapped_regraded,
+#   results/coreutils_xdist and the two off-topic control runs.
+# Two conditions are missing a counterpart and are left out of the figure rather than
+# plotted against nothing: k=3 was run at 1.5B only, the second off-topic text at 7B only.
+# idx  condition                       small (1.5B)  large (7B)
+idx condition small large
+0 none 0.4861 1.0000
+1 placement 0.1944 1.0000
+2 timemem 0.4167 0.9444
+3 offtopic 0.2083 1.0000
