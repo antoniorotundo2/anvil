@@ -117,11 +117,16 @@ graded by the same verifier as T1, with no partial credit for being closer to co
 
 \section{Method}
 
-\paragraph{Five levels.} \emph{syntax} (shebang, \verb|bash -n|, misplaced directives),
-\emph{submittability} (\verb|sbatch --test-only|), \emph{functional} (the script runs and exits
-zero), \emph{resource fit} (the \emph{effective} request against the specification, applying
-SLURM's documented defaults), and \emph{safety} (destructive-pattern probes, which gate execution).
-The strict metric requires all five.
+\paragraph{Five levels.} The strict metric requires all of them.
+
+\begin{description}\setlength{\itemsep}{2pt}
+  \item[syntax] a shebang, \texttt{bash -n}, and no directive after the first command.
+  \item[submittability] \texttt{sbatch -{}-test-only} accepts it.
+  \item[functional] it runs and exits zero.
+  \item[resource fit] the \emph{effective} request matches the specification, with SLURM's
+        documented defaults applied.
+  \item[safety] destructive-pattern probes, which gate execution.
+\end{description}
 
 \paragraph{A skipped level is never a passed one.} Without a scheduler, submittability is skipped
 and scored as not passed. One refinement was forced by measurement: a level skipped because
@@ -157,13 +162,14 @@ interval, and no significance is claimed anywhere in this paper.
 \begin{table}[t]
 \centering
 \small
-\caption{T1, writing a job script from scratch. $\mathrm{pass}@1$ per level.}
+\setlength{\tabcolsep}{3.5pt}
+\caption{T1, writing a job script from scratch. $\mathrm{pass}@1$ per level. Safety is $1.000 \pm 0.000$ for every model and is omitted.}
 \label{tab:t1}
-\begin{tabular}{lcccccc}
+\begin{tabular}{lccccc}
 \toprule
-model & syntax & submit. & functional & res. fit & safety & strict \\
+model & syntax & submit. & functional & res. fit & strict \\
 \midrule
-\input{data/t1_slurm_table.tex}
+\input{data/t1_slurm_table.tex} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -171,13 +177,14 @@ model & syntax & submit. & functional & res. fit & safety & strict \\
 \begin{table}[t]
 \centering
 \small
-\caption{T2, diagnosing and repairing an induced fault. $\mathrm{pass}@1$ per level.}
+\setlength{\tabcolsep}{3.5pt}
+\caption{T2, diagnosing and repairing an induced fault. $\mathrm{pass}@1$ per level. Safety is $1.000 \pm 0.000$ for every model and is omitted.}
 \label{tab:t2}
-\begin{tabular}{lcccccc}
+\begin{tabular}{lccccc}
 \toprule
-model & syntax & submit. & functional & res. fit & safety & strict \\
+model & syntax & submit. & functional & res. fit & strict \\
 \midrule
-\input{data/t2_repair_table.tex}
+\input{data/t2_repair_table.tex} \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -412,10 +412,13 @@ docker-verify-recipe: docker-build-apptainer
 # the target says so plainly rather than failing with a shell error nobody can read.
 paper:
 	./scripts/paper_data.py
-	@command -v latexmk >/dev/null 2>&1 || { \
-		echo "latexmk not found: the manuscript needs a TeX installation."; \
-		echo "The generated data in paper/data/ is up to date regardless."; exit 1; }
-	cd paper && latexmk -pdf anvil.tex
+	@cd paper && if command -v tectonic >/dev/null 2>&1; then tectonic -X compile anvil.tex; \
+	elif command -v latexmk >/dev/null 2>&1; then latexmk -pdf anvil.tex; \
+	else \
+		echo "no TeX engine found: install tectonic (a single binary that fetches what it"; \
+		echo "needs) or a TeX distribution with latexmk."; \
+		echo "The generated data in paper/data/ is up to date regardless."; exit 1; \
+	fi
 
 clean:
 	rm -rf .pytest_cache .ruff_cache build dist *.egg-info
