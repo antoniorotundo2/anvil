@@ -17,6 +17,8 @@ import zlib
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from .resources import resolve
+
 SYSTEM_PROMPT = (
     "You are an expert HPC user support engineer. "
     "Write a single SLURM batch script that satisfies the request. "
@@ -45,13 +47,13 @@ class OracleModel(Model):
 
     def __init__(self, reference_path: str | Path, tasks_path: str | Path):
         self._by_id: dict[str, str] = {}
-        with open(reference_path, encoding="utf-8") as fh:
+        with open(resolve(reference_path), encoding="utf-8") as fh:
             for line in fh:
                 if line.strip():
                     rec = json.loads(line)
                     self._by_id[rec["id"]] = rec["script"]
         self._prompt_to_id: dict[str, str] = {}
-        with open(tasks_path, encoding="utf-8") as fh:
+        with open(resolve(tasks_path), encoding="utf-8") as fh:
             for line in fh:
                 if line.strip():
                     rec = json.loads(line)
@@ -233,7 +235,7 @@ def reference_path_for(tasks_path: str | Path) -> Path:
     """
     path = Path(tasks_path)
     own = path.with_name(f"{path.stem}_reference.jsonl")
-    if own.exists():
+    if resolve(own).is_file():
         return own
     prefix = path.stem.split("_", 1)[0]
     return path.with_name(f"{prefix}_reference.jsonl")
@@ -255,13 +257,13 @@ class RecipeOracleModel(Model):
 
     def __init__(self, reference_path: str | Path, tasks_path: str | Path):
         self._by_id: dict[str, str] = {}
-        with open(reference_path, encoding="utf-8") as fh:
+        with open(resolve(reference_path), encoding="utf-8") as fh:
             for line in fh:
                 if line.strip():
                     rec = json.loads(line)
                     self._by_id[rec["id"]] = rec["recipe"]
         self._prompt_to_id: dict[str, str] = {}
-        with open(tasks_path, encoding="utf-8") as fh:
+        with open(resolve(tasks_path), encoding="utf-8") as fh:
             for line in fh:
                 if line.strip():
                     rec = json.loads(line)

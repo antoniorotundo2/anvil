@@ -29,6 +29,7 @@ from .repair import (
     induce_t2_tasks,
     verify_repair,
 )
+from .resources import resolve
 from .retrieval import POSITIONS, STRATEGIES, Document, build_prompt_with_context
 from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task, _satisfied
 from .verifier import (
@@ -90,7 +91,7 @@ def _file_sha(path: str | Path) -> str:
     different one is a silent scientific error: the scripts answer questions that
     were never asked. The digest travels with the generations so `verify` can refuse.
     """
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
+    return hashlib.sha256(resolve(path).read_bytes()).hexdigest()[:12]
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:

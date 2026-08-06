@@ -28,6 +28,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .resources import resolve
 from .schema import Task
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -42,7 +43,7 @@ class Document:
     @staticmethod
     def load_jsonl(path: str | Path) -> list[Document]:
         docs: list[Document] = []
-        with open(path, encoding="utf-8") as fh:
+        with open(resolve(path), encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("//"):

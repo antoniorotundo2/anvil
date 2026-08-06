@@ -44,6 +44,8 @@ Induced repair tasks (T2) live in `tasks/t2_repair.jsonl`, see
 
 ## Install
 
+To work on the benchmark, from a checkout:
+
 ```
 make install
 ```
@@ -53,6 +55,17 @@ To generate scripts with a real model, also install the model extras:
 ```
 make install-models
 ```
+
+To use the verifier without a checkout, install the package:
+
+```
+pip install git+https://github.com/antoniorotundo2/anvil
+```
+
+That gives you the `anvil` command with no dependencies beyond the standard library. The task
+files travel with it, so `anvil check job.sh --task t1_gpu_single` works from any directory. A
+checkout still reads `tasks/` from the working directory, which is where every published number
+was measured, and the packaged copy is only consulted when that path does not exist.
 
 ## Run
 

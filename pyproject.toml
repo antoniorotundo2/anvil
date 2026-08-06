@@ -9,7 +9,23 @@ description = "Executable benchmarking of LLM-generated and LLM-repaired HPC ope
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{ name = "Antonio Rotundo", email = "antonio.rotundo2@studio.unibo.it" }]
+keywords = ["hpc", "slurm", "benchmark", "llm", "evaluation", "apptainer"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+    "Topic :: System :: Distributed Computing",
+]
 dependencies = []                     # the core has no dependencies: runs anywhere
+
+[project.urls]
+Homepage = "https://github.com/antoniorotundo2/anvil"
+Source = "https://github.com/antoniorotundo2/anvil"
+Issues = "https://github.com/antoniorotundo2/anvil/issues"
 
 [project.optional-dependencies]
 models = ["transformers>=4.40", "torch>=2.2", "accelerate>=0.30"]
@@ -20,8 +36,19 @@ dev = ["pytest>=8", "ruff>=0.5"]
 [project.scripts]
 anvil = "anvil.cli:main"
 
-[tool.setuptools.packages.find]
-include = ["anvil*"]
+# The task files live at the repository root, where every script, Makefile target and
+# document refers to them, and every published number was measured against that layout.
+# An installed copy has no repository around it, so the same directory is mapped into the
+# package as `anvil/data` at build time and `anvil/resources.py` falls back to it. Nothing
+# moves, and a checkout keeps reading `tasks/` exactly as before.
+[tool.setuptools]
+packages = ["anvil", "anvil.data"]
+
+[tool.setuptools.package-dir]
+"anvil.data" = "tasks"
+
+[tool.setuptools.package-data]
+"anvil.data" = ["*.jsonl"]
 
 [tool.ruff]
 line-length = 100

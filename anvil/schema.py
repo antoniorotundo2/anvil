@@ -8,6 +8,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from .resources import resolve
+
 
 class Level(str, Enum):
     """Verification levels, weakest to strongest (see docs/REFERENCE_CLUSTER.md)."""
@@ -38,7 +40,7 @@ class Task:
     @staticmethod
     def load_jsonl(path: str | Path) -> list[Task]:
         tasks: list[Task] = []
-        with open(path, encoding="utf-8") as fh:
+        with open(resolve(path), encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("//"):
@@ -66,7 +68,7 @@ class RepairTask:
     @staticmethod
     def load_jsonl(path: str | Path) -> list[RepairTask]:
         items: list[RepairTask] = []
-        with open(path, encoding="utf-8") as fh:
+        with open(resolve(path), encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("//"):
@@ -106,7 +108,7 @@ class RecipeTask:
     @staticmethod
     def load_jsonl(path: str | Path) -> list[RecipeTask]:
         tasks: list[RecipeTask] = []
-        with open(path, encoding="utf-8") as fh:
+        with open(resolve(path), encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("//"):
