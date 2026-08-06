@@ -1,0 +1,11 @@
+{
+  "name": "anvil reference cluster",
+  "max_time_minutes": 1440,
+  "max_mem_mb": 16384,
+  "max_nodes": 4,
+  "max_ntasks": 16,
+  "max_cpus_per_task": 4,
+  "max_gpus": 4,
+  "allowed_partitions": ["normal"],
+  "required_directives": ["--time"]
+}

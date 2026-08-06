@@ -689,11 +689,16 @@ say so plainly.
         wrapper. Exit codes usable from a shell, so it composes into a hook or a CI step. This is
         the piece that turns the verifier from something the benchmark calls into something a user
         calls
-  - [ ] an installable distribution, so using it does not start with cloning this repository
-  - [ ] a submit-time policy check. The five levels map almost onto what a site's submit filter
-        does, with one difference: the constraints would come from a site policy rather than from a
-        task. A centre whose users have started submitting generated scripts has that problem now
-        and no tool for it, and `check_safety` and `check_resource_fit` are most of the answer
+  - [x] an installable distribution, so using it does not start with cloning this repository. The
+        task files are mapped into the package at build time and `anvil/resources.py` prefers a
+        checkout and falls back to them, so a clone reads `tasks/` exactly as every published
+        number was measured against
+  - [x] a submit-time policy check: `anvil check --policy`, `anvil/policy.py`. Ceilings on what a
+        job may request, an allow-list of partitions, directives the site requires or forbids,
+        compared against the *effective* request rather than the written one. The comparison runs
+        the opposite way from `resource_fit`, which is the whole distinction between a task spec
+        and a site rule: one fails a script that asks for too little, the other one that asks for
+        too much
   - [ ] published results, as a page rather than a table buried in these documents, so a reader can
         cite where the models stand without running anything
   - [ ] dataset release, leaderboard, preprint

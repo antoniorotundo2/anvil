@@ -173,6 +173,33 @@ anvil check job.sh --task t1_mpi_multinode
 The exit code is 0 when every level that ran is satisfied and 1 otherwise, which is what makes it
 usable from a pre-submission hook or a CI step. `--json` prints the same verdict for a machine.
 
+### Against a site policy
+
+A cluster has rules that no task file knows: how long a job may run, how many nodes it may take,
+which partitions exist, which directives are required. `--policy` checks a script against them:
+
+```
+anvil check job.sh --policy policies/reference_cluster.json
+```
+
+```
+  policy           FAIL   anvil reference cluster
+                          partition 'gpu' is not one of normal
+                          nodes 9 exceeds the site maximum 4
+                          --time 2880min exceeds the site maximum 1440min
+```
+
+The comparison runs the opposite way from `resource_fit`, which is the distinction worth keeping
+straight: a task fails a script that asks for too little, a policy fails one that asks for too
+much. Ceilings apply to the *effective* request, so a script with no `--nodes` is judged as asking
+for one node and one with no `--ntasks` as asking for one task per node. A missing `--time` is a
+violation rather than a pass, because SLURM would apply a partition limit the file does not state
+and the site cannot conclude the job fits.
+
+Every field is optional and an absent field is not a rule. A field that is not recognised is an
+error rather than a silence: a misspelled `max_mem_gb` would otherwise read as a site with no
+memory limit at all. See [`policies/reference_cluster.json`](policies/reference_cluster.json).
+
 ## Development
 
 ### Tests

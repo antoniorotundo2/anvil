@@ -1290,6 +1290,7 @@ def _check(tmp_path, script: str, **kw):
         tasks=str(ROOT / "tasks" / "t1_slurm.jsonl"),
         no_exec=kw.get("no_exec", False),
         json=kw.get("json", False),
+        policy=kw.get("policy"),
         executor="bash",
     )
     return cmd_check(args)
@@ -1320,7 +1321,7 @@ def test_check_without_a_task_does_not_pretend_to_judge_the_request(tmp_path):
     path = tmp_path / "a.sh"
     path.write_text(script, encoding="utf-8")
     args = Namespace(scripts=[str(path)], task=None, tasks="", no_exec=False,
-                     json=False, executor="bash")
+                     json=False, policy=None, executor="bash")
     assert cmd_check(args) == 0
     assert check_syntax(script).passed and check_safety(script).passed
     assert Level.RESOURCE_FIT.value == "resource_fit"

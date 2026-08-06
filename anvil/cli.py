@@ -21,6 +21,7 @@ from .inducer import FAULT_CATEGORIES
 from .metrics import aggregate, aggregate_by_category, aggregate_recipes
 from .models import build_model, build_recipe_model, reference_path_for
 from .parse import extract_script
+from .policy import Policy, check_policy
 from .recipe_parse import extract_recipe
 from .recipe_verifier import apptainer_available, verify_recipe
 from .repair import (
@@ -245,6 +246,15 @@ def cmd_check(args: argparse.Namespace) -> int:
                   file=sys.stderr)
             return 2
 
+    policy = None
+    policy_path = getattr(args, "policy", None)
+    if policy_path:
+        try:
+            policy = Policy.load(policy_path)
+        except (OSError, ValueError) as exc:
+            print(f"cannot read the policy: {exc}", file=sys.stderr)
+            return 2
+
     reports = []
     worst = 0
     for path in args.scripts:
@@ -260,8 +270,11 @@ def cmd_check(args: argparse.Namespace) -> int:
             if levels[0].passed and levels[1].passed:
                 levels.insert(1, check_submittability(script))
             satisfied = all(_satisfied(lr) for lr in levels)
+        verdict = check_policy(script, policy) if policy is not None else None
+        if verdict is not None:
+            satisfied = satisfied and verdict.passed
         worst |= 0 if satisfied else 1
-        reports.append((path, levels, satisfied))
+        reports.append((path, levels, verdict, satisfied))
 
     if args.json:
         print(json.dumps([
@@ -270,8 +283,9 @@ def cmd_check(args: argparse.Namespace) -> int:
                 "task": args.task,
                 "satisfied": satisfied,
                 "levels": [lr.to_dict() for lr in levels],
+                **({"policy": verdict.to_dict()} if verdict is not None else {}),
             }
-            for path, levels, satisfied in reports
+            for path, levels, verdict, satisfied in reports
         ], indent=2))
         return worst
 
@@ -279,7 +293,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         ("resource_fit", "no --task, so there is nothing to compare the request against"),
         ("functional", "no --task, so there is nothing to expect the payload to print"),
     ]
-    for path, levels, satisfied in reports:
+    for path, levels, verdict, satisfied in reports:
         print(path)
         for lr in levels:
             state = "pass" if lr.passed else ("skip" if lr.skipped else "FAIL")
@@ -289,6 +303,10 @@ def cmd_check(args: argparse.Namespace) -> int:
             print(line)
         for level, why in unchecked:
             print(f"  {level:<16} n/a    {why}")
+        if verdict is not None:
+            print(f"  {'policy':<16} {'pass' if verdict.passed else 'FAIL'}   {verdict.policy}")
+            for problem in verdict.problems:
+                print(f"  {'':<16}        {problem}")
         print(f"  -> {'satisfied' if satisfied else 'NOT satisfied'}\n")
     return worst
 
@@ -828,6 +846,10 @@ def main(argv: list[str] | None = None) -> int:
                         "and functional; without it those two are reported as not checked")
     c.add_argument("--tasks", default="tasks/t1_slurm.jsonl",
                    help="where --task is looked up")
+    c.add_argument("--policy", metavar="PATH",
+                   help="a site policy in JSON: ceilings on what a job may request, "
+                        "allowed partitions, directives the site requires or forbids. "
+                        "See policies/reference_cluster.json")
     c.add_argument("--no-exec", action="store_true", help="skip the functional level")
     c.add_argument("--json", action="store_true", help="machine-readable output")
     _add_executor_flag(c)
