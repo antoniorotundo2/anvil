@@ -11,11 +11,11 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "transcribed from docs/RESULTS.md: generated in results/20260802_091236, graded in results/executor_20260802_140437. Re-import from those files to verify.",
+  "source": "results/executor_20260802_140437",
   "scores": {
     "syntax": {
-      "mean": 0.862,
-      "half_range": 0.002,
+      "mean": 0.8621,
+      "half_range": 0.00225,
       "cells": 3
     },
     "submittability": {
@@ -29,8 +29,8 @@
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.753,
-      "half_range": 0.009,
+      "mean": 0.753033,
+      "half_range": 0.0091,
       "cells": 3
     },
     "safety": {
@@ -39,8 +39,8 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.661,
-      "half_range": 0.009,
+      "mean": 0.6606,
+      "half_range": 0.0091,
       "cells": 3
     }
   }

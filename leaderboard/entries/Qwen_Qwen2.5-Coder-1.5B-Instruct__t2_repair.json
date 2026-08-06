@@ -11,26 +11,26 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "transcribed from docs/RESULTS.md: generated in results/20260802_091236, graded in results/executor_20260802_140437. Re-import from those files to verify.",
+  "source": "results/executor_20260802_140437",
   "scores": {
     "syntax": {
-      "mean": 0.792,
-      "half_range": 0.016,
+      "mean": 0.7924,
+      "half_range": 0.0159,
       "cells": 3
     },
     "submittability": {
-      "mean": 0.886,
-      "half_range": 0.005,
+      "mean": 0.886367,
+      "half_range": 0.00455,
       "cells": 3
     },
     "functional": {
-      "mean": 0.664,
-      "half_range": 0.005,
+      "mean": 0.663633,
+      "half_range": 0.00455,
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.412,
-      "half_range": 0.014,
+      "mean": 0.412133,
+      "half_range": 0.01365,
       "cells": 3
     },
     "safety": {
@@ -39,7 +39,7 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.291,
+      "mean": 0.2909,
       "half_range": 0.0,
       "cells": 3
     }

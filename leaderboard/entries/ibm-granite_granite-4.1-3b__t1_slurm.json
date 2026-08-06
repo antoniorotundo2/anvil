@@ -11,7 +11,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "transcribed from docs/RESULTS.md: generated in results/20260802_091236, graded in results/executor_20260802_140437. Re-import from those files to verify.",
+  "source": "results/executor_20260802_140437",
   "scores": {
     "syntax": {
       "mean": 1.0,
@@ -24,8 +24,8 @@
       "cells": 3
     },
     "functional": {
-      "mean": 0.842,
-      "half_range": 0.037,
+      "mean": 0.841667,
+      "half_range": 0.0375,
       "cells": 3
     },
     "resource_fit": {

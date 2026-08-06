@@ -11,7 +11,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "transcribed from docs/RESULTS.md: generated in results/20260802_091236, graded in results/executor_20260802_140437. Re-import from those files to verify.",
+  "source": "results/executor_20260802_140437",
   "scores": {
     "syntax": {
       "mean": 0.575,
@@ -19,18 +19,18 @@
       "cells": 3
     },
     "submittability": {
-      "mean": 0.842,
-      "half_range": 0.013,
+      "mean": 0.841667,
+      "half_range": 0.0125,
       "cells": 3
     },
     "functional": {
-      "mean": 0.533,
-      "half_range": 0.037,
+      "mean": 0.533333,
+      "half_range": 0.0375,
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.442,
-      "half_range": 0.013,
+      "mean": 0.441667,
+      "half_range": 0.0125,
       "cells": 3
     },
     "safety": {
@@ -39,7 +39,7 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.308,
+      "mean": 0.308333,
       "half_range": 0.025,
       "cells": 3
     }
