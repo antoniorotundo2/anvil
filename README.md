@@ -184,9 +184,9 @@ anvil check job.sh --policy policies/reference_cluster.json
 
 ```
   policy           FAIL   anvil reference cluster
-                          partition 'gpu' is not one of normal
                           nodes 9 exceeds the site maximum 4
                           --time 2880min exceeds the site maximum 1440min
+                          --mem 131072MB exceeds the site maximum 64000MB
 ```
 
 The comparison runs the opposite way from `resource_fit`, which is the distinction worth keeping
@@ -195,6 +195,11 @@ much. Ceilings apply to the *effective* request, so a script with no `--nodes` i
 for one node and one with no `--ntasks` as asking for one task per node. A missing `--time` is a
 violation rather than a pass, because SLURM would apply a partition limit the file does not state
 and the site cannot conclude the job fits.
+
+The shipped example carries the declared reference cluster's own limits, and a test holds it to
+the bracket the rest of this project uses: it must accept every canonical solution, and it must
+still refuse a script that asks for too much. An example policy that rejected the benchmark's own
+reference answers would be defective rather than strict, which the first version of that file was.
 
 Every field is optional and an absent field is not a rule. A field that is not recognised is an
 error rather than a silence: a misspelled `max_mem_gb` would otherwise read as a site with no

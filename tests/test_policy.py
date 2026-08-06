@@ -36,23 +36,6 @@ def test_the_shipped_example_loads_and_accepts_a_compliant_script():
     assert check_policy(COMPLIANT, policy).passed
 
 
-def test_every_ceiling_catches_a_script_that_exceeds_it():
-    policy = Policy.load(ROOT / "policies" / "reference_cluster.json")
-    greedy = (
-        "#!/bin/bash\n"
-        "#SBATCH --time=48:00:00\n"
-        "#SBATCH --partition=gpu\n"
-        "#SBATCH --nodes=9\n"
-        "#SBATCH --mem=64G\n"
-        "echo ANVIL_OK\n"
-    )
-    problems = " ".join(check_policy(greedy, policy).problems)
-    assert "partition" in problems
-    assert "nodes" in problems
-    assert "--time" in problems
-    assert "--mem" in problems
-
-
 def test_asking_for_less_than_the_ceiling_is_not_a_violation():
     """The direction that separates a policy from a task spec."""
     policy = _policy(max_nodes=4, max_mem_mb=16384, max_time_minutes=1440)
@@ -105,3 +88,33 @@ def test_an_unknown_field_is_refused_rather_than_ignored(tmp_path):
     path.write_text(json.dumps({"max_mem_gb": 16}), encoding="utf-8")
     with pytest.raises(ValueError, match="unknown policy fields"):
         Policy.load(path)
+
+
+def test_the_shipped_policy_accepts_every_canonical_solution():
+    """The bracket the rest of this project applies, aimed at the policy layer: an example
+    that rejects the benchmark's own reference solutions is defective, not strict. The
+    first version of this file required a partition and capped cores at four, and failed
+    every canonical solution and one of them respectively. Its limits now come from the
+    declared reference topology instead of from an author's guess."""
+    policy = Policy.load(ROOT / "policies" / "reference_cluster.json")
+    rejected = {}
+    for line in (ROOT / "tasks" / "t1_reference.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        result = check_policy(record["script"], policy)
+        if not result.passed:
+            rejected[record["id"]] = result.problems
+    assert not rejected, rejected
+
+
+def test_the_shipped_policy_still_refuses_a_greedy_script():
+    """A policy that accepts the oracle and everything else would pass the test above by
+    forbidding nothing."""
+    policy = Policy.load(ROOT / "policies" / "reference_cluster.json")
+    greedy = (
+        "#!/bin/bash\n#SBATCH --time=48:00:00\n#SBATCH --nodes=9\n"
+        "#SBATCH --mem=128G\necho ANVIL_OK\n"
+    )
+    problems = " ".join(check_policy(greedy, policy).problems)
+    assert "nodes" in problems and "--time" in problems and "--mem" in problems
