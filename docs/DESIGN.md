@@ -705,7 +705,11 @@ say so plainly.
   - [x] dataset release: [DATASET.md](DATASET.md) and `dataset/MANIFEST.json`, which ties
         every published figure to the digest of the files it was measured against. The
         upload to a hosting platform needs the author's account and has not been done
-  - [ ] leaderboard, preprint
+  - [x] leaderboard: [LEADERBOARD.md](LEADERBOARD.md), rendered from
+        `leaderboard/entries/` by `scripts/leaderboard.py` and held to them by a test, so
+        the page cannot drift from the runs it claims to summarise. An entry graded
+        against an older task digest is shown as stale rather than ranked
+  - [ ] preprint
   - [ ] one external user. It is the only item here that cannot be built, and the only one that
         decides whether any of the others mattered
 
