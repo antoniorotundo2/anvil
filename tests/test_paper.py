@@ -21,6 +21,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from paper_data import build as build_paper_data  # noqa: E402
 
+from leaderboard import LEVELS  # noqa: E402
+
 PAPER = ROOT / "paper" / "anvil.tex"
 DATA = ROOT / "paper" / "data"
 BIB = ROOT / "paper" / "anvil.bib"
@@ -88,3 +90,24 @@ def test_the_sweep_behind_the_bibliography_is_committed():
     it was selected from are in the repository."""
     for name in ("results.csv", "results.md", "by_query.json"):
         assert (ROOT / "sweep" / name).is_file(), name
+
+
+def test_a_model_the_generator_does_not_know_still_reaches_the_tables(tmp_path):
+    """The order was a hardcoded list and also a filter, so a model added to the
+    leaderboard would have been dropped from every table and figure without a word. It is
+    a preference now: unknown models are appended by ascending strict score."""
+    import paper_data as pd  # noqa: PLC0415
+
+    def entry(model, strict):
+        return {
+            "model": model, "tasks_file": "tasks/t1_slurm.jsonl",
+            "scores": {lv: {"mean": strict, "half_range": 0.0} for lv in LEVELS},
+        }
+
+    models = {
+        "Qwen/Qwen2.5-Coder-7B-Instruct": entry("Qwen/Qwen2.5-Coder-7B-Instruct", 0.667),
+        "newcomer/Model-9B": entry("newcomer/Model-9B", 0.5),
+    }
+    assert pd.order(models)[-1] == "newcomer/Model-9B"
+    assert "Model-9B" in pd._table(models)
+    assert "Model-9B" in pd._dat(models)
