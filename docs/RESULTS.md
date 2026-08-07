@@ -4,6 +4,15 @@ Every measured number this project stands behind, on one page, so it can be read
 running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
+**Every score below predates a verifier fix and is high by a known amount.** `check_resource_fit`
+compared `--time` against the walltime a task declares in one direction only, so `#SBATCH
+--time=00:15` against a task naming 15 minutes was fifteen seconds and passed. The floor landed
+with the tests that pin it, and counted before it landed the gap is **123 of 2421 passing
+artifacts, 5.1%**, spread unevenly: it is concentrated on Granite 4.1 3B and Qwen2.5-Coder 1.5B
+and absent from the 7B. The tables here are the last grading under the old check and are left in
+place, unedited, until the whole run is regraded in one pass; nothing is quietly adjusted. See
+[The mirror of F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-does-not-catch).
+
 ## How to read them
 
 `pass@1` with the unbiased estimator (Chen et al., 2021), per level, plus `strict_all_levels`,

@@ -225,11 +225,28 @@ Granite 4.1 3B is where it is most visible, `--time=00:15` on all fifteen `t1_ar
 and `00:30` on nine of fifteen `t1_cpus_per_task`, and the 1.5B produces `02:00` against a
 two-hour prompt. Both are counted as correct in every number this repository has published.
 
-Nothing is regraded on this page yet. `scripts/walltime_floor.py` counts the passing artifacts
-that request less than the prompt named, and the size of that number is what a decision should
-rest on: adding a floor moves every published score, the leaderboard entries and the preprint's
-tables, and the project's own rule after the wrong-cluster table is to measure first and then
-regrade in one deliberate pass rather than to patch a check and let the figures drift.
+`scripts/walltime_floor.py` counted it before anything was changed: **123 of 2421 passing
+artifacts, 5.1%**, across the five models and both task sets. 106 of them request under a minute.
+The largest single group is 39 artifacts writing `--time=00:30` against `t1_cpus_per_task`, which
+names 30 minutes, and the most extreme is 16 asking two minutes of the two-hour `t1_gpu_single`.
+
+That was enough to settle it. `check_resource_fit` now reports a walltime below the declared one
+as its own problem, worded so a report distinguishes the two directions: an over-request is a
+queue policy problem and an under-request is a job killed early. The oracle still scores 1.0 under
+the floor, which is the evidence that equality is the right reading and not an overreach, since
+the canonical solution to every task already writes the walltime its prompt names.
+
+**The numbers already published were graded without it and are high by roughly that 5.1%.** They
+are left in place, unedited, until the run is regraded in one pass, the way the wrong-cluster table
+was: a page that quietly improves between readings is worse than one that says which check
+produced it. The regrade is a re-verification and not a re-generation, since the saved generations
+and `tasks_sha` are untouched by a change to the verifier.
+
+Which is the part worth keeping from this episode. A report carries `tasks_sha`, and `anvil verify`
+refuses generations whose task set has moved, because a changed task invalidates a comparison. A
+changed verifier invalidates it exactly as thoroughly and nothing records that at all: the reports
+from before this fix and the reports from after it are indistinguishable on disk. That is the same
+class of gap the digest was built to close, on the other half of the pair.
 
 ---
 
@@ -602,11 +619,13 @@ that does not know the rule and minus 6 to the one that does. See
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- the size of the walltime floor gap, and then the decision it feeds. All five models are
-  screened for F10 and the screen turned up its mirror, an under-request the verifier passes;
-  see [The mirror of F10](#the-mirror-of-f10-which-this-verifier-does-not-catch).
-  `scripts/walltime_floor.py` counts the affected passes across a run. Whether to add a floor
-  is a regrade of everything published, so the count comes first;
+- the regrade under the walltime floor. It is measured, 123 of 2421 passes, and the check is
+  fixed; every published figure still comes from the grading before it, and re-verifying the
+  saved generations is what closes it, see
+  [The mirror of F10](#the-mirror-of-f10-which-this-verifier-does-not-catch);
+- a digest of the verifier to sit beside `tasks_sha` in every report. This episode produced two
+  gradings of the same generations that disagree and leave no trace of why, which is the failure
+  `tasks_sha` prevents on the task side and nothing prevents on the check side;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;

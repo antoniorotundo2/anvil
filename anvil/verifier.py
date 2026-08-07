@@ -708,6 +708,16 @@ def check_resource_fit(script: str, task: Task) -> LevelResult:
                 problems.append(f"--time unparsable: {raw!r}")
             elif mins > c["time_max_minutes"]:
                 problems.append(f"--time {mins}min exceeds maximum {c['time_max_minutes']}min")
+            elif mins < c["time_max_minutes"]:
+                # The ceiling used to be the only test, and `--time=00:15` against a task
+                # naming 15 minutes is fifteen seconds and passed it. `functional` cannot
+                # cover for that here: every payload finishes in under a second, so a job
+                # granted fifteen seconds still prints what was asked. Every task declares
+                # the walltime its prompt names, so equality is the reading, the same one
+                # --nodes, --ntasks and --cpus-per-task already get a few lines above.
+                problems.append(
+                    f"--time {mins}min below the {c['time_max_minutes']}min the task declares"
+                )
 
     if "mem_min_mb" in c:
         raw = directive_value(d, "--mem")

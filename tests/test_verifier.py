@@ -526,13 +526,52 @@ def test_multiple_options_on_one_sbatch_line():
 
 
 def test_multi_option_line_satisfies_resource_fit():
-    """The regression this bug caused: a correct script scored as missing --time."""
-    script = "#!/bin/bash\n#SBATCH --ntasks=1 --time=00:05:00 --mem=1G\necho ANVIL_OK\n"
+    """The regression this bug caused: a correct script scored as missing --time.
+
+    The walltime here used to be 00:05:00 against a declared 10, which passed while the
+    check had a ceiling and no floor. What this test is about is parsing several options
+    off one line, so it now names the declared value and leaves the floor to the tests
+    below.
+    """
+    script = "#!/bin/bash\n#SBATCH --ntasks=1 --time=00:10:00 --mem=1G\necho ANVIL_OK\n"
     t = Task(id="x", prompt="p",
              constraints={"ntasks": 1, "time_max_minutes": 10, "mem_min_mb": 512},
              required_directives=["--time"])
     r = check_resource_fit(script, t)
     assert r.passed, r.detail
+
+
+# Observed across three models before the floor existed: `--time=00:15` against a task
+# naming 15 minutes is fifteen seconds, and 123 of 2421 passing artifacts in the multi-seed
+# run were requests like it. See docs/OBSERVED_FAILURES.md, "The mirror of F10".
+@pytest.mark.parametrize(
+    ("value", "declared", "passes"),
+    [
+        ("00:15", 15, False),      # minutes:seconds, so fifteen seconds
+        ("00:15:00", 15, True),    # hours:minutes:seconds, the intended request
+        ("15:00", 15, True),       # minutes:seconds, also fifteen minutes
+        ("2:00", 120, False),      # two minutes against a two-hour task
+        ("2:00:00", 120, True),
+        ("15:00:00", 15, False),   # F10: the prompt's integer in the hours field
+    ],
+)
+def test_walltime_must_match_what_the_task_declares(value, declared, passes):
+    script = f"#!/bin/bash\n#SBATCH --time={value}\necho ANVIL_OK\n"
+    t = Task(id="x", prompt="p", constraints={"time_max_minutes": declared},
+             required_directives=["--time"])
+    r = check_resource_fit(script, t)
+    assert r.passed is passes, r.detail
+
+
+def test_an_under_request_is_named_as_such():
+    """The two directions read differently in a report, and the message has to say which:
+    an over-request is a queue policy problem, an under-request is a job killed early."""
+    script = "#!/bin/bash\n#SBATCH --time=00:30\necho ANVIL_OK\n"
+    t = Task(id="x", prompt="p", constraints={"time_max_minutes": 30},
+             required_directives=["--time"])
+    r = check_resource_fit(script, t)
+    assert not r.passed
+    assert "below the 30min the task declares" in r.detail
 
 
 @pytest.mark.parametrize(
