@@ -436,18 +436,29 @@ sbatch: error: invalid partition specified: compute  t1_mpi_multinode, 3 of 15
 expected output not found: ['ANVIL_OK']              t1_container_apptainer, 15 of 15
 ```
 
-The repair prompt asks for the corrected script, so the model rewrites the whole artifact, and
-what it hands back can be broken in places the induced fault never touched. On `t1_mpi_multinode`
-it fixes the missing walltime and invents a memory option SLURM does not have, which costs it
-`submittability` and leaves `--mem` unsatisfied at the same time. On `t1_container_apptainer` it
-fixes the walltime and returns a payload that never prints `ANVIL_OK`.
+The first reading of this was that repairing introduces faults, since the model is asked for the
+whole script and rewrites more than the broken line. The from-scratch run does not support it.
+Gemma's T1 failures are `t1_mpi_multinode` 15 times out of 15 and `t1_container_apptainer` 15 out
+of 15, which is exactly the set of tasks its F4 failures come from. **The two tasks fail in both
+settings.** Nothing was introduced: the weakness is standing, and repair does not remove it.
 
-So a per-category score is not a measurement of whether the induced fault was repaired. It is a
-measurement of whether the returned artifact is correct, and those are different questions
-whenever the model rewrites more than the broken line. F4 at 0.750 for Gemma and F4 at 0.242 for
-Qwen3.5 are not two points on one scale: one model never gets the walltime wrong and breaks other
-things, the other gets only the walltime wrong. Reading the column as a ranking on a single
-ability would have been wrong in both directions.
+What repair changes is which fault. Generating from scratch, `t1_mpi_multinode` is refused for an
+invented partition name and `t1_container_apptainer` for a bash syntax error; repairing an F4, the
+same two tasks are refused for an invented `--mem-per-node` and a payload that stops printing
+`ANVIL_OK`. Same task, same verdict, four different reasons.
+
+The scaffold does help elsewhere, which is worth recording because it cuts the other way. From
+scratch Gemma fails `t1_dependency_chain` 10 times of 15 on a walltime over the ceiling and
+`t1_gpu_single` once; repairing an F4 it passes both, on all fifteen. Being shown a script fixes
+some of what it gets wrong when writing one.
+
+So a per-category score is not a measurement of whether the induced fault was repaired. Gemma
+restores the removed directive in 120 artifacts out of 120 and scores 0.750, and the 0.250 that is
+missing is its ability to write two of the eight tasks at all. Where that ability is at floor the
+category number carries no information about the category, and F4 at 0.750 for Gemma and F4 at
+0.242 for Qwen3.5 are not two points on one scale. One model never gets the walltime wrong; the
+other gets only the walltime wrong. Reading the column as a ranking on a single ability would have
+been wrong in both directions.
 
 The honest version of the earlier claim is narrower. Qwen3.5-9B's F4 collapse is real, it is
 entirely `--time`, and it has two mechanisms, a unit slip and a failure to notice a removal. It is

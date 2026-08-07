@@ -118,10 +118,11 @@ the same model writes it correctly from scratch.
 
 **A per-category score does not measure whether the induced fault was repaired.** Gemma 4 12B
 scores 0.750 on the same category and never once gets the walltime wrong: it restores the removed
-directive correctly in all 120 artifacts. Its thirty failures are faults it introduced while
-rewriting the rest of the script, an invented `--mem-per-node` that SLURM does not have and a
-payload that stops printing `ANVIL_OK`. The two 0.242 and 0.750 cells are not two points on one
-ability. See [The right number in the wrong
+directive correctly in all 120 artifacts. Its thirty failures are two tasks it also fails 15 times
+out of 15 when writing them from scratch, so the missing 0.250 measures its ability to produce
+those two artifacts at all and not anything about F4. Where that ability is at floor the category
+number carries no information about the category, and the 0.242 and 0.750 cells are not two points
+on one scale. See [The right number in the wrong
 field](OBSERVED_FAILURES.md#the-right-number-in-the-wrong-field).
 
 **Two coreutils implementations are not interchangeable, and no model has reached the difference.**
