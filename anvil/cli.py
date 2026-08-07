@@ -22,6 +22,7 @@ from .metrics import aggregate, aggregate_by_category, aggregate_recipes
 from .models import build_model, build_recipe_model, reference_path_for
 from .parse import extract_script
 from .policy import Policy, check_policy
+from .provenance import verifier_sha
 from .recipe_parse import extract_recipe
 from .recipe_verifier import apptainer_available, verify_recipe
 from .repair import (
@@ -777,6 +778,8 @@ def _report(
         payload = {
             "model": model_name,
             "tasks_file": str(tasks_file),
+            "tasks_sha": _file_sha(tasks_file),
+            "verifier_sha": verifier_sha(),   # which rules produced these verdicts
             "k": args.k,
             "environment": env,          # base image, bash, coreutils, device: all recorded
             "elapsed_s": round(elapsed, 2),
@@ -807,6 +810,8 @@ def _report_recipe(model_name, tasks_file, tasks, results, args, elapsed) -> Non
         payload = {
             "model": model_name,
             "tasks_file": str(tasks_file),
+            "tasks_sha": _file_sha(tasks_file),
+            "verifier_sha": verifier_sha(),
             "k": args.k,
             "environment": env,
             "elapsed_s": round(elapsed, 2),

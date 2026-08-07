@@ -244,9 +244,25 @@ and `tasks_sha` are untouched by a change to the verifier.
 
 Which is the part worth keeping from this episode. A report carries `tasks_sha`, and `anvil verify`
 refuses generations whose task set has moved, because a changed task invalidates a comparison. A
-changed verifier invalidates it exactly as thoroughly and nothing records that at all: the reports
-from before this fix and the reports from after it are indistinguishable on disk. That is the same
-class of gap the digest was built to close, on the other half of the pair.
+changed verifier invalidates it exactly as thoroughly and nothing recorded that at all: the reports
+from before this fix and the reports from after it were indistinguishable on disk. That was the
+same class of gap the digest was built to close, on the other half of the pair, and it is closed
+now. `anvil/provenance.py` digests the modules a verdict depends on, `verifier.py` and `parse.py`,
+and every report the CLI writes carries `verifier_sha` beside `tasks_sha`. The leaderboard refuses
+to rank a row whose rules are not the current ones, and the executor ablation refuses to compare
+two gradings that did not come from the same verifier, which is a real risk for a run assembled
+over several days.
+
+The digest is taken over raw bytes, so a comment moves it. That is the conservative direction on
+purpose: a changed digest means *these two gradings came from different code, find out why*, a
+question worth being asked once too often, and not *the numbers are wrong*. Normalising the source
+first would buy quieter digests at the price of the guarantee, and would tie the value to whichever
+Python version had unparsed it.
+
+Every leaderboard row currently reads `unstamped`, because every published entry was imported from
+a report written before any of this existed. That is not a cosmetic state to clear: those rows were
+graded without the walltime floor, and the marker is the accurate description of them until the
+regrade.
 
 ---
 

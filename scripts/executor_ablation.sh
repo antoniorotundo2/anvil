@@ -149,6 +149,14 @@ env = next(iter(next(iter(cells.values())).values()))["environment"]
 print(f"  base_image={env.get('base_image')}  coreutils={env.get('coreutils')}  "
       f"sbatch={env.get('sbatch')}")
 
+# A run assembled over days can pick up a verifier change halfway, and the two gradings
+# then differ for a reason that has nothing to do with the executor. That is the whole
+# point of the comparison, so it has to be ruled out rather than assumed.
+rules = {d.get("verifier_sha", "unstamped") for per in cells.values() for d in per.values()}
+if len(rules) > 1:
+    sys.exit(f"reports were graded by different verifiers, not comparable: {sorted(rules)}")
+print(f"  verifier_sha={rules.pop()}")
+
 def level(result, name):
     return next((x for x in result["levels"] if x["level"] == name), None)
 

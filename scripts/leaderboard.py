@@ -12,10 +12,12 @@ if the rendered page and the entries disagree.
     ./scripts/leaderboard.py --check                                    # fail on drift
 
 An entry carries the figures and the conditions they were obtained under: which task file,
-its digest, the base image, the executor, how many seeds and samples. The digest is the
-one that matters. Two entries for the same model against different task sets are not
+its digest, the base image, the executor, how many seeds and samples. The digests are the
+ones that matter. Two entries for the same model against different task sets are not
 comparable and must not sit in the same ranking, so an entry whose `tasks_sha` is not the
-current one is rendered as stale rather than ranked.
+current one is rendered as stale rather than ranked. The same holds for `verifier_sha`, and
+for the same reason: the walltime floor moved 123 verdicts of 2421 without touching a
+single task file, and rows graded on either side of it are two series, not one.
 
 Averaging across seeds happens at import: a cell is one seed, and an entry is the mean and
 half-range over the seeds given. Half-range, not a confidence interval, and the page says
@@ -28,6 +30,11 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+ROOT_FOR_ANVIL = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_FOR_ANVIL))
+
+from anvil.provenance import verifier_sha  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -48,6 +55,24 @@ def _slug(text: str) -> str:
     return text.replace("/", "_").replace(":", "-")
 
 
+def _not_comparable(entry: dict, current_tasks_sha: str | None) -> str | None:
+    """Why this row cannot be ranked against the others, or None if it can.
+
+    Task set first: a row measured on different tasks answers different questions, and that
+    is the older and more obvious of the two. Rules second, and only reported when the task
+    set is current, because a row that is wrong on both is not made clearer by saying so
+    twice.
+    """
+    if entry["tasks_sha"] != current_tasks_sha:
+        return "stale tasks"
+    recorded = entry.get("verifier_sha", "unstamped")
+    if recorded == "unstamped":
+        return "unstamped"
+    if recorded != verifier_sha():
+        return "stale rules"
+    return None
+
+
 def cmd_import(args: argparse.Namespace) -> int:
     cells = [json.loads(Path(p).read_text(encoding="utf-8")) for p in args.results]
     models = {c["model"] for c in cells}
@@ -65,7 +90,14 @@ def cmd_import(args: argparse.Namespace) -> int:
     entry = {
         "model": cells[0]["model"],
         "tasks_file": cells[0]["tasks_file"],
-        "tasks_sha": _current_digests().get(cells[0]["tasks_file"], "unknown"),
+        # Taken from the report when it carries one. Before reports were stamped there was
+        # nothing to take, and the digest of the task file as it stands now was the only
+        # value available: that is a guess, and it reads as fresh even for a cell graded
+        # against an older task set. Reports written from now on settle it.
+        "tasks_sha": cells[0].get(
+            "tasks_sha", _current_digests().get(cells[0]["tasks_file"], "unknown")
+        ),
+        "verifier_sha": cells[0].get("verifier_sha", "unstamped"),
         "seeds": args.seeds,
         "n_per_task": args.n,
         "executor": cells[0]["environment"].get("functional_executor", "bash"),
@@ -133,8 +165,8 @@ def render() -> str:
         out.append("| model | " + " | ".join(f"`{lv}`" for lv in LEVELS) + " | conditions |")
         out.append("|---" * (len(LEVELS) + 2) + "|")
         for entry in group:
-            stale = entry["tasks_sha"] != current.get(tasks_file)
-            name = f"{entry['model']}{' (stale)' if stale else ''}"
+            why = _not_comparable(entry, current.get(tasks_file))
+            name = f"{entry['model']}{f' ({why})' if why else ''}"
             conditions = (
                 f"{len(entry['seeds'])} seeds, n={entry['n_per_task']}, "
                 f"{entry['executor']}, {entry['quantization']}"
@@ -144,11 +176,14 @@ def render() -> str:
                 + f" | {conditions} |"
             )
         out.append("")
-        if any(e["tasks_sha"] != current.get(tasks_file) for e in group):
+        reasons = {_not_comparable(e, current.get(tasks_file)) for e in group} - {None}
+        if reasons:
             out.append(
-                "An entry marked stale was measured against a different version of this task "
-                "file. It is shown rather than deleted, and it is not comparable with the rest "
-                "of the column."
+                "An entry marked *stale tasks* was measured against a different version of this "
+                "task file; one marked *stale rules* was graded by a different verifier, and "
+                "*unstamped* predates the digest being recorded at all. Any of the three means "
+                "the row is not comparable with the rest of the column. They are shown rather "
+                "than deleted."
             )
             out.append("")
 
