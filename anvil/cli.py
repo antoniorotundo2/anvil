@@ -171,6 +171,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             "load_in_4bit": args.load_in_4bit,
             "max_new_tokens": args.max_new_tokens,
             "temperature": args.temperature,
+            "disable_thinking": getattr(args, "disable_thinking", False),
         }
     model = build_model(args.model, args.tasks, **model_kw)
     tasks_sha = _file_sha(args.tasks)
@@ -198,6 +199,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "tasks_sha": tasks_sha,
                 "retrieval": args.retrieval,
                 "retrieval_position": args.retrieval_position,
+                "disable_thinking": getattr(args, "disable_thinking", False),
                 "retrieved_docs": [d.id for d in docs],
                 "script": script,
             })
@@ -431,6 +433,7 @@ def cmd_repair(args: argparse.Namespace) -> int:
             "load_in_4bit": args.load_in_4bit,
             "max_new_tokens": args.max_new_tokens,
             "temperature": args.temperature,
+            "disable_thinking": getattr(args, "disable_thinking", False),
         }
     model = build_repair_model(
         args.model, reference_path_for(args.tasks), t1_tasks, **model_kw
@@ -553,6 +556,7 @@ def cmd_recipe(args: argparse.Namespace) -> int:
             "load_in_4bit": args.load_in_4bit,
             "max_new_tokens": args.max_new_tokens,
             "temperature": args.temperature,
+            "disable_thinking": getattr(args, "disable_thinking", False),
         }
     model = build_recipe_model(args.model, args.tasks, **model_kw)
     tasks_sha = _file_sha(args.tasks)
@@ -832,6 +836,12 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--retrieval-position", choices=list(POSITIONS), default="append",
                    help="where the retrieved documents go relative to the task prompt "
                    "(ignored for zero-shot); every published arm used append")
+    r.add_argument("--disable-thinking", action="store_true",
+                   help="ask the chat template not to emit a reasoning block. A model that "
+                        "thinks by default is cut off mid-thought under this benchmark's "
+                        "token budget and never reaches the code block; raising the budget "
+                        "for it alone would give it more computation per sample than every "
+                        "other model in the table")
     _add_executor_flag(r)
     r.set_defaults(func=cmd_run)
 

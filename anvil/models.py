@@ -128,12 +128,14 @@ class HFModel(Model):
         temperature: float = 0.2,
         load_in_4bit: bool = False,
         system_prompt: str = SYSTEM_PROMPT,
+        disable_thinking: bool = False,
     ):
         self.name = model_id
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.load_in_4bit = load_in_4bit
         self.system_prompt = system_prompt
+        self.disable_thinking = disable_thinking
         self._model = None      # sentinel: the model is loaded lazily, ONCE
 
     def _ensure_loaded(self) -> None:
@@ -197,9 +199,18 @@ class HFModel(Model):
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": prompt},
         ]
+        # Reasoning models emit a <think> block before the answer and want tens of
+        # thousands of output tokens for it. Under this benchmark's budget they are cut off
+        # mid-thought and never reach the code block, so every sample fails `syntax` for a
+        # reason that belongs to the harness. Raising the budget for them alone would hand
+        # one model far more computation per sample than the rest, which is the other way
+        # to make a table incomparable. `enable_thinking` is passed into the chat template
+        # and ignored by templates that do not define it, so this changes nothing for the
+        # models measured before it existed.
+        template_kwargs = {"enable_thinking": False} if self.disable_thinking else {}
         try:
             text = self._tok.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+                messages, tokenize=False, add_generation_prompt=True, **template_kwargs
             )
         except Exception:  # base models without a chat template
             text = f"{self.system_prompt}\n\n{prompt}\n\n```bash\n"

@@ -1335,3 +1335,35 @@ def test_check_grades_the_reference_solution_against_its_task(tmp_path):
 
 def test_check_reports_an_unknown_task_rather_than_grading_nothing(tmp_path):
     assert _check(tmp_path, "#!/bin/bash\necho ANVIL_OK\n", task="no_such_task") == 2
+
+
+# ---------------------------------------------------------------- reasoning models
+def test_thinking_is_only_disabled_when_asked(monkeypatch):
+    """`enable_thinking` reaches the chat template, so it must not be passed to the models
+    measured before the flag existed: their templates ignore unknown variables, but a
+    silent change to how a prompt is built is exactly what makes two tables incomparable.
+    """
+    from anvil.models import HFModel  # noqa: PLC0415
+
+    seen = []
+
+    class FakeTokenizer:
+        eos_token_id = 0
+
+        def apply_chat_template(self, messages, **kw):
+            seen.append(kw)
+            return "prompt"
+
+        def __call__(self, text, return_tensors=None):
+            raise RuntimeError("stop here: the prompt is what this test is about")
+
+    for disable in (False, True):
+        model = HFModel("fake/model", disable_thinking=disable)
+        model._model = object()          # skip the lazy load
+        model._tok = FakeTokenizer()
+        model._device = "cpu"
+        with pytest.raises(RuntimeError):
+            model.generate("write a script", n=1)
+
+    assert "enable_thinking" not in seen[0]
+    assert seen[1]["enable_thinking"] is False

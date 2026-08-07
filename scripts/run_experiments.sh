@@ -102,6 +102,9 @@ fi
 # ever one flag here, so word-splitting an unquoted string is safe and portable.
 FLAGS=""
 [[ "$FOURBIT" == "1" ]] && FLAGS="--load-in-4bit"
+# Reasoning models never reach the code block inside this budget: see anvil/models.py.
+DISABLE_THINKING="${DISABLE_THINKING:-0}"
+[[ "$DISABLE_THINKING" == "1" ]] && FLAGS="$FLAGS --disable-thinking"
 
 echo
 echo "==> T1 matrix: $(echo "$MODELS" | wc -w) models x $(echo "$SEEDS" | wc -w) seeds, n=${N}"
