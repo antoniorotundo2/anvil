@@ -37,7 +37,7 @@
     tick align=outside,
     enlarge x limits=0.10,
     legend style={draw=none, fill=none, font=\footnotesize, at={(0.5,1.06)},
-                  anchor=south, legend columns=-1, /tikz/every even column/.append style={column sep=10pt}},
+                  anchor=south, legend columns=-1, /tikz/every even column/.append style={column sep=4pt}},
     every axis plot/.append style={draw=none},
     x tick label style={font=\small},
     y tick label style={font=\small},
@@ -227,7 +227,7 @@ model & syntax & submit. & functional & res. fit & strict \\
 \addplot[fill=anvilB] table[x=idx, y=m2] {data/t1_slurm.dat};
 \addplot[fill=anvilD] table[x=idx, y=m3] {data/t1_slurm.dat};
 \addplot[fill=anvilC] table[x=idx, y=m4] {data/t1_slurm.dat};
-\legend{Qwen2.5-Coder 1.5B, Qwen3.5 9B, Granite 4.1 3B, Gemma 4 12B, Qwen2.5-Coder 7B}
+\legend{Qwen2.5 1.5B, Qwen3.5 9B, Granite 3B, Gemma 12B, Qwen2.5 7B}
 \end{axis}
 \end{tikzpicture}
 \caption{T1 per level, five models. Every level broadly rises with capability except
