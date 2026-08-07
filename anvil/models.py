@@ -188,13 +188,15 @@ class HFModel(Model):
         self._tok, self._model = tok, model
         self._device = info.device
 
-    def generate(self, prompt: str, n: int = 1, seed: int | None = None) -> list[str]:
-        self._ensure_loaded()
-        import torch  # noqa: PLC0415
+    def _render_prompt(self, prompt: str) -> str:
+        """Turn the task into the exact text the model is asked to continue.
 
-        if seed is not None:
-            torch.manual_seed(seed)
-
+        Separate from `generate` so that what the model is *asked* can be checked without
+        an ML stack: `generate` imports torch on its first line, and the container that
+        runs this project's suite has no torch by design. A test written against `generate`
+        passed on the development machine and failed there, which is the container earning
+        its keep.
+        """
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": prompt},
@@ -209,11 +211,20 @@ class HFModel(Model):
         # models measured before it existed.
         template_kwargs = {"enable_thinking": False} if self.disable_thinking else {}
         try:
-            text = self._tok.apply_chat_template(
+            return self._tok.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True, **template_kwargs
             )
         except Exception:  # base models without a chat template
-            text = f"{self.system_prompt}\n\n{prompt}\n\n```bash\n"
+            return f"{self.system_prompt}\n\n{prompt}\n\n```bash\n"
+
+    def generate(self, prompt: str, n: int = 1, seed: int | None = None) -> list[str]:
+        self._ensure_loaded()
+        import torch  # noqa: PLC0415
+
+        if seed is not None:
+            torch.manual_seed(seed)
+
+        text = self._render_prompt(prompt)
 
         enc = self._tok(text, return_tensors="pt")
         enc = {k: v.to(self._device) for k, v in enc.items()}

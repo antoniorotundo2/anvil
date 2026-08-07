@@ -1354,16 +1354,14 @@ def test_thinking_is_only_disabled_when_asked(monkeypatch):
             seen.append(kw)
             return "prompt"
 
-        def __call__(self, text, return_tensors=None):
-            raise RuntimeError("stop here: the prompt is what this test is about")
-
     for disable in (False, True):
         model = HFModel("fake/model", disable_thinking=disable)
-        model._model = object()          # skip the lazy load
         model._tok = FakeTokenizer()
-        model._device = "cpu"
-        with pytest.raises(RuntimeError):
-            model.generate("write a script", n=1)
+        # `_render_prompt` and not `generate`: the latter imports torch on its first line,
+        # and the container this suite runs in has none. The first version of this test
+        # called `generate`, passed on a development machine that happened to have torch,
+        # and failed in CI.
+        assert model._render_prompt("write a script") == "prompt"
 
     assert "enable_thinking" not in seen[0]
     assert seen[1]["enable_thinking"] is False
