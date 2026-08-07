@@ -163,10 +163,20 @@ so the job asks for sixty times the walltime it was told to ask for. Both models
 also write the correct forms, `00:45:00` and the bare `MM:SS`, on other samples of the same task,
 so this is not a model that lacks the format.
 
-Two families, from-scratch generation, three seeds each. Qwen3.5-9B does it in 34 artifacts of
-120, on `t1_hello_serial`, `t1_container_apptainer`, `t1_mpi_multinode` and `t1_cpus_per_task`.
-Gemma 4 12B does it in 10 of 120, all on `t1_dependency_chain`, a task where Qwen3.5 never does.
-The habit is shared; which prompt triggers it is not.
+All five models screened, from-scratch generation, three seeds each:
+
+| model | T1 artifacts with the slip | tasks it appears on |
+|---|---|---|
+| Qwen2.5-Coder 1.5B | 14 of 120 | container, cpus_per_task, hello_serial, output_paths |
+| Qwen2.5-Coder 7B | 0 of 120 | none |
+| Granite 4.1 3B | 0 of 120 | none |
+| Gemma 4 12B | 10 of 120 | dependency_chain |
+| Qwen3.5 9B | 34 of 120 | container, hello_serial, mpi_multinode, cpus_per_task |
+
+Three models of five, two families, and no ordering by size: the 7B sits between two Qwen
+models that both do it and does not, and the 12B does it while the 3B does not. Which prompt
+triggers it is not shared either. Gemma slips only on `t1_dependency_chain`, where Qwen3.5 never
+does, and Qwen3.5 slips on four tasks that Gemma always gets right.
 
 The one prompt that cannot expose it is `t1_gpu_single`, which asks for a walltime of two hours and
 gets `02:00:00` from both. Reading the integer and ignoring the unit gives the right answer when
@@ -185,6 +195,41 @@ It has no inducer, for the reason given under F9: registering one regenerates
 the class most worth inducing when that regeneration happens for an independent reason, because it
 is the only one whose repair cannot be faked by any check cheaper than the one this benchmark
 runs.
+
+### The mirror of F10, which this verifier does not catch
+
+Screening for F10 turned up its opposite, and the opposite is a defect in the harness rather than
+in a model:
+
+```
+#SBATCH --time=00:15    the prompt asks for 15 minutes; this is fifteen seconds
+#SBATCH --time=00:30    the prompt asks for 30 minutes; this is thirty seconds
+#SBATCH --time=02:00    the prompt asks for two hours; this is two minutes
+```
+
+`00:15` is SLURM's `minutes:seconds`, so the request is a sixtieth of what the prompt named
+rather than sixty times it. **These artifacts pass.** `check_resource_fit` compares `--time`
+against `time_max_minutes` in one direction only: above the ceiling is a problem, below it is not.
+That reading was taken from `t1_hello_serial`, whose prompt says *at most* 10 minutes, and it is
+wrong for the other seven, which name an exact walltime the way they name an exact node count.
+The same function demands exact equality for `--nodes`, `--ntasks` and `--cpus-per-task`, so the
+looseness is an inconsistency inside one check rather than a considered position.
+
+`functional` does not cover for it. Every T1 payload finishes in under a second, so a job granted
+fifteen seconds still prints what the task asked for and the level sees a correct run. F8 is the
+same defect on memory and `functional` does catch that one, because a payload that allocates more
+than it requested is killed for it; walltime has no equivalent here because the work is too small
+to run out of time.
+
+Granite 4.1 3B is where it is most visible, `--time=00:15` on all fifteen `t1_array_job` samples
+and `00:30` on nine of fifteen `t1_cpus_per_task`, and the 1.5B produces `02:00` against a
+two-hour prompt. Both are counted as correct in every number this repository has published.
+
+Nothing is regraded on this page yet. `scripts/walltime_floor.py` counts the passing artifacts
+that request less than the prompt named, and the size of that number is what a decision should
+rest on: adding a floor moves every published score, the leaderboard entries and the preprint's
+tables, and the project's own rule after the wrong-cluster table is to measure first and then
+regrade in one deliberate pass rather than to patch a check and let the figures drift.
 
 ---
 
@@ -557,12 +602,11 @@ that does not know the rule and minus 6 to the one that does. See
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- F10 on the three models it has not been looked for in. It is confirmed on Qwen3.5-9B and
-  Gemma 4 12B, and the 1.5B, the 7B and Granite have not been screened: the count of
-  `--time Nmin exceeds maximum Nmin` in their T1 reports is an upper bound on it, and the
-  `--lines` mode of `scripts/category_dig.py` reads the values themselves. Whether the class is
-  general or belongs to the two newest models is the difference between an observation and a
-  finding, and it is one command per model;
+- the size of the walltime floor gap, and then the decision it feeds. All five models are
+  screened for F10 and the screen turned up its mirror, an under-request the verifier passes;
+  see [The mirror of F10](#the-mirror-of-f10-which-this-verifier-does-not-catch).
+  `scripts/walltime_floor.py` counts the affected passes across a run. Whether to add a floor
+  is a regrade of everything published, so the count comes first;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
