@@ -54,15 +54,15 @@ Induced faults from the same eight tasks, same protocol, 220 repairs per seed.
 Per fault category, `strict_all_levels`, three seeds pooled. F1 applies to three tasks and F6 to
 one, hence the smaller denominators.
 
-| category | 1.5B | 7B | Granite 3B | n per model |
-|---|---|---|---|---|
-| F1 omitted default | 0.000 | 1.000 | 0.356 | 45 |
-| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 120 |
-| F3 prose in a value | 0.542 | 0.875 | 0.800 | 120 |
-| F4 directive absent | 0.000 | 0.750 | 0.742 | 120 |
-| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 120 |
-| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 15 |
-| F7 malformed value | 0.550 | 0.875 | 0.833 | 120 |
+| category | 1.5B | 7B | Granite 3B | Gemma 12B | n per model |
+|---|---|---|---|---|---|
+| F1 omitted default | 0.000 | 1.000 | 0.356 | 0.667 | 45 |
+| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 0.875 | 120 |
+| F3 prose in a value | 0.542 | 0.875 | 0.800 | 0.875 | 120 |
+| F4 directive absent | 0.000 | 0.750 | 0.742 | 0.750 | 120 |
+| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 0.375 | 120 |
+| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 15 |
+| F7 malformed value | 0.550 | 0.875 | 0.833 | 0.775 | 120 |
 
 ## Four findings
 

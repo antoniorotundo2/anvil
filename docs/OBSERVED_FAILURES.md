@@ -132,8 +132,8 @@ not.
 It has no inducer, and that is a decision rather than an omission. `tasks/t2_repair.jsonl` is held
 equal to what the inducers produce by a test, so registering F9 regenerates it, and that file is
 the denominator of every T2 number published here, including the tables below. The
-fault it would teach is also close to F7's: both are refused at `submittability`, and the models
-that clear F7 above 0.83 would most likely clear this too. It stays an observed class, and joins
+fault it would teach is also close to F7's: both are refused at `submittability`, and the three
+models that clear F7 between 0.775 and 0.875 would most likely clear this too. It stays an observed class, and joins
 the induced ones if the T2 set is ever regenerated for an independent reason.
 
 ---
@@ -274,28 +274,27 @@ task existed that reads its own affinity. No such task was needed: a model wrote
 ### Which fault is hardest depends on the model, and on the level
 
 Per fault category, `bash` arm, three seeds pooled. F1 applies to three tasks and F6 to one, hence
-the smaller denominators. Gemma 4 12B is absent from this table and present in the ones above: its
-per-category breakdown has not been extracted yet, and inventing a column would be worse than
-missing one.
+the smaller denominators.
 
-| category | 1.5B | 7B | Granite 3B | n per model |
-|---|---|---|---|---|
-| F1 omitted default | 0.000 | 1.000 | 0.356 | 45 |
-| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 120 |
-| F3 prose in a value | 0.542 | 0.875 | 0.800 | 120 |
-| F4 directive absent | 0.000 | 0.750 | 0.742 | 120 |
-| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 120 |
-| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 15 |
-| F7 malformed value | 0.550 | 0.875 | 0.833 | 120 |
+| category | 1.5B | 7B | Granite 3B | Gemma 12B | n per model |
+|---|---|---|---|---|---|
+| F1 omitted default | 0.000 | 1.000 | 0.356 | 0.667 | 45 |
+| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 0.875 | 120 |
+| F3 prose in a value | 0.542 | 0.875 | 0.800 | 0.875 | 120 |
+| F4 directive absent | 0.000 | 0.750 | 0.742 | 0.750 | 120 |
+| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 0.375 | 120 |
+| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 15 |
+| F7 malformed value | 0.550 | 0.875 | 0.833 | 0.775 | 120 |
 
-`strict_all_levels` pass@1. **F5 is the lowest category for two of the three models and never
+`strict_all_levels` pass@1. **F5 is the lowest category for three of the four models and never
 comfortable for any of them**, which no single-model view showed: it is the fault that leaves the
 artifact furthest from a job script, and restoring every directive from the prompt alone is closer
-to writing one than to repairing one. F6 stays the easy category, as it was with two models.
+to writing one than to repairing one. F6 stays the easy category, and with a fourth model it is
+1.000 for everything except the 1.5B, so it separates nothing.
 
-F1 is the one that separates them: 0.000, 0.356, 1.000, the widest spread in the table, on the
-fault this document opens with. A benchmark wants categories like that, and a claim about model
-capability made on F6 would be worth nothing.
+F1 is the one that separates them, and the fourth model turns a spread into a ladder: 0.000, 0.356,
+0.667, 1.000, on the fault this document opens with. A benchmark wants categories like that, and a
+claim about model capability made on F6 would be worth nothing.
 
 An earlier version of this section called F1 the hardest category outright, on the strength of the
 7B capping at 0.33 there with `submittability` as the bottleneck. That number came from the run
@@ -310,9 +309,11 @@ well-formed script behind and the fault surfaces higher up, at `resource_fit` or
 `submittability`; F2 and F5 are the only two that concern whether directives exist and where they
 sit, which is what `syntax` is able to look at. A repair fails at the level its fault lives on.
 
-Second, Granite at 3B is within twelve points of the 7B on F2, F3, F4 and F7, and the whole gap
-between its 0.661 and the 7B's 0.824 comes from F1 and F5. Two categories out of seven account for
-a model of less than half the size trailing.
+Second, the gap between the capable models is concentrated in the same two categories. Granite at
+3B is within twelve points of the 7B on F2, F3, F4 and F7, and the whole distance between its 0.661
+and the 7B's 0.824 comes from F1 and F5; Gemma at 12B matches the 7B exactly on F2, F3 and F4 and
+trails it on the same two, F1 by 33 points and F5 by 28. Two categories out of seven account for
+the ordering of three models across three families.
 
 ### Writing a directive and noticing it is missing are different abilities
 
