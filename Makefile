@@ -410,9 +410,18 @@ docker-verify-recipe: docker-build-apptainer
 # The tables and the plotted data come from leaderboard/entries/, so the manuscript cannot
 # quote a run that has since been re-imported. latexmk is not a dependency of this project:
 # the target says so plainly rather than failing with a shell error nobody can read.
+#
+# SOURCE_DATE_EPOCH is the commit time of the manuscript's own sources, which does two
+# things. The build becomes byte-reproducible, so `git status` after `make paper` answers
+# whether the paper changed instead of always reporting a modified binary: two consecutive
+# compiles of identical sources used to differ by 64 bytes of embedded timestamp. And the
+# date on the title page becomes the date the manuscript last changed rather than the date
+# somebody happened to rebuild it, which for a preprint is the more honest of the two.
 paper:
 	./scripts/paper_data.py
-	@cd paper && if command -v tectonic >/dev/null 2>&1; then tectonic -X compile anvil.tex; \
+	@cd paper && if command -v tectonic >/dev/null 2>&1; then \
+		SOURCE_DATE_EPOCH=$$(git log -1 --format=%ct -- anvil.tex anvil.bib data) \
+		tectonic -X compile anvil.tex; \
 	elif command -v latexmk >/dev/null 2>&1; then latexmk -pdf anvil.tex; \
 	else \
 		echo "no TeX engine found: install tectonic (a single binary that fetches what it"; \
