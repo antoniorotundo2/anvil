@@ -225,7 +225,8 @@ Granite 4.1 3B is where it is most visible, `--time=00:15` on all fifteen `t1_ar
 and `00:30` on nine of fifteen `t1_cpus_per_task`, and the 1.5B produces `02:00` against a
 two-hour prompt. Both are counted as correct in every number this repository has published.
 
-`scripts/walltime_floor.py` counted it before anything was changed: **123 of 2421 passing
+`scripts/constraint_audit.py`, then a single-constraint script, counted it before anything
+was changed: **123 of 2421 passing
 artifacts, 5.1%**, across the five models and both task sets. 106 of them request under a minute.
 The largest single group is 39 artifacts writing `--time=00:30` against `t1_cpus_per_task`, which
 names 30 minutes, and the most extreme is 16 asking two minutes of the two-hour `t1_gpu_single`.
