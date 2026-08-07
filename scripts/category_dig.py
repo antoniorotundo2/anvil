@@ -8,6 +8,7 @@ throws the reason away. This reads the reason back out of the reports.
 
     ./scripts/category_dig.py F4 'results/RUN/repair__*Qwen3.5*__bash.json'
     ./scripts/category_dig.py F4 --lines '^#SBATCH.*--time' 'results/RUN/repair__*__bash.json'
+    ./scripts/category_dig.py all --lines '^#SBATCH.*--time' 'results/RUN/Qwen*__bash.json'
 
 The output is three groupings of the failing artifacts: which levels refused them, which
 problem strings the verifier emitted with digits collapsed so near-identical messages
@@ -19,6 +20,10 @@ With `--lines`, every artifact in the category also has its matching script line
 per base task and split by verdict, absence included. The problem strings say a directive
 was missing or out of range; this says what stood there instead, which is the difference
 between a model that ignores a constraint and one that reads it and answers it wrongly.
+
+The category `all` drops the suffix filter, which is what reads a T1 report: a habit found
+in one repair category is worth much less than the same habit found in from-scratch
+generation, and the question is not answerable from the T2 reports alone.
 
 Levels skipped for an environment reason are separated out rather than counted as
 failures. `strict_all_levels` is right to refuse them, but a skip is the absence of
@@ -44,10 +49,11 @@ def collect(
     for path in paths:
         report = json.loads(path.read_text(encoding="utf-8"))
         for r in report["results"]:
-            if not r["task_id"].endswith("__" + category):
+            if category != "all" and not r["task_id"].endswith("__" + category):
                 continue
             total += 1
-            base = r["task_id"].rsplit("__", 1)[0]
+            # `all` reads a T1 report too, where the id carries no fault suffix to strip.
+            base = r["task_id"].rsplit("__", 1)[0] if category != "all" else r["task_id"]
             if matcher is not None:
                 hits = [ln.strip() for ln in r["script"].splitlines() if matcher.search(ln)]
                 # An artifact with no matching line is the interesting case, not a gap in

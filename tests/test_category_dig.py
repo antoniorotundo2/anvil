@@ -86,3 +86,13 @@ def test_lines_records_absence_and_keeps_the_passing_artifacts(tmp_path):
         ("t1_gpu_single", False, "(absent)"): 1,
         ("t1_array_job", True, "#SBATCH --time=00:10:00"): 1,
     }
+
+
+def test_all_reads_a_report_whose_ids_carry_no_fault_suffix(tmp_path):
+    """A T1 report has ids like `t1_array_job`, and stripping at the last `__` would file
+    them under `t1`. `all` keeps the id whole, so the same tool answers whether a habit
+    seen in one repair category is also there in from-scratch generation."""
+    c = collect("all", [_report(tmp_path)])
+    assert c["totals"]["total"] == 4
+    assert c["tasks"] == {"t1_hello_serial__F4": 1, "t1_gpu_single__F4": 1,
+                          "t1_array_job__F5": 1}
