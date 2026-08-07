@@ -145,8 +145,8 @@ not.
 It has no inducer, and that is a decision rather than an omission. `tasks/t2_repair.jsonl` is held
 equal to what the inducers produce by a test, so registering F9 regenerates it, and that file is
 the denominator of every T2 number published here, including the tables below. The
-fault it would teach is also close to F7's: both are refused at `submittability`, and the four
-models that clear F7 between 0.775 and 0.875 would most likely clear this too. It stays an
+fault it would teach is also close to F7's: both are refused at `submittability`, and the three
+models that clear F7 between 0.742 and 0.875 would most likely clear this too. It stays an
 observed class, and joins the induced ones if the T2 set is ever regenerated for an independent
 reason.
 
@@ -196,7 +196,7 @@ the class most worth inducing when that regeneration happens for an independent 
 is the only one whose repair cannot be faked by any check cheaper than the one this benchmark
 runs.
 
-### The mirror of F10, which this verifier does not catch
+### The mirror of F10, which this verifier did not catch
 
 Screening for F10 turned up its opposite, and the opposite is a defect in the harness rather than
 in a model:
@@ -236,11 +236,30 @@ queue policy problem and an under-request is a job killed early. The oracle stil
 the floor, which is the evidence that equality is the right reading and not an overreach, since
 the canonical solution to every task already writes the walltime its prompt names.
 
-**The numbers already published were graded without it and are high by roughly that 5.1%.** They
-are left in place, unedited, until the run is regraded in one pass, the way the wrong-cluster table
-was: a page that quietly improves between readings is worse than one that says which check
-produced it. The regrade is a re-verification and not a re-generation, since the saved generations
-and `tasks_sha` are untouched by a change to the verifier.
+Then the whole run was regraded, in one pass, from the saved generations. A verifier change does
+not touch generations or `tasks_sha`, so no model was asked anything a second time.
+
+**Five of the ten published cells moved, and one ordering changed with them:**
+
+| | `resource_fit` before | after | `strict` before | after |
+|---|---|---|---|---|
+| T1 Granite 4.1 3B | 0.625 | 0.550 | 0.500 | 0.425 |
+| T2 Granite 4.1 3B | 0.753 | 0.621 | 0.661 | 0.529 |
+| T2 Qwen2.5-Coder 1.5B | 0.412 | 0.377 | 0.291 | 0.256 |
+| T2 Gemma 4 12B | 0.938 | 0.932 | 0.732 | 0.726 |
+
+The other six cells are identical to the digit. The 7B, which had not one artifact below the
+floor, does not move on either task set, and neither does Qwen3.5.
+
+On T1 `strict`, Granite falls from 0.500 to 0.425 and **passes below Qwen3.5-9B at 0.450**. Two
+models swap rank because a one-sided comparison was missing one side. That is the concrete answer
+to what a verifier defect costs: not a uniform inflation that leaves the reading intact, but a
+reordering, concentrated on whichever model happened to have the habit the check could not see.
+
+What the regrade did not touch is worth as much. The executor ablation returns the same six
+artifacts whose strict verdict changes and the same 32 that fail under `bash` and pass under real
+submission, with zero disagreements outside `functional`. The walltime floor and the executor
+comparison measure disjoint things, which was assumed before and is now known.
 
 Which is the part worth keeping from this episode. A report carries `tasks_sha`, and `anvil verify`
 refuses generations whose task set has moved, because a changed task invalidates a comparison. A
@@ -310,7 +329,10 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 3 seeds (0/1/2), n=5, five models across three families and two Qwen generations, 4-bit on an RTX 3060. Generated on the experiment
 machine, **graded inside the container**, which the first version of this table was not: see
 [A table measured against the wrong cluster](#a-table-measured-against-the-wrong-cluster) below.
-Generations in `results/20260802_091236/`, verdicts in `results/executor_20260802_140437/`.
+Generations in `results/20260802_091236/`, verdicts in `results/regrade_floor/`, verifier
+`74e00ebdcced`. An earlier grading of these same generations is superseded: it ran before
+`check_resource_fit` had a floor on `--time`, and five of the ten cells below moved when it was
+added, see [The mirror of F10](#the-mirror-of-f10-which-this-verifier-did-not-catch).
 
 **T1 (from scratch), pass@1, mean and half-range across seeds:**
 
@@ -318,7 +340,7 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 |---|---|---|---|---|---|---|---|
 | Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.375±0.025 | 0.442±0.013 | 0.308±0.025 | 0.308±0.025 |
 | Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 | 0.667±0.025 |
-| granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 | 0.500±0.000 |
+| granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.550±0.000 | 0.425±0.000 | 0.425±0.000 |
 | gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.742±0.013 | 0.917±0.050 | 0.658±0.062 | 0.658±0.062 |
 | Qwen3.5-9B | 1.000±0.000 | 0.875±0.025 | 0.650±0.025 | 0.658±0.013 | 0.600±0.050 | 0.450±0.025 | 0.475±0.025 |
 
@@ -326,10 +348,10 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 
 | model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict (bash) | strict (sbatch) |
 |---|---|---|---|---|---|---|---|
-| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.412±0.014 | 0.291±0.000 | 0.292±0.002 |
+| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.377±0.011 | 0.256±0.007 | 0.258±0.005 |
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 | 0.824±0.002 |
-| granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 | 0.661±0.009 |
-| gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.938±0.002 | 0.732±0.000 | 0.732±0.000 |
+| granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.621±0.016 | 0.529±0.016 | 0.529±0.016 |
+| gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.932±0.005 | 0.726±0.002 | 0.726±0.002 |
 | Qwen3.5-9B | 0.982±0.005 | 0.982±0.005 | 0.947±0.011 | 0.950±0.009 | 0.711±0.009 | 0.691±0.009 | 0.694±0.009 |
 
 `safety` is 1.000±0.000 everywhere and is left out of both tables.
@@ -433,15 +455,18 @@ F8 above, which no static check and no sandbox can see.
 Per fault category, `bash` arm, three seeds pooled. F1 applies to three tasks and F6 to one, hence
 the smaller denominators.
 
-| category | 1.5B | 7B | Granite 3B | Gemma 12B | Qwen3.5 9B | n per model |
+| category | Qwen2.5-Coder 1.5B | Qwen3.5 9B | Granite 4.1 3B | Gemma 4 12B | Qwen2.5-Coder 7B | n per model |
 |---|---|---|---|---|---|---|
-| F1 omitted default | 0.000 | 1.000 | 0.356 | 0.667 | 0.667 | 45 |
-| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 0.875 | 1.000 | 120 |
-| F3 prose in a value | 0.542 | 0.875 | 0.800 | 0.875 | 0.983 | 120 |
-| F4 directive absent | 0.000 | 0.750 | 0.742 | 0.750 | 0.242 | 120 |
-| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 0.375 | 0.383 | 120 |
+| F1 omitted default | 0.000 | 0.667 | 0.356 | 0.667 | 1.000 | 45 |
+| F2 directive after the first command | 0.342 | 1.000 | 0.642 | 0.875 | 0.875 | 120 |
+| F3 prose in a value | 0.542 | 0.983 | 0.800 | 0.875 | 0.875 | 120 |
+| F4 directive absent | 0.000 | 0.242 | 0.383 | 0.750 | 0.750 | 120 |
+| F5 no `#SBATCH` at all | 0.050 | 0.383 | 0.250 | 0.375 | 0.658 | 120 |
 | F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 1.000 | 15 |
-| F7 malformed value | 0.550 | 0.875 | 0.833 | 0.775 | 0.817 | 120 |
+| F7 malformed value | 0.358 | 0.817 | 0.575 | 0.742 | 0.875 | 120 |
+
+Emitted by `scripts/category_table.py` from the reports rather than assembled by hand, which is
+how the previous version of it went to press twice with a column missing.
 
 `strict_all_levels` pass@1. **F5 is the lowest category for three of the five models and never
 comfortable for any of them**: it is the fault that leaves the artifact furthest from a job script,
@@ -452,12 +477,18 @@ F1 separates the models: 0.000, 0.356, 0.667, 0.667, 1.000 on the fault this doc
 A benchmark wants categories like that, and a claim about model capability made on F6 would be
 worth nothing.
 
-**F4 is where the fifth model breaks the pattern**, and it is the only category that does. Four
-models sit between 0.742 and 0.750 there, near enough to be one number; Qwen3.5-9B sits at 0.242.
-That is the same collapse its `resource_fit` column shows on both task sets, localised. Its own
-hardest category is F4 rather than F5, which is true of no other model here. The next two sections
-take that number apart, and it does not survive the description above: F4 turns out not to be one
-finding about one model.
+**F4 splits the five models in two.** It reads 0.750 for the 7B and for Gemma, 0.383 for Granite,
+0.242 for Qwen3.5 and 0.000 for the 1.5B: two models at three quarters, three well below half, and
+nothing in between. It is the widest spread of any category except F1. For Qwen3.5 it is also its
+own hardest category rather than F5, which is true of no other model here. The next two sections
+take that number apart, and it does not survive as one finding about one model.
+
+An earlier version of this paragraph read F4 as four models clustered between 0.742 and 0.750 with
+Qwen3.5 alone at 0.242, and built a claim about the newest model being the outlier on it. That
+cluster was an artifact. Granite's 0.742 came from a grading with no floor on `--time`, and under
+the floor it is 0.383, which puts it in the low group rather than the high one. The retraction is
+kept here because the pattern it describes, one model isolated against a tight group, is exactly
+the shape a missing check produces, and it read as a finding for a day.
 
 One property of the category has to be stated first, because both sections depend on it. F4 drops
 `--time`, `--mem` or `--gpus`, whichever the task declares, in that order. Every T1 task declares
@@ -480,11 +511,18 @@ well-formed script behind and the fault surfaces higher up, at `resource_fit` or
 `submittability`; F2 and F5 are the only two that concern whether directives exist and where they
 sit, which is what `syntax` is able to look at. A repair fails at the level its fault lives on.
 
-Second, the gap between the capable models is concentrated in the same two categories. Granite at
-3B is within twelve points of the 7B on F2, F3, F4 and F7, and the whole distance between its 0.661
-and the 7B's 0.824 comes from F1 and F5; Gemma at 12B matches the 7B exactly on F2, F3 and F4 and
-trails it on the same two, F1 by 33 points and F5 by 28. Two categories out of seven account for
-the ordering of three models across three families.
+Second, the gap to the 7B is concentrated in two categories for one model and spread across five
+for another, and the difference between those two cases is worth more than the pattern it replaces.
+Gemma at 12B matches the 7B exactly on F2, F3 and F4, trails it by 13 points on F7, and the rest of
+the distance between 0.726 and 0.824 is F1 by 33 points and F5 by 28. Granite at 3B trails on
+everything except F6: F1 by 64, F5 by 41, F4 by 37, F7 by 30, F2 by 23. Its 0.529 is not two
+categories of weakness against an otherwise matched profile, it is a weaker profile.
+
+That distinction is the one the regrade produced. Before the walltime floor, Granite read 0.742 on
+F4, 0.833 on F7 and 0.750 on F2, which put it within twelve points of the 7B on four categories and
+made it look like the same two-category story as Gemma. Three of those four numbers were inflated
+by artifacts requesting seconds where the prompt named minutes. A shared pattern across two
+families was the more interesting claim and it was the false one.
 
 ### The right number in the wrong field
 
@@ -534,8 +572,8 @@ here it would buy nothing.
 
 ### The category names the fault that was induced, not the fault that was found
 
-Gemma 4 12B scores 0.750 on F4, in the middle of the four-model cluster, and its failures have
-nothing to do with `--time`. It restores the removed directive on all eight tasks, 120 artifacts
+Gemma 4 12B scores 0.750 on F4, the joint highest of the five, and its failures have nothing to
+do with `--time`. It restores the removed directive on all eight tasks, 120 artifacts
 out of 120, with the correct value in the correct field every time. Its thirty failures are two
 tasks, failing whole, for two unrelated reasons it introduced itself:
 
@@ -635,13 +673,11 @@ that does not know the rule and minus 6 to the one that does. See
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- the regrade under the walltime floor. It is measured, 123 of 2421 passes, and the check is
-  fixed; every published figure still comes from the grading before it, and re-verifying the
-  saved generations is what closes it, see
-  [The mirror of F10](#the-mirror-of-f10-which-this-verifier-does-not-catch);
-- a digest of the verifier to sit beside `tasks_sha` in every report. This episode produced two
-  gradings of the same generations that disagree and leave no trace of why, which is the failure
-  `tasks_sha` prevents on the task side and nothing prevents on the check side;
+- a floor on `--mem`, which has the shape the walltime one had. `check_resource_fit` compares
+  `--mem` against `mem_min_mb` from below only, so a request far above what a task names passes,
+  and the reason to look is that the walltime gap was found by accident rather than by audit. The
+  other direction is not symmetric, since over-requesting memory wastes an allocation instead of
+  killing a job, so whether it should fail at all is the question to settle first;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;

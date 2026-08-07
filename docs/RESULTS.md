@@ -4,14 +4,11 @@ Every measured number this project stands behind, on one page, so it can be read
 running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
-**Every score below predates a verifier fix and is high by a known amount.** `check_resource_fit`
-compared `--time` against the walltime a task declares in one direction only, so `#SBATCH
---time=00:15` against a task naming 15 minutes was fifteen seconds and passed. The floor landed
-with the tests that pin it, and counted before it landed the gap is **123 of 2421 passing
-artifacts, 5.1%**, spread unevenly: it is concentrated on Granite 4.1 3B and Qwen2.5-Coder 1.5B
-and absent from the 7B. The tables here are the last grading under the old check and are left in
-place, unedited, until the whole run is regraded in one pass; nothing is quietly adjusted. See
-[The mirror of F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-does-not-catch).
+Everything here was graded by verifier `74e00ebdcced`, which every report and every leaderboard
+entry records. An earlier grading of the same generations is superseded: it ran before
+`check_resource_fit` had a floor on `--time`, and adding one moved five of the ten cells and
+swapped two models on T1. What that cost is written up in [The mirror of
+F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-did-not-catch).
 
 ## How to read them
 
@@ -43,7 +40,7 @@ Eight tasks, 3 seeds (0/1/2), n=5, five models across three families and two Qwe
 |---|---|---|---|---|---|---|
 | Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.375±0.025 | 0.442±0.013 | 0.308±0.025 |
 | Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 |
-| granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 |
+| granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.550±0.000 | 0.425±0.000 |
 | gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.742±0.013 | 0.917±0.050 | 0.658±0.062 |
 | Qwen3.5-9B | 1.000±0.000 | 0.875±0.025 | 0.650±0.025 | 0.658±0.013 | 0.600±0.050 | 0.450±0.025 |
 
@@ -59,26 +56,26 @@ Induced faults from the same eight tasks, same protocol, 220 repairs per seed.
 
 | model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict |
 |---|---|---|---|---|---|---|
-| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.412±0.014 | 0.291±0.000 |
+| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.377±0.011 | 0.256±0.007 |
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 |
-| granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 |
-| gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.938±0.002 | 0.732±0.000 |
+| granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.621±0.016 | 0.529±0.016 |
+| gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.932±0.005 | 0.726±0.002 |
 | Qwen3.5-9B | 0.982±0.005 | 0.982±0.005 | 0.947±0.011 | 0.950±0.009 | 0.711±0.009 | 0.691±0.009 |
 
 Per fault category, `strict_all_levels`, three seeds pooled. F1 applies to three tasks and F6 to
 one, hence the smaller denominators.
 
-| category | 1.5B | 7B | Granite 3B | Gemma 12B | Qwen3.5 9B | n per model |
+| category | Qwen2.5-Coder 1.5B | Qwen3.5 9B | Granite 4.1 3B | Gemma 4 12B | Qwen2.5-Coder 7B | n per model |
 |---|---|---|---|---|---|---|
-| F1 omitted default | 0.000 | 1.000 | 0.356 | 0.667 | 0.667 | 45 |
-| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 0.875 | 1.000 | 120 |
-| F3 prose in a value | 0.542 | 0.875 | 0.800 | 0.875 | 0.983 | 120 |
-| F4 directive absent | 0.000 | 0.750 | 0.742 | 0.750 | 0.242 | 120 |
-| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 0.375 | 0.383 | 120 |
+| F1 omitted default | 0.000 | 0.667 | 0.356 | 0.667 | 1.000 | 45 |
+| F2 directive after the first command | 0.342 | 1.000 | 0.642 | 0.875 | 0.875 | 120 |
+| F3 prose in a value | 0.542 | 0.983 | 0.800 | 0.875 | 0.875 | 120 |
+| F4 directive absent | 0.000 | 0.242 | 0.383 | 0.750 | 0.750 | 120 |
+| F5 no `#SBATCH` at all | 0.050 | 0.383 | 0.250 | 0.375 | 0.658 | 120 |
 | F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 1.000 | 15 |
-| F7 malformed value | 0.550 | 0.875 | 0.833 | 0.775 | 0.817 | 120 |
+| F7 malformed value | 0.358 | 0.817 | 0.575 | 0.742 | 0.875 | 120 |
 
-## Six findings
+## Seven findings
 
 **`submittability` is not ordered by model size.** T1 reads 0.875 for Granite at 3B, 0.867 for
 Gemma at 12B, 0.842 for Qwen at 1.5B and 0.792 for Qwen at 7B: the largest model in the set and the
@@ -135,6 +132,17 @@ those two artifacts at all and not anything about F4. Where that ability is at f
 number carries no information about the category, and the 0.242 and 0.750 cells are not two points
 on one scale. See [The right number in the wrong
 field](OBSERVED_FAILURES.md#the-right-number-in-the-wrong-field).
+
+**A missing floor in the verifier reordered two models, and only the regrade showed it.**
+`check_resource_fit` compared `--time` against the walltime a task declares from above only, so
+`#SBATCH --time=00:15` against a task naming 15 minutes was fifteen seconds and passed. 123 of 2421
+passing artifacts were requests like it. Regrading the saved generations under the floor moved five
+of the ten cells above, left the other five identical to the digit, and dropped Granite 4.1 3B on
+T1 `strict` from 0.500 to 0.425, **below Qwen3.5-9B at 0.450**. A one-sided comparison does not
+inflate a table evenly: it inflates whichever model has the habit the check cannot see, which is a
+reordering rather than an offset. Every report and entry now records a `verifier_sha` beside
+`tasks_sha`, so two gradings of one set of generations can no longer read as one series. See [The
+mirror of F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-did-not-catch).
 
 **Two coreutils implementations are not interchangeable, and no model has reached the difference.**
 101 invocations run in Ubuntu 24.04 (GNU 9.4) and 26.04 (`uutils` 0.8.0): 91 agree exactly. Of the

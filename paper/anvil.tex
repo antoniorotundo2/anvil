@@ -344,6 +344,16 @@ grading environment, not the seeds.
 Three mechanisms proposed for the retrieval effect were each refuted by the experiment run to test
 them. The fourth was found only by counting per sample instead of per problem.
 
+The resource fit check compared the requested walltime against the one a task names from above
+only, so a script asking fifteen seconds where the prompt asked fifteen minutes was scored correct.
+$123$ of $2421$ passing artifacts were requests of that kind. Regrading the saved generations under
+a floor moved five of ten published cells, left the other five identical to the digit, and dropped
+one model below another on strict: a one-sided comparison does not inflate a table evenly, it
+inflates whichever model has the habit the check cannot see. Reports and leaderboard entries now
+carry a digest of the verifier beside the digest of the task file, since a changed check
+invalidates a comparison exactly as thoroughly as a changed task and left no trace of having done
+so.
+
 \section{Threats to validity}
 
 Eight T1 tasks, which makes each one worth $0.125$ of every T1 figure. Three seeds, so the ranges
