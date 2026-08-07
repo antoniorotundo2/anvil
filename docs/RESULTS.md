@@ -110,11 +110,13 @@ worst per-category score, F4 at 0.242, is entirely `--time`, and thirty-one of i
 failures read `#SBATCH --time=45:00:00` where the prompt asked for forty-five minutes. The integer
 is right and the field is wrong: SLURM reads `hours:minutes:seconds`, so the artifact requests
 sixty times the walltime it needs. The same slip appears in 34 of the model's 120 from-scratch
-artifacts, so it is a habit and not a repair-time accident, and it is invisible to four of the
-five levels. The script is well formed, `sbatch` accepts it silently, the job runs and prints what
-was asked. `resource_fit` is the only thing between it and a queue. The remaining sixty failures
-are the opposite: the repaired script comes back with `--time` still missing, on four tasks where
-the same model writes it correctly from scratch.
+artifacts, and in 10 of Gemma 4 12B's, so it is a habit shared by two families and not a
+repair-time accident. It is invisible to four of the five levels: the script is well formed,
+`sbatch` accepts it silently, the job runs and prints what was asked. `resource_fit` is the only
+thing between it and a queue, and no static check the project compares itself against would report
+it. The remaining sixty failures are the opposite defect, a repaired script that comes back with
+`--time` still missing, on four tasks where the same model writes it correctly from scratch. See
+[F10](OBSERVED_FAILURES.md#f10-a-unit-confusion-the-scheduler-accepts).
 
 **A per-category score does not measure whether the induced fault was repaired.** Gemma 4 12B
 scores 0.750 on the same category and never once gets the walltime wrong: it restores the removed

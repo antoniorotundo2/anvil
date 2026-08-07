@@ -150,6 +150,42 @@ models that clear F7 between 0.775 and 0.875 would most likely clear this too. I
 observed class, and joins the induced ones if the T2 set is ever regenerated for an independent
 reason.
 
+## F10: A unit confusion the scheduler accepts
+
+```
+#SBATCH --time=45:00:00     the prompt asks for 45 minutes
+#SBATCH --time=25:00:00     the prompt asks for 25 minutes
+#SBATCH --time=10:00:00     the prompt asks for 10 minutes
+```
+
+The integer is the one the prompt named. It is in the leading field of `hours:minutes:seconds`,
+so the job asks for sixty times the walltime it was told to ask for. Both models that produce it
+also write the correct forms, `00:45:00` and the bare `MM:SS`, on other samples of the same task,
+so this is not a model that lacks the format.
+
+Two families, from-scratch generation, three seeds each. Qwen3.5-9B does it in 34 artifacts of
+120, on `t1_hello_serial`, `t1_container_apptainer`, `t1_mpi_multinode` and `t1_cpus_per_task`.
+Gemma 4 12B does it in 10 of 120, all on `t1_dependency_chain`, a task where Qwen3.5 never does.
+The habit is shared; which prompt triggers it is not.
+
+The one prompt that cannot expose it is `t1_gpu_single`, which asks for a walltime of two hours and
+gets `02:00:00` from both. Reading the integer and ignoring the unit gives the right answer when
+the unit is the field's own. Everywhere else the unit is minutes and the answer is wrong by a
+factor of sixty.
+
+**This class is the one that no level except `resource_fit` sees.** The directive is well formed,
+so `syntax` passes it. `sbatch` accepts it without a word, so `submittability` passes it. The job
+runs and prints what the task asked for, so `functional` passes it. It is not a syntax error, not
+an unknown option, and not a value a parser can refuse: every static check this project compares
+itself against reports a correct script. On a real cluster it is a request that a queue policy
+rejects or, worse, admits and schedules badly.
+
+It has no inducer, for the reason given under F9: registering one regenerates
+`tasks/t2_repair.jsonl`, and that file is the denominator of every T2 number published here. It is
+the class most worth inducing when that regeneration happens for an independent reason, because it
+is the only one whose repair cannot be faked by any check cheaper than the one this benchmark
+runs.
+
 ---
 
 ## Two verifications that dry-run cannot do
@@ -395,19 +431,14 @@ the prompt and writes it into the leading field, and the leading field is hours.
 The from-scratch run confirms the reading and rules out the repair setting as the cause. In T1,
 34 of 120 artifacts carry the same slip: `45:00:00`, `10:00:00`, `30:00:00`, always the prompt's
 own integer in the hours position. It is the largest single `resource_fit` defect the model has.
-The one place the habit is invisible is `t1_gpu_single`, whose prompt asks for a walltime of two
-hours and gets `02:00:00`, correct because the unit the model ignored happened to be the right
-one. Where the prompt names minutes it is wrong by a factor of sixty; where the prompt names
-hours it is right by coincidence.
 
-**This is the case `resource_fit` was built for, in its cleanest form yet.** `#SBATCH
---time=45:00:00` is well formed, so `syntax` passes it. `sbatch` accepts it without a word, so
-`submittability` passes it. The job runs and prints what the task asked for, so `functional`
-passes it. Four of the five levels see a correct artifact, and on a real cluster it is a request
-for sixty times the walltime the work needs, which is the kind of thing a queue policy rejects or,
-worse, admits and schedules badly. No static check in the project's own comparison set would
-report it either: it is not a syntax error, not an unknown option, and not a value the parser can
-refuse.
+It is also not this model's alone. Gemma 4 12B writes `#SBATCH --time=25:00:00` on
+`t1_dependency_chain` in 10 of its 15 T1 samples, against a prompt asking for 25 minutes, and
+writes `00:25:00` and `25:00` correctly on the other five. Two families produce the same
+confusion, on tasks that do not overlap: Qwen3.5 never slips on `t1_dependency_chain` and Gemma
+slips nowhere else. That is what promoted it from a property of one model to
+[F10](#f10-a-unit-confusion-the-scheduler-accepts), where the class and its consequence for the
+levels are stated.
 
 The other sixty failures are the opposite defect. On `t1_array_job`, `t1_cpus_per_task`,
 `t1_gpu_single` and `t1_mpi_multinode` the repaired script comes back with no `--time` at all, 15
@@ -526,6 +557,12 @@ that does not know the rule and minus 6 to the one that does. See
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
+- F10 on the three models it has not been looked for in. It is confirmed on Qwen3.5-9B and
+  Gemma 4 12B, and the 1.5B, the 7B and Granite have not been screened: the count of
+  `--time Nmin exceeds maximum Nmin` in their T1 reports is an upper bound on it, and the
+  `--lines` mode of `scripts/category_dig.py` reads the values themselves. Whether the class is
+  general or belongs to the two newest models is the difference between an observation and a
+  finding, and it is one command per model;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
