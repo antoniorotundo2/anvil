@@ -21,13 +21,14 @@
 \definecolor{anvilB}{HTML}{C9772E}
 \definecolor{anvilC}{HTML}{3F7D5A}
 \definecolor{anvilD}{HTML}{8A5A9E}
+\definecolor{anvilE}{HTML}{9E3B4E}
 
 \pgfplotsset{
   anvilbar/.style={
     ybar,
     width=\linewidth,
     height=6.2cm,
-    bar width=4.5pt,
+    bar width=3.6pt,
     ymin=0, ymax=1.05,
     ytick={0,0.25,0.5,0.75,1.0},
     ymajorgrids=true,
@@ -35,7 +36,7 @@
     axis lines*=left,
     tick align=outside,
     enlarge x limits=0.10,
-    legend style={draw=none, fill=none, font=\small, at={(0.5,1.06)},
+    legend style={draw=none, fill=none, font=\footnotesize, at={(0.5,1.06)},
                   anchor=south, legend columns=-1, /tikz/every even column/.append style={column sep=10pt}},
     every axis plot/.append style={draw=none},
     x tick label style={font=\small},
@@ -56,17 +57,17 @@ metrics, because no benchmark verifies whether the artifacts they produce actual
 verifies them by execution against a declared reference cluster: five levels covering syntax,
 submittability, execution, effective resource fit and safety, bracketed by an oracle that must
 score $1.0$ and a deliberately faulty model that must score $0.0$. On eight from-scratch tasks and
-$220$ induced repair tasks we measure four models across three families, and report four results,
-two of them deflationary about the benchmark's own machinery. Submittability is not ordered by
-model size: on the from-scratch set a 3B model of one family and a 12B of another lead it while a
-7B trails both, and within one family the level falls as size rises. Real job submission changes
-exactly one verdict in $3984$ artifacts against a
-\texttt{bash} sandbox, so the most expensive component of the harness is nearly redundant on this
-task set. Retrieved documentation costs the smaller model $28$ points of resource fit whatever the
+$220$ induced repair tasks we measure five models across three families and two generations of one
+of them. Submittability is not ordered by model size: on the from-scratch set a 3B model of one
+family and a 12B of another lead it while a 7B trails both, and within one family the level falls
+as size rises. Real job submission looked nearly redundant against a \texttt{bash} sandbox, one
+verdict in $3120$ artifacts, until a fifth model wrote \texttt{srun} inside its scripts: the
+sandbox has no allocation for a job step to attach to, and the count moved to six in $3900$ with
+$32$ samples failing in the sandbox and passing on the scheduler. Retrieved documentation costs the smaller model $28$ points of resource fit whatever the
 text says, while the larger one is unaffected by irrelevant text and loses $6$ points to the one
 document that addresses the level it concerns. A task built so that GNU coreutils and
-\texttt{uutils} must judge it differently is failed by all three models for reasons that precede
-the difference. We also report, rather than conceal, three measurement faults found and corrected
+\texttt{uutils} must judge it differently is failed by all three models asked for reasons that
+precede the difference. We also report, rather than conceal, three measurement faults found and corrected
 during the work, one of which had already been published.
 \end{abstract}
 
@@ -88,8 +89,8 @@ on graph edit distance or model judges, these artifacts are directly checkable.
 \verb|sbatch --test-only| costs milliseconds, the job really runs, and the ground truth is
 objective. The empty slot is not a hard problem; it is an unoccupied one.
 
-This paper reports what the resulting instrument says about four models and, with more care, what
-it says about itself.
+This paper reports what the resulting instrument says about five models and, with more care, what
+it says about itself, including one claim that four models supported and a fifth overturned.
 
 \section{Related work}
 
@@ -222,22 +223,23 @@ model & syntax & submit. & functional & res. fit & strict \\
   ylabel={$\mathrm{pass}@1$},
 ]
 \addplot[fill=anvilA] table[x=idx, y=m0] {data/t1_slurm.dat};
-\addplot[fill=anvilB] table[x=idx, y=m1] {data/t1_slurm.dat};
-\addplot[fill=anvilD] table[x=idx, y=m2] {data/t1_slurm.dat};
-\addplot[fill=anvilC] table[x=idx, y=m3] {data/t1_slurm.dat};
-\legend{Qwen2.5-Coder 1.5B, Granite 4.1 3B, Gemma 4 12B, Qwen2.5-Coder 7B}
+\addplot[fill=anvilE] table[x=idx, y=m1] {data/t1_slurm.dat};
+\addplot[fill=anvilB] table[x=idx, y=m2] {data/t1_slurm.dat};
+\addplot[fill=anvilD] table[x=idx, y=m3] {data/t1_slurm.dat};
+\addplot[fill=anvilC] table[x=idx, y=m4] {data/t1_slurm.dat};
+\legend{Qwen2.5-Coder 1.5B, Qwen3.5 9B, Granite 4.1 3B, Gemma 4 12B, Qwen2.5-Coder 7B}
 \end{axis}
 \end{tikzpicture}
-\caption{T1 per level. Every level rises with capability except submittability, where the 3B and
-the 12B lead and the 7B trails all three.}
+\caption{T1 per level, five models. Every level broadly rises with capability except
+submittability, where the 3B, the 9B and the 12B lead and the 7B trails all four.}
 \label{fig:t1}
 \end{figure}
 
 \subsection{Submittability is not ordered by size}
 
-On T1 the level reads $0.875$ for a 3B model, $0.867$ for a 12B, $0.842$ for a 1.5B and $0.792$ for
-a 7B. The largest model in the set and the smallest of another family sit together at the top and
-the 7B is alone at the bottom, while within the Qwen family the level falls as size rises and every
+On T1 the level reads $0.875$ for a 3B model and for a 9B of a third generation, $0.867$ for a 12B,
+$0.842$ for a 1.5B and $0.792$ for a 7B. Four models sit within eight points of each other at the
+top and the 7B is alone at the bottom, while within the Qwen family the level falls as size rises and every
 other level improves, which Figure~\ref{fig:t1} shows as the one bar group running against the
 others. Two families of three are above Qwen across a range from 3B to 12B, so the shortfall is not
 one model's quirk.
@@ -251,16 +253,32 @@ might genuinely have; another invents an option SLURM does not have, which no cl
 level measures how much a model volunteers that nothing asked for, and whose vocabulary it reaches
 for when it does.
 
-\subsection{Real submission is nearly redundant here}
+\subsection{Real submission was nearly redundant until a model wrote \texttt{srun}}
 
 Grading the same generations twice inside the same image, once through a \texttt{bash} sandbox and
-once through real \texttt{sbatch}, exactly one artifact of $3984$ changes verdict, and it changes in
-favour of real submission, which accepts a script the sandbox wrongly rejects. Every script real
-submission stopped was already failing another level.
+once through real \texttt{sbatch}, four models produced one changed verdict in $3120$ artifacts.
+Everything real submission stopped had already failed another level, so the executor propagated a
+verdict rather than producing one, and this section said so.
 
-This is a statement about these eight tasks and not about execution. A task built to need it does
-need it: a memory under-request that only cgroup enforcement can observe is invisible to every
-static level and to the sandbox, and there the verdict does change.
+The fifth model ended that. Six artifacts of $3900$ now change verdict and $32$ samples fail under
+the sandbox while passing under real submission, and five of the six share one cause:
+
+\begin{center}
+\small\texttt{srun: error: Unable to confirm allocation for job 1: Invalid job id specified}
+\end{center}
+
+The model writes \texttt{srun} inside the batch script, which is how a job step is launched on a
+real cluster. The sandbox has no allocation for it to attach to, so the step exits non-zero and the
+sample is recorded as failing. The sandbox produces a false negative on every script that launches
+a job step, and did so silently while no model wrote one.
+
+Both artifacts the two executors disagree about run the same direction, and it is not the one a
+sandbox is usually suspected of: neither is the scheduler catching something the sandbox missed,
+both are the sandbox rejecting what the scheduler accepts, for want of an allocation or a core
+binding. The deflationary claim was true of the four models measured and not of the method, which
+is the more useful way to have been wrong. A task built to need real execution needs it regardless:
+a memory under-request that only cgroup enforcement can observe is invisible to every static level
+and to the sandbox.
 
 \subsection{Retrieval costs, and the sign depends on prior knowledge}
 
@@ -329,8 +347,9 @@ them. The fourth was found only by counting per sample instead of per problem.
 \section{Threats to validity}
 
 Eight T1 tasks, which makes each one worth $0.125$ of every T1 figure. Three seeds, so the ranges
-are spread rather than intervals. Three model families at four sizes, from 1.5B to 12B, all
-quantized to 4 bit. One reference topology, declared by this work rather than borrowed from a centre in
+are spread rather than intervals. Three model families at five sizes, from 1.5B to 12B, all
+quantized to 4 bit; one of the five reasons by default and was measured with that disabled, since
+under this token budget it would otherwise be cut off before producing a script. One reference topology, declared by this work rather than borrowed from a centre in
 production. All prompts written by one author, in one language and one style. No result here has
 been replicated independently.
 

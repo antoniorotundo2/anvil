@@ -28,7 +28,7 @@ wrong; that correction is recorded in
 
 ## T1: writing a job script from scratch
 
-Eight tasks, 3 seeds (0/1/2), n=5, four models across three families.
+Eight tasks, 3 seeds (0/1/2), n=5, five models across three families and two Qwen generations.
 
 | model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict |
 |---|---|---|---|---|---|---|
@@ -36,9 +36,13 @@ Eight tasks, 3 seeds (0/1/2), n=5, four models across three families.
 | Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 |
 | granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 |
 | gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.742±0.013 | 0.917±0.050 | 0.658±0.062 |
+| Qwen3.5-9B | 1.000±0.000 | 0.875±0.025 | 0.650±0.025 | 0.658±0.013 | 0.600±0.050 | 0.450±0.025 |
 
-`strict` is identical under both executors for every model. `safety` is 1.000±0.000 everywhere and
-is left out.
+`safety` is 1.000±0.000 everywhere and is left out. Qwen3.5-9B is the only model whose `strict`
+differs between the two executors, 0.450 against 0.475, and the reason is the subject of the second
+finding below. It is also the only one measured with `--disable-thinking`: it reasons by default,
+and under this benchmark's token budget it would be cut off mid-thought and never reach the code
+block, so every sample would fail `syntax` for a reason belonging to the harness.
 
 ## T2: diagnosing and repairing a broken one
 
@@ -50,6 +54,7 @@ Induced faults from the same eight tasks, same protocol, 220 repairs per seed.
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 |
 | granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 |
 | gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.938±0.002 | 0.732±0.000 |
+| Qwen3.5-9B | 0.982±0.005 | 0.982±0.005 | 0.947±0.011 | 0.950±0.009 | 0.711±0.009 | 0.691±0.009 |
 
 Per fault category, `strict_all_levels`, three seeds pooled. F1 applies to three tasks and F6 to
 one, hence the smaller denominators.
@@ -78,13 +83,19 @@ cluster might genuinely have; Granite invents an option SLURM does not have, whi
 See [`submittability` does not track model
 size](OBSERVED_FAILURES.md#submittability-does-not-track-model-size).
 
-**Real submission changes almost nothing on this task set.** `scripts/executor_ablation.sh` grades
-the same generations twice in the same image, once through the `bash` sandbox and once through real
-`sbatch`. Across **3984 artifacts, exactly one changes verdict**, and it changes in favour of real
-submission, which accepts a script the sandbox wrongly rejects. The scripts real submission stops
-were already failing another level. This is a statement about these eight tasks, not about the
-executor: a task built to need it does need it, and F8 is invisible to every static level and to
-bash.
+**The sandbox was almost redundant until a model wrote `srun`.** `scripts/executor_ablation.sh`
+grades the same generations twice in the same image, once through the `bash` sandbox and once
+through real `sbatch`. With four models the count was one artifact of 3120. With a fifth it is
+**six of 3900, and 32 samples that fail under `bash` and pass under real submission**. Five of the
+six are the same mechanism: the model writes `srun` inside the script, the sandbox has no
+allocation for it to attach to, and the step exits non-zero. **The sandbox produces a false
+negative on every script that launches a job step**, and did so silently while no model wrote one.
+
+Both artifacts the executors disagree about point that way: neither is the scheduler catching
+something the sandbox missed, both are the sandbox rejecting a script the scheduler accepts. The
+earlier claim that real submission was nearly redundant was true of the models measured, not of the
+method. See [Real submission was almost redundant until a model wrote
+`srun`](OBSERVED_FAILURES.md#real-submission-was-almost-redundant-until-a-model-wrote-srun).
 
 **Retrieval costs this model family, and the sign depends on what the model already knows.** Seven
 conditions across two sizes. Any attached text costs the 1.5B about 28 points of `resource_fit`,

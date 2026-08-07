@@ -38,6 +38,7 @@ OUT = ROOT / "paper" / "data"
 # every table and figure without a word.
 PREFERRED = [
     "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    "Qwen/Qwen3.5-9B",
     "ibm-granite/granite-4.1-3b",
     "google/gemma-4-12B-it",
     "Qwen/Qwen2.5-Coder-7B-Instruct",
@@ -48,6 +49,7 @@ SHORT = {
     "Qwen/Qwen2.5-Coder-7B-Instruct": "Qwen2.5-Coder 7B",
     "ibm-granite/granite-4.1-3b": "Granite 4.1 3B",
     "google/gemma-4-12B-it": "Gemma 4 12B",
+    "Qwen/Qwen3.5-9B": "Qwen3.5 9B",
 }
 
 

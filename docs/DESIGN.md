@@ -775,15 +775,22 @@ Measuring the executor means comparing it with the one it stands beside, not rep
 alone: `scripts/executor_ablation.sh` verifies the same generations twice inside the same image and
 counts the samples on which the two arms part company.
 
-The answer on the current task set is deflationary, and worth stating that way. Across 3120
-artifacts from four models, real submission costs `functional` up to 21 points depending on the
-cell and nothing at all in one of them, and moves `strict_all_levels` by nothing anywhere: the
-scripts it stops were already failing another level, mostly `submittability`, so the executor
-propagates a verdict rather than producing one.
-Exactly one artifact of the 3120 changes verdict, and it changes in favour of real submission,
-which accepts a script the sandbox wrongly rejects. The nine runs of the retrieval intervention
-series were graded the same way and add 864 comparisons without a single further disagreement,
-which puts the count at one artifact of 3984. The numbers are in
+The answer was deflationary for four models and stopped being so with the fifth, which is the more
+useful shape of the result. Across the first four, real submission cost `functional` up to 21
+points per cell and moved `strict_all_levels` by nothing at all: one artifact of 3120 changed
+verdict, because everything real submission stopped had already failed another level.
+
+Adding Qwen3.5-9B takes it to **six of 3900**, with 32 samples failing under `bash` and passing
+under real submission, and five of the six share one cause: the model writes `srun` inside the
+script, the sandbox has no allocation for the step to attach to, and it exits non-zero. The sandbox
+produces a false negative on every script that launches a job step. The nine runs of the retrieval
+intervention series were graded the same way and add 864 comparisons without a further
+disagreement, which puts the count at six artifacts of 4764.
+
+Both disagreements run the same direction, and it is not the one a sandbox is usually suspected of:
+neither is the scheduler catching something the sandbox missed, both are the sandbox rejecting what
+the scheduler accepts. What the four-model version of this section described was a property of what
+those models happened to write, not of the method. The numbers are in
 [`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-moves-functional-and-barely-touches-the-verdict).
 
 That is a statement about these eight tasks, not about the executor. A task built to need real

@@ -179,7 +179,7 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 
 ## Multi-seed validation (T1 and T2)
 
-3 seeds (0/1/2), n=5, four models across three families, 4-bit on an RTX 3060. Generated on the experiment
+3 seeds (0/1/2), n=5, five models across three families and two Qwen generations, 4-bit on an RTX 3060. Generated on the experiment
 machine, **graded inside the container**, which the first version of this table was not: see
 [A table measured against the wrong cluster](#a-table-measured-against-the-wrong-cluster) below.
 Generations in `results/20260802_091236/`, verdicts in `results/executor_20260802_140437/`.
@@ -192,6 +192,7 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 | Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 0.667±0.025 | 1.000±0.000 | 0.667±0.025 | 0.667±0.025 |
 | granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.717±0.037 | 0.625±0.000 | 0.500±0.000 | 0.500±0.000 |
 | gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.742±0.013 | 0.917±0.050 | 0.658±0.062 | 0.658±0.062 |
+| Qwen3.5-9B | 1.000±0.000 | 0.875±0.025 | 0.650±0.025 | 0.658±0.013 | 0.600±0.050 | 0.450±0.025 | 0.475±0.025 |
 
 **T2 (diagnose-and-repair), same protocol:**
 
@@ -201,6 +202,7 @@ Generations in `results/20260802_091236/`, verdicts in `results/executor_2026080
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 | 0.824±0.002 |
 | granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.753±0.009 | 0.661±0.009 | 0.661±0.009 |
 | gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.938±0.002 | 0.732±0.000 | 0.732±0.000 |
+| Qwen3.5-9B | 0.982±0.005 | 0.982±0.005 | 0.947±0.011 | 0.950±0.009 | 0.711±0.009 | 0.691±0.009 | 0.694±0.009 |
 
 `safety` is 1.000±0.000 everywhere and is left out of both tables.
 
@@ -239,21 +241,41 @@ So the level does not rank models by capability. It measures how much each one a
 prompt never asked for, and which scheduler's vocabulary it reaches for when it does. Two
 families, two habits, and a 3B ahead of a 7B.
 
-### Real submission moves `functional` and barely touches the verdict
+### Real submission was almost redundant until a model wrote `srun`
 
-`functional` drops under real submission in every cell, by 16 points at 1.5B, 21 at 7B, 12 at
-Granite 3B and 13 at Gemma 12B on T1. `strict_all_levels` does not move at all: 0.308 against 0.308, 0.667 against
-0.667, 0.500 against 0.500, 0.658 against 0.658, and the T2 rows agree to within 0.001. Of 3120
-artifacts, exactly **one** changes verdict between the two executors.
+For four models this section said the sandbox and the scheduler agree. `functional` dropped under
+real submission in every cell, by 12 to 21 points, and `strict_all_levels` did not move at all:
+0.308 against 0.308, 0.667 against 0.667, 0.500 against 0.500, 0.658 against 0.658. One artifact of
+3120 changed verdict. The reason was that everything real submission stopped had already failed
+another level, so the executor propagated a verdict rather than producing one.
 
-The reason is that the scripts real submission stops were already failing another level. All 218
-refusals fail `submittability` in both arms; the executor only propagates the verdict into `functional`. So on these eight tasks the
-extra strictness of real execution is almost
-entirely redundant with the static levels, which is worth saying plainly rather than claiming an
-executor earns its keep by itself. Where it does earn it is on a task built to need it: F8 below
-is invisible to every static check and to bash.
+The fifth model ended that. Of **3900 artifacts, six** change verdict, **32** fail under `bash` and
+pass under real submission, and five of the six are Qwen3.5-9B on `t1_hello_serial`, across both
+the from-scratch task and its F5 repairs. They all fail the same way:
 
-### The one artifact the two executors disagree about
+```
+srun: error: Unable to confirm allocation for job 1: Invalid job id specified
+```
+
+The model writes `srun` inside the batch script, which is how a job step is launched on a real
+cluster and what a user would expect to see. In the `bash` sandbox there is no allocation for
+`srun` to attach to, so it exits non-zero and the sample is recorded as failing `functional`. Under
+real submission the allocation exists, the step runs, and the same script passes. **The sandbox
+produces a false negative on every script that launches a job step**, and it did so silently for as
+long as no model wrote one.
+
+That is the correction, and it is worth more than the count. The claim that the expensive executor
+was nearly redundant was true of the four models measured, not of the method: it described a
+property of what those models happened to write. One newer model, writing SLURM the way SLURM is
+normally written, moved the number from one in 3120 to six in 3900. A benchmark can only report the
+artifacts it has been given, and this is what that limitation looks like when it breaks.
+
+The sandbox is still the default and every published figure still uses it, because switching would
+make later numbers incomparable with earlier ones. What changes is the standing of the
+recommendation: `--executor sbatch` is not an optional refinement for task sets whose models use
+`srun`, and the gap will widen as models write more idiomatic scripts rather than less.
+
+### The other artifact the two executors disagree about
 
 ```bash
 if [ -z "$OMP_NUM_THREADS" ]; then
@@ -270,6 +292,13 @@ enforces binding.
 
 It also settles a question the roadmap had left open. Binding was listed as unobservable until a
 task existed that reads its own affinity. No such task was needed: a model wrote one.
+
+Both disagreements point the same way, and it is the opposite of the one a sandbox is usually
+suspected of. Neither is the scheduler catching something the sandbox missed; both are the sandbox
+rejecting a script the scheduler accepts, because the sandbox cannot supply an allocation, a core
+binding, or a job step. Real submission has yet to catch a single artifact that `bash` promoted and
+that was genuinely wrong, on any of the eight tasks. The one place it does is a task built for it,
+F8 above, which no static check and no sandbox can see.
 
 ### Which fault is hardest depends on the model, and on the level
 
