@@ -9,6 +9,7 @@ directory happens to list files in, and that a report carries it beside `tasks_s
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -50,16 +51,32 @@ def test_it_moves_when_the_rules_move(monkeypatch, tmp_path):
 
 def test_a_report_carries_both_digests(tmp_path):
     """The pair is the point: a task set and the rules applied to it. Either moving alone
-    makes two reports incomparable, and before this the second one left no trace."""
-    from anvil.cli import main
+    makes two reports incomparable, and before this the second one left no trace.
+
+    The generations are written here rather than read from `results/`, which is not tracked:
+    the first version of this test passed on the machine that had a leftover run and failed
+    in the container, where the directory is empty.
+    """
+    from anvil.cli import _file_sha, main
+
+    tasks = ROOT / "tasks" / "t1_slurm.jsonl"
+    generations = tmp_path / "g.jsonl"
+    generations.write_text(json.dumps({
+        "task_id": "t1_hello_serial",
+        "sample": 0,
+        "model": "test",
+        "seed": 0,
+        "tasks_sha": _file_sha(tasks),
+        "script": "#!/bin/bash\n#SBATCH --time=00:10:00\n#SBATCH --mem=512M\necho ANVIL_OK\n",
+    }) + "\n", encoding="utf-8")
 
     out = tmp_path / "r.json"
-    rc = main(["verify", "--generations", str(ROOT / "results" / "generations.jsonl"),
-               "--tasks", str(ROOT / "tasks" / "t1_slurm.jsonl"), "--out", str(out)])
+    rc = main(["verify", "--generations", str(generations), "--tasks", str(tasks),
+               "--out", str(out)])
     assert rc == 0
     payload = json.loads(out.read_text(encoding="utf-8"))
     assert payload["verifier_sha"] == verifier_sha()
-    assert len(payload["tasks_sha"]) == 12
+    assert payload["tasks_sha"] == _file_sha(tasks)
 
 
 def test_an_entry_graded_by_other_rules_is_not_ranked():
@@ -69,3 +86,22 @@ def test_an_entry_graded_by_other_rules_is_not_ranked():
     assert _not_comparable({"tasks_sha": "abc"}, "abc") == "unstamped"
     # A row wrong on the task set is reported on that, not on both at once.
     assert _not_comparable({**fresh, "tasks_sha": "zzz"}, "abc") == "stale tasks"
+
+
+def test_no_test_reads_the_untracked_results_directory():
+    """The class of defect, not the instance. `results/` is gitignored, so a test that opens
+    a file in it passes on whichever machine last ran an experiment and fails in the
+    container, which is where the suite is supposed to be authoritative. This has cost two
+    CI runs, once for a torch import and once for a leftover generations file.
+    """
+    # Written as patterns rather than as the literals themselves, so this check does not
+    # report its own source lines.
+    needles = [re.compile(r"""["']""" + "results" + "/"),
+               re.compile("ROOT" + r"""\s*/\s*["']""" + "results")]
+    offenders = []
+    for path in sorted((ROOT / "tests").glob("test_*.py")):
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            code = line.split("#", 1)[0]
+            if any(n.search(code) for n in needles):
+                offenders.append(f"{path.name}:{i}")
+    assert not offenders, f"tests must build their own fixtures: {offenders}"

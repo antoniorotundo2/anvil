@@ -119,6 +119,9 @@ def cmd_import(args: argparse.Namespace) -> int:
             for level, v in scores.items() if v
         },
     }
+    # The paper's tables and figures are a projection of these entries, and `tests/test_paper.py`
+    # fails when the two disagree. Importing without regenerating them broke main once.
+    print("entries changed: run ./scripts/paper_data.py and rebuild the paper", file=sys.stderr)
     ENTRIES.mkdir(parents=True, exist_ok=True)
     path = ENTRIES / f"{_slug(entry['model'])}__{Path(entry['tasks_file']).stem}.json"
     path.write_text(json.dumps(entry, indent=2) + "\n", encoding="utf-8")
