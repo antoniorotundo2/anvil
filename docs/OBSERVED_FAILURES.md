@@ -123,6 +123,19 @@ resource, requested as `-l walltime=hh:mm:ss`, so the artifact carries SLURM's l
 around PBS's parameter name: a blend of two schedulers rather than an error in either. It appears
 on the one multi-node task, which is where published examples are most likely to be PBS.
 
+A second model has since produced the class, and on the same task:
+
+```
+sbatch: unrecognized option '--mem-per-node=4G'
+```
+
+Gemma 4 12B, twelve of the fifteen F4 repairs of `t1_mpi_multinode`. `--mem-per-node` is not a
+SLURM option either, and unlike `--walltime` it is not another scheduler's name for the resource:
+SLURM's `--mem` already is per node, and `--mem-per-cpu` and `--mem-per-gpu` exist beside it, so
+the invented option is the one that completes the pattern. Two families, two different routes to
+an option that does not exist, both on the multi-node task. That F9 is not a Granite quirk is now
+the more defensible reading.
+
 F7 is a real directive with a value the parser rejects, and a better value would have saved it.
 Here no value exists that would: the option itself is not in the vocabulary. The distinction is
 worth keeping because it is also the distinction between a portable failure and a local one. The
@@ -133,8 +146,9 @@ It has no inducer, and that is a decision rather than an omission. `tasks/t2_rep
 equal to what the inducers produce by a test, so registering F9 regenerates it, and that file is
 the denominator of every T2 number published here, including the tables below. The
 fault it would teach is also close to F7's: both are refused at `submittability`, and the four
-models that clear F7 between 0.775 and 0.875 would most likely clear this too. It stays an observed class, and joins
-the induced ones if the T2 set is ever regenerated for an independent reason.
+models that clear F7 between 0.775 and 0.875 would most likely clear this too. It stays an
+observed class, and joins the induced ones if the T2 set is ever regenerated for an independent
+reason.
 
 ---
 
@@ -326,10 +340,18 @@ worth nothing.
 
 **F4 is where the fifth model breaks the pattern**, and it is the only category that does. Four
 models sit between 0.742 and 0.750 there, near enough to be one number; Qwen3.5-9B sits at 0.242.
-That is the same collapse its `resource_fit` column shows on both task sets, localised: F4 is the
-directive absent with no universal default, `--time` and `--mem`, and the newest model of the set
-is the one that does not restore them. Its own hardest category is F4 rather than F5, which is true
-of no other model here.
+That is the same collapse its `resource_fit` column shows on both task sets, localised. Its own
+hardest category is F4 rather than F5, which is true of no other model here. The next two sections
+take that number apart, and it does not survive the description above: F4 turns out not to be one
+finding about one model.
+
+One property of the category has to be stated first, because both sections depend on it. F4 drops
+`--time`, `--mem` or `--gpus`, whichever the task declares, in that order. Every T1 task declares
+`time_max_minutes`, so the first candidate always applies and the other two are never reached:
+**as instantiated, F4 removes `--time` and nothing else, on all eight tasks**. The category is
+written to cover three directives and currently exercises one. That is a property of the task set
+rather than of the inducer, and it would change on its own if a task without a walltime constraint
+were ever added.
 
 An earlier version of this section called F1 the hardest category outright, on the strength of the
 7B capping at 0.33 there with `submittability` as the bottleneck. That number came from the run
@@ -349,6 +371,89 @@ Second, the gap between the capable models is concentrated in the same two categ
 and the 7B's 0.824 comes from F1 and F5; Gemma at 12B matches the 7B exactly on F2, F3 and F4 and
 trails it on the same two, F1 by 33 points and F5 by 28. Two categories out of seven account for
 the ordering of three models across three families.
+
+### The right number in the wrong field
+
+Every one of Qwen3.5-9B's 91 F4 failures is `resource_fit`, and every one of them is `--time`.
+No other directive, no other level, one stray `functional` aside. The failures split in two, and
+neither half is what the score suggested.
+
+Thirty-one artifacts request a walltime that the ceiling refuses. What they contain is this:
+
+```
+#SBATCH --time=45:00:00     the prompt asks for 45 minutes
+#SBATCH --time=10:00:00     the prompt asks for 10 minutes
+#SBATCH --time=25:00:00     the prompt asks for 25 minutes
+```
+
+The integer is right every time. It is in the wrong field. `45:00:00` is SLURM's `hours:minutes:
+seconds`, so the artifact requests forty-five hours for a forty-five minute job, and the same
+model writes `00:20:00` and `00:25:00` correctly on the two tasks it passes, on the same seeds.
+This is not a model that does not know the constraint. It is a model that reads the number out of
+the prompt and writes it into the leading field, and the leading field is hours.
+
+The from-scratch run confirms the reading and rules out the repair setting as the cause. In T1,
+34 of 120 artifacts carry the same slip: `45:00:00`, `10:00:00`, `30:00:00`, always the prompt's
+own integer in the hours position. It is the largest single `resource_fit` defect the model has.
+The one place the habit is invisible is `t1_gpu_single`, whose prompt asks for a walltime of two
+hours and gets `02:00:00`, correct because the unit the model ignored happened to be the right
+one. Where the prompt names minutes it is wrong by a factor of sixty; where the prompt names
+hours it is right by coincidence.
+
+**This is the case `resource_fit` was built for, in its cleanest form yet.** `#SBATCH
+--time=45:00:00` is well formed, so `syntax` passes it. `sbatch` accepts it without a word, so
+`submittability` passes it. The job runs and prints what the task asked for, so `functional`
+passes it. Four of the five levels see a correct artifact, and on a real cluster it is a request
+for sixty times the walltime the work needs, which is the kind of thing a queue policy rejects or,
+worse, admits and schedules badly. No static check in the project's own comparison set would
+report it either: it is not a syntax error, not an unknown option, and not a value the parser can
+refuse.
+
+The other sixty failures are the opposite defect. On `t1_array_job`, `t1_cpus_per_task`,
+`t1_gpu_single` and `t1_mpi_multinode` the repaired script comes back with no `--time` at all, 15
+times out of 15 on each. Those are four of the tasks where the same model writes a correct
+`--time` when generating from scratch. Shown a script with the directive removed, it hands the
+script back with the directive still removed; asked for the same script with no example in front
+of it, it writes the directive. The broken artifact is not being diagnosed, it is being copied,
+which is the failure mode the section below describes for a different model on a different
+category.
+
+Both halves are near-deterministic: 15 identical artifacts per task, across three seeds and five
+samples. A defect with no variance is not one more sampling attempt away from being fixed, which
+is worth saying plainly because `pass@k` at higher `k` is the usual answer to a low `pass@1` and
+here it would buy nothing.
+
+### The category names the fault that was induced, not the fault that was found
+
+Gemma 4 12B scores 0.750 on F4, in the middle of the four-model cluster, and its failures have
+nothing to do with `--time`. It restores the removed directive on all eight tasks, 120 artifacts
+out of 120, with the correct value in the correct field every time. Its thirty failures are two
+tasks, failing whole, for two unrelated reasons it introduced itself:
+
+```
+sbatch: unrecognized option '--mem-per-node=4G'      t1_mpi_multinode, 12 of 15
+sbatch: error: invalid partition specified: compute  t1_mpi_multinode, 3 of 15
+expected output not found: ['ANVIL_OK']              t1_container_apptainer, 15 of 15
+```
+
+The repair prompt asks for the corrected script, so the model rewrites the whole artifact, and
+what it hands back can be broken in places the induced fault never touched. On `t1_mpi_multinode`
+it fixes the missing walltime and invents a memory option SLURM does not have, which costs it
+`submittability` and leaves `--mem` unsatisfied at the same time. On `t1_container_apptainer` it
+fixes the walltime and returns a payload that never prints `ANVIL_OK`.
+
+So a per-category score is not a measurement of whether the induced fault was repaired. It is a
+measurement of whether the returned artifact is correct, and those are different questions
+whenever the model rewrites more than the broken line. F4 at 0.750 for Gemma and F4 at 0.242 for
+Qwen3.5 are not two points on one scale: one model never gets the walltime wrong and breaks other
+things, the other gets only the walltime wrong. Reading the column as a ranking on a single
+ability would have been wrong in both directions.
+
+The honest version of the earlier claim is narrower. Qwen3.5-9B's F4 collapse is real, it is
+entirely `--time`, and it has two mechanisms, a unit slip and a failure to notice a removal. It is
+not evidence that the model is worse at HPC than the 7B it succeeds. It is evidence that it
+formats one field wrongly and anchors on the artifact it is shown, and the benchmark is what
+separated those from a bad score.
 
 ### Writing a directive and noticing it is missing are different abilities
 

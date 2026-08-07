@@ -69,7 +69,7 @@ one, hence the smaller denominators.
 | F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 1.000 | 15 |
 | F7 malformed value | 0.550 | 0.875 | 0.833 | 0.775 | 0.817 | 120 |
 
-## Four findings
+## Six findings
 
 **`submittability` is not ordered by model size.** T1 reads 0.875 for Granite at 3B, 0.867 for
 Gemma at 12B, 0.842 for Qwen at 1.5B and 0.792 for Qwen at 7B: the largest model in the set and the
@@ -104,6 +104,25 @@ two off-topic controls leave it on its zero-shot values to the digit. The one do
 addresses `--time` and `--mem` is worth +21 points to the model that does not know the rule and
 -6 to the one that does. See [The intervention
 series](DESIGN.md#the-intervention-series).
+
+**A model asked for 45 minutes requested 45 hours, and only one level noticed.** Qwen3.5-9B's
+worst per-category score, F4 at 0.242, is entirely `--time`, and thirty-one of its ninety-one
+failures read `#SBATCH --time=45:00:00` where the prompt asked for forty-five minutes. The integer
+is right and the field is wrong: SLURM reads `hours:minutes:seconds`, so the artifact requests
+sixty times the walltime it needs. The same slip appears in 34 of the model's 120 from-scratch
+artifacts, so it is a habit and not a repair-time accident, and it is invisible to four of the
+five levels. The script is well formed, `sbatch` accepts it silently, the job runs and prints what
+was asked. `resource_fit` is the only thing between it and a queue. The remaining sixty failures
+are the opposite: the repaired script comes back with `--time` still missing, on four tasks where
+the same model writes it correctly from scratch.
+
+**A per-category score does not measure whether the induced fault was repaired.** Gemma 4 12B
+scores 0.750 on the same category and never once gets the walltime wrong: it restores the removed
+directive correctly in all 120 artifacts. Its thirty failures are faults it introduced while
+rewriting the rest of the script, an invented `--mem-per-node` that SLURM does not have and a
+payload that stops printing `ANVIL_OK`. The two 0.242 and 0.750 cells are not two points on one
+ability. See [The right number in the wrong
+field](OBSERVED_FAILURES.md#the-right-number-in-the-wrong-field).
 
 **Two coreutils implementations are not interchangeable, and no model has reached the difference.**
 101 invocations run in Ubuntu 24.04 (GNU 9.4) and 26.04 (`uutils` 0.8.0): 91 agree exactly. Of the
