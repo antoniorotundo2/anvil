@@ -26,21 +26,25 @@ def _level(name: str, passed: bool, detail: str, skipped: bool = False) -> dict:
 def _report(tmp_path: Path) -> Path:
     results = [
         # Two failures for the same reason, differing only in the number.
-        {"task_id": "t1_hello_serial__F4", "all_passed": False, "levels": [
+        {"task_id": "t1_hello_serial__F4", "all_passed": False,
+         "script": "#SBATCH --time=01:30:00\n", "levels": [
             _level("syntax", True, "ok"),
             _level("submittability", False, "level skipped: sbatch not available", skipped=True),
             _level("resource_fit", False, "--time 90min exceeds maximum 30min"),
         ]},
-        {"task_id": "t1_gpu_single__F4", "all_passed": False, "levels": [
+        {"task_id": "t1_gpu_single__F4", "all_passed": False,
+         "script": "#SBATCH --nodes=1\n", "levels": [
             _level("syntax", True, "ok"),
             _level("submittability", False, "level skipped: sbatch not available", skipped=True),
             _level("resource_fit", False, "--time 45min exceeds maximum 30min"),
         ]},
         # A pass, and a failure in another category, both outside the count.
-        {"task_id": "t1_array_job__F4", "all_passed": True, "levels": [
+        {"task_id": "t1_array_job__F4", "all_passed": True,
+         "script": "#SBATCH --time=00:10:00\n", "levels": [
             _level("resource_fit", True, "ok"),
         ]},
-        {"task_id": "t1_array_job__F5", "all_passed": False, "levels": [
+        {"task_id": "t1_array_job__F5", "all_passed": False,
+         "script": "#SBATCH --time=99:00:00\n", "levels": [
             _level("syntax", False, "unbalanced quote"),
         ]},
     ]
@@ -70,3 +74,15 @@ def test_digits_collapse_so_one_reason_counts_once(tmp_path):
 def test_failures_are_attributed_to_the_base_task(tmp_path):
     c = collect("F4", [_report(tmp_path)])
     assert c["tasks"] == {"t1_hello_serial": 1, "t1_gpu_single": 1}
+
+
+def test_lines_records_absence_and_keeps_the_passing_artifacts(tmp_path):
+    """The value a model wrote is only readable against the one it got right, so `--lines`
+    covers passes too, and an artifact with no matching line is counted rather than
+    dropped: on this category the absence is the finding."""
+    c = collect("F4", [_report(tmp_path)], r"^#SBATCH.*--time")
+    assert c["lines"] == {
+        ("t1_hello_serial", False, "#SBATCH --time=01:30:00"): 1,
+        ("t1_gpu_single", False, "(absent)"): 1,
+        ("t1_array_job", True, "#SBATCH --time=00:10:00"): 1,
+    }
