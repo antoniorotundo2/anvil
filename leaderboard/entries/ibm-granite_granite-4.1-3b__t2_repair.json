@@ -2,6 +2,7 @@
   "model": "ibm-granite/granite-4.1-3b",
   "tasks_file": "tasks/t2_repair.jsonl",
   "tasks_sha": "723aa7ec4463",
+  "verifier_sha": "74e00ebdcced",
   "seeds": [
     0,
     1,
@@ -11,7 +12,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/executor_20260802_140437",
+  "source": "results/regrade_floor",
   "scores": {
     "syntax": {
       "mean": 0.8621,
@@ -29,8 +30,8 @@
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.753033,
-      "half_range": 0.0091,
+      "mean": 0.6212,
+      "half_range": 0.01595,
       "cells": 3
     },
     "safety": {
@@ -39,8 +40,8 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.6606,
-      "half_range": 0.0091,
+      "mean": 0.5288,
+      "half_range": 0.01595,
       "cells": 3
     }
   }

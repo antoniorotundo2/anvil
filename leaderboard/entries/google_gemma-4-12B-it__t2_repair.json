@@ -2,6 +2,7 @@
   "model": "google/gemma-4-12B-it",
   "tasks_file": "tasks/t2_repair.jsonl",
   "tasks_sha": "723aa7ec4463",
+  "verifier_sha": "74e00ebdcced",
   "seeds": [
     0,
     1,
@@ -11,7 +12,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/executor_20260802_140437",
+  "source": "results/regrade_floor",
   "scores": {
     "syntax": {
       "mean": 1.0,
@@ -29,8 +30,8 @@
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.9379,
-      "half_range": 0.00225,
+      "mean": 0.931833,
+      "half_range": 0.00455,
       "cells": 3
     },
     "safety": {
@@ -39,8 +40,8 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.7318,
-      "half_range": 0.0,
+      "mean": 0.725767,
+      "half_range": 0.0023,
       "cells": 3
     }
   }
