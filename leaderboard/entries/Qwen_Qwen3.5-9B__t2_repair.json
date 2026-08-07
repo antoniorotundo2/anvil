@@ -1,0 +1,47 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "tasks_file": "tasks/t2_repair.jsonl",
+  "tasks_sha": "723aa7ec4463",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "n_per_task": 5,
+  "executor": "bash",
+  "base_image": "ubuntu:24.04",
+  "quantization": "4-bit",
+  "source": "results/executor_20260802_140437, --disable-thinking",
+  "scores": {
+    "syntax": {
+      "mean": 0.981833,
+      "half_range": 0.00455,
+      "cells": 3
+    },
+    "submittability": {
+      "mean": 0.981833,
+      "half_range": 0.00455,
+      "cells": 3
+    },
+    "functional": {
+      "mean": 0.947,
+      "half_range": 0.01135,
+      "cells": 3
+    },
+    "resource_fit": {
+      "mean": 0.710567,
+      "half_range": 0.0091,
+      "cells": 3
+    },
+    "safety": {
+      "mean": 1.0,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "strict_all_levels": {
+      "mean": 0.6909,
+      "half_range": 0.0091,
+      "cells": 3
+    }
+  }
+}
