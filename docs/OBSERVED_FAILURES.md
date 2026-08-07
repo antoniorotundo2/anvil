@@ -132,7 +132,7 @@ not.
 It has no inducer, and that is a decision rather than an omission. `tasks/t2_repair.jsonl` is held
 equal to what the inducers produce by a test, so registering F9 regenerates it, and that file is
 the denominator of every T2 number published here, including the tables below. The
-fault it would teach is also close to F7's: both are refused at `submittability`, and the three
+fault it would teach is also close to F7's: both are refused at `submittability`, and the four
 models that clear F7 between 0.775 and 0.875 would most likely clear this too. It stays an observed class, and joins
 the induced ones if the T2 set is ever regenerated for an independent reason.
 
@@ -305,25 +305,31 @@ F8 above, which no static check and no sandbox can see.
 Per fault category, `bash` arm, three seeds pooled. F1 applies to three tasks and F6 to one, hence
 the smaller denominators.
 
-| category | 1.5B | 7B | Granite 3B | Gemma 12B | n per model |
-|---|---|---|---|---|---|
-| F1 omitted default | 0.000 | 1.000 | 0.356 | 0.667 | 45 |
-| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 0.875 | 120 |
-| F3 prose in a value | 0.542 | 0.875 | 0.800 | 0.875 | 120 |
-| F4 directive absent | 0.000 | 0.750 | 0.742 | 0.750 | 120 |
-| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 0.375 | 120 |
-| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 15 |
-| F7 malformed value | 0.550 | 0.875 | 0.833 | 0.775 | 120 |
+| category | 1.5B | 7B | Granite 3B | Gemma 12B | Qwen3.5 9B | n per model |
+|---|---|---|---|---|---|---|
+| F1 omitted default | 0.000 | 1.000 | 0.356 | 0.667 | 0.667 | 45 |
+| F2 directive after the first command | 0.342 | 0.875 | 0.750 | 0.875 | 1.000 | 120 |
+| F3 prose in a value | 0.542 | 0.875 | 0.800 | 0.875 | 0.983 | 120 |
+| F4 directive absent | 0.000 | 0.750 | 0.742 | 0.750 | 0.242 | 120 |
+| F5 no `#SBATCH` at all | 0.050 | 0.658 | 0.250 | 0.375 | 0.383 | 120 |
+| F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 1.000 | 15 |
+| F7 malformed value | 0.550 | 0.875 | 0.833 | 0.775 | 0.817 | 120 |
 
-`strict_all_levels` pass@1. **F5 is the lowest category for three of the four models and never
-comfortable for any of them**, which no single-model view showed: it is the fault that leaves the
-artifact furthest from a job script, and restoring every directive from the prompt alone is closer
-to writing one than to repairing one. F6 stays the easy category, and with a fourth model it is
-1.000 for everything except the 1.5B, so it separates nothing.
+`strict_all_levels` pass@1. **F5 is the lowest category for three of the five models and never
+comfortable for any of them**: it is the fault that leaves the artifact furthest from a job script,
+and restoring every directive from the prompt alone is closer to writing one than to repairing one.
+F6 stays the easy category, 1.000 for everything except the 1.5B, so it separates nothing.
 
-F1 is the one that separates them, and the fourth model turns a spread into a ladder: 0.000, 0.356,
-0.667, 1.000, on the fault this document opens with. A benchmark wants categories like that, and a
-claim about model capability made on F6 would be worth nothing.
+F1 separates the models: 0.000, 0.356, 0.667, 0.667, 1.000 on the fault this document opens with.
+A benchmark wants categories like that, and a claim about model capability made on F6 would be
+worth nothing.
+
+**F4 is where the fifth model breaks the pattern**, and it is the only category that does. Four
+models sit between 0.742 and 0.750 there, near enough to be one number; Qwen3.5-9B sits at 0.242.
+That is the same collapse its `resource_fit` column shows on both task sets, localised: F4 is the
+directive absent with no universal default, `--time` and `--mem`, and the newest model of the set
+is the one that does not restore them. Its own hardest category is F4 rather than F5, which is true
+of no other model here.
 
 An earlier version of this section called F1 the hardest category outright, on the strength of the
 7B capping at 0.33 there with `submittability` as the bottleneck. That number came from the run
