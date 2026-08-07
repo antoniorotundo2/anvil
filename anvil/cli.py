@@ -61,6 +61,22 @@ def _add_executor_flag(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_thinking_flag(parser: argparse.ArgumentParser) -> None:
+    """Every subcommand that generates with a model needs it, not just `run`.
+
+    It went on `run` alone at first, and a T2 matrix died three seeds in a row on
+    `unrecognized arguments` after the T1 half had already been generated. A flag that
+    changes how the prompt is built belongs to every command that builds one.
+    """
+    parser.add_argument(
+        "--disable-thinking", action="store_true",
+        help="ask the chat template not to emit a reasoning block. A model that thinks by "
+        "default is cut off mid-thought under this benchmark's token budget and never "
+        "reaches the code block; raising the budget for it alone would give it more "
+        "computation per sample than every other model in the table",
+    )
+
+
 def _warn_about_skipped_levels() -> None:
     """Say up front which levels this environment cannot exercise.
 
@@ -836,12 +852,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--retrieval-position", choices=list(POSITIONS), default="append",
                    help="where the retrieved documents go relative to the task prompt "
                    "(ignored for zero-shot); every published arm used append")
-    r.add_argument("--disable-thinking", action="store_true",
-                   help="ask the chat template not to emit a reasoning block. A model that "
-                        "thinks by default is cut off mid-thought under this benchmark's "
-                        "token budget and never reaches the code block; raising the budget "
-                        "for it alone would give it more computation per sample than every "
-                        "other model in the table")
+    _add_thinking_flag(r)
     _add_executor_flag(r)
     r.set_defaults(func=cmd_run)
 
@@ -911,6 +922,7 @@ def main(argv: list[str] | None = None) -> int:
                      help="write the generated repairs to JSONL for later `anvil verify-repair`")
     rp.add_argument("--out", help="write full results to JSON")
     rp.add_argument("--verbose", "-v", action="store_true")
+    _add_thinking_flag(rp)
     _add_executor_flag(rp)
     rp.set_defaults(func=cmd_repair)
 
@@ -945,6 +957,7 @@ def main(argv: list[str] | None = None) -> int:
                      help="write the generated recipes to JSONL for later `anvil verify-recipe`")
     rc.add_argument("--out", help="write full results to JSON")
     rc.add_argument("--verbose", "-v", action="store_true")
+    _add_thinking_flag(rc)
     rc.set_defaults(func=cmd_recipe)
 
     vc = sub.add_parser(
