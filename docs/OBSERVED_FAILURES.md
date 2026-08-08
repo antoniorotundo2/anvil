@@ -729,9 +729,12 @@ that does not know the rule and minus 6 to the one that does. See
   while the other is not. Whether "invented values against invented syntax" is a real split or two
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
-  error as model scale keeps increasing;
-- the regrade under the `--mem` bound, which is measured at 30 verdicts in one cell and not yet
-  applied to the published figures, see [What the audit settled](#what-the-audit-settled);
+  error as model scale keeps increasing. The category now reads 0.292 for the 1.5B against 0.800
+  to 0.983 for the other four, the widest gap in the table, and 30 of its 85 failures are the
+  `--mem` rewrite the audit turned up rather than anything to do with prose in a value. The two
+  diagnoses [the F3 note](#f3-note-the-diagnosis-is-parser-dependent) asks to be told apart are
+  distinguishable in the reports, `--mem unparsable` against `--mem N MB below minimum`, and
+  `scripts/category_dig.py` reads them;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
