@@ -13,6 +13,7 @@ from __future__ import annotations
 import glob as globmod
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -489,6 +490,38 @@ def _functional_via_bash(script: str, task: Task, timeout: int) -> LevelResult:
         shutil.rmtree(workdir, ignore_errors=True)
 
 
+# A ceiling on the sandbox, in megabytes, so one runaway allocation cannot take the machine
+# with it. The execution task set is the first whose payloads allocate for real, and pointing
+# the experiment matrix at it killed the WSL virtual machine outright: the model writes a
+# script that asks for tens of gigabytes, the sandbox has no limit, and the host obliges.
+#
+# It is a constant and is never derived from `--mem` or from the task. That is the whole
+# point: the `bash` executor must keep ignoring the requested allocation, because F8 is the
+# class that exists to show what happens when nothing enforces it. This is protection for
+# the machine running the benchmark, not a resource check on the artifact.
+SANDBOX_MEM_MB = int(os.environ.get("ANVIL_SANDBOX_MEM_MB", "1024"))
+
+_sandbox_cap: int | None | str = "unset"
+
+
+def sandbox_mem_mb() -> int | None:
+    """The ceiling actually in force, or None where the platform has no `ulimit -v`.
+
+    Darwin accepts the call and enforces nothing, so the answer is platform-dependent and
+    has to be reported rather than assumed. `environment_report` carries it for that reason:
+    a run whose sandbox was uncapped is a run that could have been stopped by the host
+    rather than by the benchmark.
+    """
+    global _sandbox_cap
+    if _sandbox_cap == "unset":
+        probe = subprocess.run(
+            ["bash", "-c", f"ulimit -v {SANDBOX_MEM_MB * 1024}"],
+            capture_output=True, text=True,
+        )
+        _sandbox_cap = SANDBOX_MEM_MB if probe.returncode == 0 else None
+    return _sandbox_cap
+
+
 def _run_under_bash(workdir: str, script: str, task: Task, timeout: int) -> LevelResult:
     script_path = Path(workdir) / "job.sh"
     script_path.write_text(script, encoding="utf-8")
@@ -508,9 +541,15 @@ def _run_under_bash(workdir: str, script: str, task: Task, timeout: int) -> Leve
     if c.get("array"):
         env["SLURM_ARRAY_TASK_ID"] = "1"
 
+    cap = sandbox_mem_mb()
+    if cap is None:
+        argv = ["bash", str(script_path)]
+    else:
+        argv = ["bash", "-c", f"ulimit -v {cap * 1024}; exec bash {shlex.quote(str(script_path))}"]
+
     try:
         proc = subprocess.run(
-            ["bash", str(script_path)],
+            argv,
             capture_output=True, text=True, timeout=timeout,
             cwd=workdir, env=env,
         )
@@ -518,10 +557,11 @@ def _run_under_bash(workdir: str, script: str, task: Task, timeout: int) -> Leve
         return LevelResult(Level.FUNCTIONAL, False, f"timed out after {timeout}s")
 
     if proc.returncode != 0:
-        return LevelResult(
-            Level.FUNCTIONAL, False,
-            f"exit code {proc.returncode}: {proc.stderr.strip()[:200]}",
-        )
+        detail = f"exit code {proc.returncode}: {proc.stderr.strip()[:200]}"
+        if cap is not None and "cannot allocate" in proc.stderr:
+            # Said out loud, or the reader takes it for a resource verdict on the artifact.
+            detail += f" (sandbox ceiling {cap}MB, not the requested allocation)"
+        return LevelResult(Level.FUNCTIONAL, False, detail)
 
     combined = proc.stdout + proc.stderr
     missing = [s for s in task.expects_in_body if s not in combined]

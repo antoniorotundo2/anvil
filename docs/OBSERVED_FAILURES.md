@@ -145,6 +145,27 @@ strict on 8 records, 2 record(s) in ['F8'] not judged under bash*; on `tasks/t2_
 reads 44 records with no exclusion, because that set has no F8. The exclusion is not a hole: a
 verifier that had become permissive would still be caught on the eight.
 
+The second attempt at the run did spend GPU time, and then the shell disappeared. The host's
+virtual machine had been killed. The execution set is the first whose payloads allocate for real,
+and **the `bash` sandbox had no memory limit at all**: a model writes a script asking for tens of
+gigabytes, nothing stands between it and the host, and the machine running the benchmark dies
+rather than the artifact failing. The sandbox now runs under a ceiling, `ANVIL_SANDBOX_MEM_MB`,
+1024 by default.
+
+The ceiling is a constant and is never derived from `--mem` or from the task, which is not a detail
+but the whole design. The `bash` executor has to keep ignoring the requested allocation, because
+that is what F8 exists to demonstrate; a limit that tracked the request would quietly turn the
+sandbox into an enforcing executor and delete the class. A test asserts the separation directly: a
+script declaring `--mem=16M` and allocating 64MB still passes under `bash`, and both F8 no-op
+repairs still pass all five levels there. When the ceiling does stop something, the reason says so,
+`(sandbox ceiling 1024MB, not the requested allocation)`, so nobody reads machine protection as a
+verdict on the artifact.
+
+`ulimit -v` does nothing on Darwin, so the ceiling is platform-dependent and reported rather than
+assumed. `anvil doctor` prints `sandbox_mem_mb` and warns when it reads `uncapped`, and every report
+carries the value: a run whose sandbox was uncapped is one that could have been stopped by the host
+instead of by the benchmark.
+
 One consequence of adding the task has to be stated rather than left implicit. `tasks/t1_exec.jsonl`
 grew by append, so the `t1_memory_bound` record is byte-identical and the 15-sample observation
 above is still an observation of the task it names. The file's digest moved all the same, which is

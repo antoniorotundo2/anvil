@@ -19,11 +19,18 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from anvil.inducer import INDUCERS, NEEDS_ENFORCEMENT, decidable  # noqa: E402
 from anvil.schema import Task  # noqa: E402
-from anvil.verifier import check_resource_fit, check_syntax  # noqa: E402
+from anvil.verifier import (  # noqa: E402
+    check_functional,
+    check_resource_fit,
+    check_syntax,
+    sandbox_mem_mb,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 EXEC_TASKS = ROOT / "tasks" / "t1_exec.jsonl"
@@ -99,3 +106,37 @@ def test_the_execution_repair_set_leaves_the_guard_something_to_decide():
     test records why: four of its five categories are decidable under bash."""
     categories = {r["id"].rsplit("__", 1)[-1] for r in _records(EXEC_REPAIRS)}
     assert categories - NEEDS_ENFORCEMENT
+
+
+def test_the_sandbox_ceiling_is_not_the_requested_allocation():
+    """The `bash` executor must keep ignoring `--mem`, or F8 stops being a class. A script
+    declaring 16M and allocating far more still completes, because the ceiling protects the
+    machine and says nothing about the artifact."""
+    script = (
+        "#!/bin/bash\n#SBATCH --mem=16M\n#SBATCH --time=00:15:00\n"
+        "chunk=$(head -c 67108864 /dev/zero | tr '\\0' 'x')\n"
+        'echo "ALLOCATED=${#chunk}"\necho ANVIL_OK\n'
+    )
+    task = Task(id="t", prompt="p", constraints={"nodes": 1, "ntasks": 1},
+                expects_in_body=["ANVIL_OK", "ALLOCATED="])
+    result = check_functional(script, task)
+    assert result.passed, result.detail
+
+
+@pytest.mark.skipif(sandbox_mem_mb() is None,
+                    reason="ulimit -v does nothing on this platform, so nothing is capped")
+def test_an_unbounded_allocation_is_stopped_by_the_ceiling_and_named_as_such():
+    """Pointing the experiment matrix at the execution set killed the host's virtual machine
+    before this existed. The detail has to name the ceiling, or the next reader takes a
+    machine-protection failure for a verdict on the artifact's resource request."""
+    huge = 4 * sandbox_mem_mb() * 1024 * 1024
+    script = (
+        "#!/bin/bash\n#SBATCH --mem=64G\n#SBATCH --time=00:15:00\n"
+        f"chunk=$(head -c {huge} /dev/zero | tr '\\0' 'x')\n"
+        "echo ANVIL_OK\n"
+    )
+    task = Task(id="t", prompt="p", constraints={"nodes": 1, "ntasks": 1},
+                expects_in_body=["ANVIL_OK"])
+    result = check_functional(script, task)
+    assert not result.passed
+    assert "sandbox ceiling" in result.detail, result.detail

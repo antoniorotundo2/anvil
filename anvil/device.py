@@ -206,7 +206,7 @@ def shell_environment() -> dict[str, str]:
 
 def environment_report() -> dict[str, object]:
     """Summary for `anvil doctor` and for the paper's setup section."""
-    from .verifier import functional_executor  # noqa: PLC0415
+    from .verifier import functional_executor, sandbox_mem_mb  # noqa: PLC0415
 
     info = detect()
     shell = shell_environment()
@@ -217,6 +217,13 @@ def environment_report() -> dict[str, object]:
             f"non-GNU coreutils ({shell['coreutils']}): the `functional` level may "
             "diverge from the cluster. Run the verifier inside the container."
         )
+    cap = sandbox_mem_mb()
+    if cap is None:
+        notes.append(
+            "the bash sandbox is uncapped on this platform (`ulimit -v` does nothing on "
+            "Darwin): a generated script that allocates without bound can take the machine "
+            "down rather than fail. Run the verifier inside the container."
+        )
     return {
         "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
         "python": platform.python_version(),
@@ -224,6 +231,7 @@ def environment_report() -> dict[str, object]:
         "bash": shell["bash_version"],
         "coreutils": shell["coreutils"],
         "gnu_faithful": faithful,
+        "sandbox_mem_mb": cap if cap is not None else "uncapped",
         "device": info.device,
         "device_name": info.name,
         "dtype": info.dtype,

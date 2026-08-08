@@ -5,7 +5,13 @@ running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
 Everything here was graded by verifier `20dd4a2e4159`, which every report and every leaderboard
-entry records.
+entry records. The current verifier is `a4685dcb0234`, so every leaderboard row is marked *stale
+rules* again. What moved is a ceiling on the `bash` sandbox, machine protection rather than a rule
+about artifacts, added after a generated script with an unbounded allocation took a host down. It
+can change a verdict, which is why the digest moved and the rows are marked, but no payload in
+`tasks/t1_slurm.jsonl` or `tasks/t2_repair.jsonl` comes within three orders of magnitude of the
+ceiling, so the figures below are expected to survive it unchanged. Expected, not verified: the
+next reverification says.
 
 Two earlier gradings of the same generations are superseded, both of them for a one-sided comparison
 in `check_resource_fit`. The first had no floor on `--time`: adding one moved five of the ten cells
