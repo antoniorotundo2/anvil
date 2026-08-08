@@ -921,7 +921,14 @@ A first attempt at that fix probed readiness with `sbatch --test-only`, which br
 dependency task at once: a test-only submission still takes a job id, and the entrypoint relies on
 `FirstJobId=12345` plus a placeholder landing on exactly 12345 so that `--dependency=afterok:12345`
 resolves. The probe consumed the id, the placeholder moved, and `t1_dependency_chain` began failing
-with `Job dependency problem`. The readiness checks that survive are the ones that cost nothing.
+with `Job dependency problem`.
+
+Waiting on the cheap signals alone was not enough either: the next run came back with two failures
+instead of four, intermittently inside a single container, which says the controller answers
+`scontrol ping` and reports its nodes up while still refusing the first job it is asked to place.
+The probe that settles it has to be the call every level makes, so it is now made **after** the
+placeholder has taken 12345, where the ids it consumes are 12346 upward and nothing depends on
+them. Two readiness checks that cost nothing and one that costs a job id nobody needs.
 
 The deeper fix is not the timing. `anvil induce` now **refuses to run** where `submittability`
 cannot be judged, naming the reason, and `make induce-t2` builds the set inside the container the

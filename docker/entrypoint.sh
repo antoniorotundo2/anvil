@@ -333,6 +333,17 @@ if [[ "${live_daemons:-0}" -gt 0 ]]; then
   done
 fi
 
+# Only now, with 12345 taken, is it safe to probe with the call every level actually makes.
+# `scontrol ping` answering and the nodes leaving `down` were not enough on a loaded CI
+# runner: the first `sbatch --test-only` of the run still came back "Requested node
+# configuration is not available", which is indistinguishable from an artifact asking for
+# something impossible, and it reached the task set through `induce_t2_tasks`. Ids from here
+# on are 12346 upward and nothing depends on them.
+printf '#!/bin/bash\n#SBATCH --nodes=1\n#SBATCH --ntasks=1\n#SBATCH --time=00:10:00\n#SBATCH --mem=512M\necho ok\n' \
+  >/tmp/anvil_ready.sh
+anvil_wait_for "a placeable job" "sbatch --test-only /tmp/anvil_ready.sh"
+rm -f /tmp/anvil_ready.sh
+
 if [[ "${ANVIL_QUIET:-0}" != "1" ]]; then
   echo "==> base image: ${ANVIL_BASE_IMAGE:-unknown}"
   echo "==> reference cluster: ${ANVIL_NODES} nodes x ${ANVIL_CPUS} cores x ${ANVIL_MEM_MB} MB x ${ANVIL_GPUS} GPUs"
