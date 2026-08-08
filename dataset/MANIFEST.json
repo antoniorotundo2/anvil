@@ -34,21 +34,21 @@
     },
     {
       "path": "tasks/t1_exec.jsonl",
-      "sha256": "9d7bcd7b93c7733d89c194ab2e870358e9182da79989202458ba42e50a4c204a",
-      "bytes": 547,
-      "records": 1
+      "sha256": "6a7c2fe00c374ddea2470adc6512f72403431f1095456df90a1a0fe88d4b14c2",
+      "bytes": 1197,
+      "records": 2
     },
     {
       "path": "tasks/t1_exec_reference.jsonl",
-      "sha256": "14d876972174fb77dfdc6ff40806006d4609a05c70e6746a2c3cca0b458e1173",
-      "bytes": 264,
-      "records": 1
+      "sha256": "18eae347803c2dcdf075fae8cca175808ea53ca0bea17a31cd2c1c422f75a62e",
+      "bytes": 995,
+      "records": 2
     },
     {
       "path": "tasks/t2_exec_repair.jsonl",
-      "sha256": "6e08c39f0df141846cebbb1c6a71a067607b216e0e88d684170692f3c012b455",
-      "bytes": 1862,
-      "records": 5
+      "sha256": "de1e9d60396fcb93c2d8e74613cec2b212f2f38ba20ce44e515bc2ef5ee97c0a",
+      "bytes": 6066,
+      "records": 10
     },
     {
       "path": "tasks/t1_coreutils.jsonl",

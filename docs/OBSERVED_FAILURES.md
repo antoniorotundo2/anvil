@@ -109,6 +109,34 @@ called correct.
 
 **One model, one task, 15 samples: an observation, not a rate.**
 
+### A second execution task, and why it is not the same one twice
+
+Two tasks that fail F8 by the same mechanism are one task measured twice, so the second one
+under-spends for a different reason. `t1_memory_workers` starts four workers at the same time, each
+holding 32MB, and asks for enough memory for all four to be resident at once. `--mem` is the
+allocation for the whole node, so the requirement is four times one worker's footprint, and a model
+that reasons correctly about a single worker still under-requests by a factor of four. The first
+task hides its cost inside one command substitution; this one hides it in concurrency, and the
+directive's scope is the thing to get right rather than a pipeline's peak.
+
+The properties that make it an F8 task rather than an F4 one are verified rather than asserted. The
+oracle solves it under real submission with cgroup enforcement. The induced under-request, `--mem`
+cut to 16M against a peak above 256MB, **passes `syntax`, `submittability`, `resource_fit`, `safety`
+and `functional` under the `bash` executor, all five levels, and comes back `OUT_OF_MEMORY` under
+real submission with no other level failing.** Both tasks now do that, and
+`make docker-guards-enforcement` fails if either stops doing it.
+
+What this does not yet give is a rate. Extending the set means the models have to be run against it,
+and until they are, F8 is two tasks with the property and one observation of a model tripping over
+it.
+
+One consequence of adding the task has to be stated rather than left implicit. `tasks/t1_exec.jsonl`
+grew by append, so the `t1_memory_bound` record is byte-identical and the 15-sample observation
+above is still an observation of the task it names. The file's digest moved all the same, which is
+what `dataset/MANIFEST.json` and `tasks_sha` are for: re-verifying those generations needs the
+one-task version of the file, and `anvil verify` will refuse them against this one. That is the
+correct behaviour and not an obstacle to work around.
+
 ---
 
 ## F9: An option this scheduler does not have
@@ -790,9 +818,12 @@ that does not know the rule and minus 6 to the one that does. See
   in gigabytes on two of the eight tasks, so appending a unit blindly passes a quarter of the
   category. A per-task value would separate repairing from copying. It regenerates
   `tasks/t2_repair.jsonl`, so it waits for the same pass as the F9 and F10 inducers;
-- F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
-  single task whose payload sits on the boundary of what it requests. Whether larger models leave
-  headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
+- F8 beyond one model. The task set is now two tasks that under-spend for different reasons,
+  a pipeline's peak and a directive's scope, both verified to be invisible to every static check
+  and to the `bash` executor, see [A second execution
+  task](#a-second-execution-task-and-why-it-is-not-the-same-one-twice). What is missing is the
+  models: the only observation is still 15 samples of the 1.5B, so whether larger models leave
+  headroom, and whether the concurrency case is harder than the pipeline one, is unmeasured;
 - the toolchain-sensitive task on a model that can reach the question. `tasks/t1_coreutils.jsonl`
   splits the two implementations by construction, and both Qwen sizes fail it on both images for
   reasons that have nothing to do with either: a here-string newline at 1.5B, a missing output
