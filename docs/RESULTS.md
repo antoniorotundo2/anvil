@@ -4,18 +4,16 @@ Every measured number this project stands behind, on one page, so it can be read
 running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
-Everything here was graded by verifier `74e00ebdcced`, which every report and every leaderboard
-entry records. **The current verifier is `20dd4a2e4159` and these numbers predate it**, which is
-why every leaderboard row reads *stale rules*: a constraint audit found `--mem` compared from below
-only, and it now demands equality. The effect is measured and confined, 30 verdicts in Qwen2.5-Coder
-1.5B's T2 cell, whose `strict` falls from 0.256 to about 0.21 with no ordering change. The tables
-below are left as graded until the run is reverified in one pass, see [What the audit
-settled](OBSERVED_FAILURES.md#what-the-audit-settled).
+Everything here was graded by verifier `20dd4a2e4159`, which every report and every leaderboard
+entry records.
 
-An earlier grading of the same generations is superseded: it ran before
-`check_resource_fit` had a floor on `--time`, and adding one moved five of the ten cells and
-swapped two models on T1. What that cost is written up in [The mirror of
-F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-did-not-catch).
+Two earlier gradings of the same generations are superseded, both of them for a one-sided comparison
+in `check_resource_fit`. The first had no floor on `--time`: adding one moved five of the ten cells
+and swapped two models on T1, see [The mirror of
+F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-did-not-catch). The second had no
+ceiling on `--mem`, found by auditing the remaining checks on purpose rather than by accident, and
+moved one cell, see [What the audit
+settled](OBSERVED_FAILURES.md#what-the-audit-settled).
 
 ## How to read them
 
@@ -63,7 +61,7 @@ Induced faults from the same eight tasks, same protocol, 220 repairs per seed.
 
 | model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict |
 |---|---|---|---|---|---|---|
-| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.377±0.011 | 0.256±0.007 |
+| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.330±0.009 | 0.211±0.007 |
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 |
 | granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.621±0.016 | 0.529±0.016 |
 | gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.932±0.005 | 0.726±0.002 |
@@ -76,7 +74,7 @@ one, hence the smaller denominators.
 |---|---|---|---|---|---|---|
 | F1 omitted default | 0.000 | 0.667 | 0.356 | 0.667 | 1.000 | 45 |
 | F2 directive after the first command | 0.342 | 1.000 | 0.642 | 0.875 | 0.875 | 120 |
-| F3 prose in a value | 0.542 | 0.983 | 0.800 | 0.875 | 0.875 | 120 |
+| F3 prose in a value | 0.292 | 0.983 | 0.800 | 0.875 | 0.875 | 120 |
 | F4 directive absent | 0.000 | 0.242 | 0.383 | 0.750 | 0.750 | 120 |
 | F5 no `#SBATCH` at all | 0.050 | 0.383 | 0.250 | 0.375 | 0.658 | 120 |
 | F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 1.000 | 15 |

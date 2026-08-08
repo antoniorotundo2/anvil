@@ -330,10 +330,12 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 3 seeds (0/1/2), n=5, five models across three families and two Qwen generations, 4-bit on an RTX 3060. Generated on the experiment
 machine, **graded inside the container**, which the first version of this table was not: see
 [A table measured against the wrong cluster](#a-table-measured-against-the-wrong-cluster) below.
-Generations in `results/20260802_091236/`, verdicts in `results/regrade_floor/`, verifier
-`74e00ebdcced`. An earlier grading of these same generations is superseded: it ran before
-`check_resource_fit` had a floor on `--time`, and five of the ten cells below moved when it was
-added, see [The mirror of F10](#the-mirror-of-f10-which-this-verifier-did-not-catch).
+Generations in `results/20260802_091236/`, verdicts in `results/regrade_mem/`, verifier
+`20dd4a2e4159`. Two earlier gradings of these same generations are superseded, both of them for a
+one-sided comparison in `check_resource_fit`: the first had no floor on `--time` and five of the ten
+cells below moved when it was added, see [The mirror of
+F10](#the-mirror-of-f10-which-this-verifier-did-not-catch); the second had no ceiling on `--mem` and
+one cell moved, see [What the audit settled](#what-the-audit-settled).
 
 **T1 (from scratch), pass@1, mean and half-range across seeds:**
 
@@ -349,7 +351,7 @@ added, see [The mirror of F10](#the-mirror-of-f10-which-this-verifier-did-not-ca
 
 | model | syntax | submittability | functional (bash) | functional (sbatch) | resource_fit | strict (bash) | strict (sbatch) |
 |---|---|---|---|---|---|---|---|
-| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.377±0.011 | 0.256±0.007 | 0.258±0.005 |
+| Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.595±0.009 | 0.330±0.009 | 0.211±0.007 | 0.212±0.005 |
 | Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.847±0.002 | 0.965±0.007 | 0.824±0.002 | 0.824±0.002 |
 | granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.750±0.000 | 0.621±0.016 | 0.529±0.016 | 0.529±0.016 |
 | gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.762±0.002 | 0.932±0.005 | 0.726±0.002 | 0.726±0.002 |
@@ -487,11 +489,17 @@ and over-requesting wastes an allocation rather than killing a job. What settles
 was specified also runs, and is also refused. `functional` is the level that asks whether the job
 works.
 
-The measured cost is one cell. Qwen2.5-Coder 1.5B loses 30 of its T2 passes, its F3 goes from 0.542
-to about 0.29 and its T2 `strict` from 0.256 to about 0.21. No ordering moves; it is last on T2 by
-thirty points either way. The constraint keeps the name `mem_min_mb`, misleading as that now is,
-because renaming it moves `tasks_sha` and would invalidate every generation ever measured against
-it, which is a far larger price than a stale name.
+The measured cost is one cell, and the estimate made before the regrade is worth recording beside
+what it produced. Qwen2.5-Coder 1.5B was expected to lose 30 T2 passes, taking its F3 from 0.542 to
+about 0.29 and its T2 `strict` from 0.256 to about 0.21. Reverified, F3 reads **0.292** and `strict`
+**0.211**, `resource_fit` **0.330** from 0.377, and every other cell on both task sets is identical
+to the digit. No ordering moves; the 1.5B is last on T2 by thirty points either way. An audit that
+can predict the effect of a fix to three decimals before applying it is the difference between
+tightening a check and guessing at one.
+
+The constraint keeps the name `mem_min_mb`, misleading as that now is, because renaming it moves
+`tasks_sha` and would invalidate every generation ever measured against it, which is a far larger
+price than a stale name.
 
 One thing happened by itself and is worth pointing at. Editing `verifier.py` moved `verifier_sha`
 from `74e00ebdcced` to `20dd4a2e4159`, and the next test run failed because the leaderboard page no
@@ -508,7 +516,7 @@ the smaller denominators.
 |---|---|---|---|---|---|---|
 | F1 omitted default | 0.000 | 0.667 | 0.356 | 0.667 | 1.000 | 45 |
 | F2 directive after the first command | 0.342 | 1.000 | 0.642 | 0.875 | 0.875 | 120 |
-| F3 prose in a value | 0.542 | 0.983 | 0.800 | 0.875 | 0.875 | 120 |
+| F3 prose in a value | 0.292 | 0.983 | 0.800 | 0.875 | 0.875 | 120 |
 | F4 directive absent | 0.000 | 0.242 | 0.383 | 0.750 | 0.750 | 120 |
 | F5 no `#SBATCH` at all | 0.050 | 0.383 | 0.250 | 0.375 | 0.658 | 120 |
 | F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 1.000 | 15 |
