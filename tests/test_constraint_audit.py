@@ -39,7 +39,7 @@ def _report(tmp_path: Path) -> Path:
         rec("t1_hello_serial", "#SBATCH --time=00:01\n#SBATCH --mem=64G\n", False),
     ]
     path = tmp_path / "model__seed0__bash.json"
-    path.write_text(json.dumps({"results": results}), encoding="utf-8")
+    path.write_text(json.dumps({"model": "vendor/m", "results": results}), encoding="utf-8")
     return path
 
 
@@ -72,7 +72,7 @@ def test_the_two_directions_are_separated(tmp_path):
 
 def test_a_sub_minute_request_is_read_as_seconds(tmp_path):
     _, written, _, _ = scan([_report(tmp_path)])
-    assert written[("time_max_minutes", "below", "t1_array_job", "00:15", 15)] == 1
+    assert written[("time_max_minutes", "below", "vendor/m", "t1_array_job", "00:15", 15)] == 1
 
 
 def test_the_table_states_which_direction_each_check_refuses():
@@ -88,9 +88,16 @@ def test_artifacts_of_another_task_file_are_reported_not_silently_dropped(tmp_pa
     with zeros in every bucket would read as a clean result. The count of what it could not
     audit is what tells the two apart."""
     path = tmp_path / "other__seed0__bash.json"
-    path.write_text(json.dumps({"results": [
+    path.write_text(json.dumps({"model": "vendor/m", "results": [
         {"task_id": "t1_memory_bound", "script": "#SBATCH --mem=64M\n", "all_passed": True},
     ]}), encoding="utf-8")
     sides, _, passed, unknown = scan([path])
     assert (passed, unknown) == (1, 1)
     assert not sides
+
+
+def test_the_model_is_part_of_the_breakdown(tmp_path):
+    """A loose bucket that belongs to one model moves a ranking when the check is tightened;
+    one spread across all of them shaves every row. The two need different decisions."""
+    _, written, _, _ = scan([_report(tmp_path)])
+    assert {key[2] for key in written} == {"vendor/m"}

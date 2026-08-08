@@ -75,11 +75,13 @@ def scan(paths: list[Path]) -> tuple[Counter, Counter, int, int]:
     written: Counter = Counter()
     passed = unknown = 0
     for path in paths:
-        for r in json.loads(path.read_text(encoding="utf-8"))["results"]:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        for r in report["results"]:
             if not r["all_passed"]:
                 continue
             passed += 1
             base = r["task_id"].split("__", 1)[0]
+            model = report.get("model", "unknown")
             if base not in limits:
                 # A report from another task file. Counted rather than skipped: without
                 # this, pointing the audit at the wrong run prints zeros everywhere and
@@ -98,7 +100,10 @@ def scan(paths: list[Path]) -> tuple[Counter, Counter, int, int]:
                 side = "exact" if got == value else ("above" if got > value else "below")
                 sides[(constraint, side)] += 1
                 if side != "exact":
-                    written[(constraint, side, base, raw, value)] += 1
+                    # The model belongs in the key: whether a loose bucket is one model's
+                    # habit or everyone's decides whether tightening the check moves a
+                    # ranking or shaves every row equally.
+                    written[(constraint, side, model, base, raw, value)] += 1
     return sides, written, passed, unknown
 
 
@@ -127,9 +132,10 @@ def main(argv: list[str]) -> int:
         print("\nnothing outside exact")
         return 0
     print("\nwhat was written where the value is not the declared one")
-    for (constraint, side, base, raw, value), n in written.most_common(20):
+    for (constraint, side, model, base, raw, value), n in written.most_common(20):
         label = KINDS[constraint][0]
-        print(f"  {n:4d}  {side:5s}  {base:24s} {label}={raw:14s} task declares {value:g}")
+        print(f"  {n:4d}  {side:5s}  {model.split('/')[-1]:28s} {base:24s} "
+              f"{label}={raw:10s} task declares {value:g}")
     return 0
 
 
