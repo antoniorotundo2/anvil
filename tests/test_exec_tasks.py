@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from anvil.inducer import INDUCERS  # noqa: E402
+from anvil.inducer import INDUCERS, NEEDS_ENFORCEMENT, decidable  # noqa: E402
 from anvil.schema import Task  # noqa: E402
 from anvil.verifier import check_resource_fit, check_syntax  # noqa: E402
 
@@ -74,3 +74,28 @@ def test_the_two_tasks_underspend_for_different_reasons():
     assert set(refs) == {"t1_memory_bound", "t1_memory_workers"}
     assert "&" not in refs["t1_memory_bound"]
     assert "wait" in refs["t1_memory_workers"]
+
+
+def test_only_f8_needs_an_enforced_allocation():
+    """Every other induced fault is decidable from the text or from a sandbox run, so a guard
+    without a scheduler can still conclude something about it. Adding a class here weakens
+    what the pre-GPU guards check, so the set is pinned."""
+    assert NEEDS_ENFORCEMENT == {"F8"}
+
+
+def test_a_guard_under_bash_may_not_conclude_anything_about_f8():
+    """It passes all five levels under bash by construction, which is the property F8 exists
+    to demonstrate. A guard that read that as a permissive verifier refused to run the whole
+    execution task set, which is how this was found."""
+    assert not decidable("F8", "bash")
+    assert decidable("F8", "sbatch")
+    for category in ("F2", "F4", "F5", "F7"):
+        assert decidable(category, "bash"), category
+
+
+def test_the_execution_repair_set_leaves_the_guard_something_to_decide():
+    """If every record needed enforcement the pre-GPU guard would have nothing to say, and
+    saying nothing must be a hard stop rather than a pass. This set does not hit that, and the
+    test records why: four of its five categories are decidable under bash."""
+    categories = {r["id"].rsplit("__", 1)[-1] for r in _records(EXEC_REPAIRS)}
+    assert categories - NEEDS_ENFORCEMENT

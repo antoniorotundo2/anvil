@@ -84,16 +84,37 @@ if [[ "$RUN_T2" == "1" ]]; then
     --out "${OUT}/repair_broken.json" >/dev/null
   "$PYTHON" - "$OUT" <<'PY'
 import json, sys, os
+sys.path.insert(0, os.getcwd())
+from anvil.inducer import NEEDS_ENFORCEMENT, decidable
+
 out = sys.argv[1]
-o = json.load(open(os.path.join(out, "repair_oracle.json")))["summary"]
-b = json.load(open(os.path.join(out, "repair_broken.json")))["summary"]
+oracle = json.load(open(os.path.join(out, "repair_oracle.json")))
+broken = json.load(open(os.path.join(out, "repair_broken.json")))
+o = oracle["summary"]
 bad = [l for l in ("syntax", "functional", "resource_fit", "safety") if o[l]["pass@1"] != 1.0]
 if bad:
-    sys.exit(f"STOP: oracle repair not at 1.0 on {bad}. tasks/t2_repair.jsonl or the repair "
+    sys.exit(f"STOP: oracle repair not at 1.0 on {bad}. the repair task set or the repair "
               "verifier is broken, not the models.")
-if b["strict_all_levels"]["pass@1"] != 0.0:
-    sys.exit("STOP: a no-op repair passes induced faults - the repair verifier is too permissive.")
-print("T2 guards OK: oracle repair 1.0, no-op repair 0.0 strict.")
+
+# The no-op repair must fail every fault this environment can judge. A fault that needs an
+# enforced allocation is excluded and named, never counted as if it had been checked: under
+# bash an F8 no-op passes all five levels because that is what F8 demonstrates, and a guard
+# that treated it as a permissive verifier would refuse to run the execution task set at all.
+executor = broken["environment"].get("functional_executor", "bash")
+judged = [r for r in broken["results"] if decidable(r["task_id"].rsplit("__", 1)[-1], executor)]
+skipped = len(broken["results"]) - len(judged)
+if not judged:
+    sys.exit(f"STOP: every induced fault in this set needs an enforcing executor and this one "
+             f"is {executor}: the guard cannot decide anything. Grade with --executor sbatch.")
+passing = [r["task_id"] for r in judged if r["all_passed"]]
+if passing:
+    sys.exit("STOP: a no-op repair passes induced faults - the repair verifier is too "
+             f"permissive: {sorted(set(passing))[:5]}")
+note = ""
+if skipped:
+    note = (f", {skipped} record(s) in {sorted(NEEDS_ENFORCEMENT)} not judged under {executor} "
+            "(they need an enforced allocation)")
+print(f"T2 guards OK: oracle repair 1.0, no-op repair 0.0 strict on {len(judged)} records{note}.")
 PY
 fi
 

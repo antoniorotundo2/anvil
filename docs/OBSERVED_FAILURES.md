@@ -130,6 +130,21 @@ What this does not yet give is a rate. Extending the set means the models have t
 and until they are, F8 is two tasks with the property and one observation of a model tripping over
 it.
 
+Pointing the experiment runner at this set for the first time stopped it before it spent any GPU
+time, with `a no-op repair passes induced faults - the repair verifier is too permissive`. The
+runner's pre-GPU guard requires every induced fault to be refused, and under `bash` an F8 no-op
+passes all five levels, which is the property F8 exists to demonstrate. The guard was right in
+general and wrong here, and it had been wrong since the execution set existed; nobody had met it
+because nobody had run the matrix against that set.
+
+A guard that cannot decide has to say so rather than block, and rather than quietly excuse itself.
+`anvil.inducer.NEEDS_ENFORCEMENT` names the classes no sandbox can judge, F8 being the only one, and
+the runner now computes its bracket over the records the current executor can decide, prints how
+many it excluded and why, and hard-stops if that leaves nothing. On the execution set it reads *0.0
+strict on 8 records, 2 record(s) in ['F8'] not judged under bash*; on `tasks/t2_repair.jsonl` it
+reads 44 records with no exclusion, because that set has no F8. The exclusion is not a hole: a
+verifier that had become permissive would still be caught on the eight.
+
 One consequence of adding the task has to be stated rather than left implicit. `tasks/t1_exec.jsonl`
 grew by append, so the `t1_memory_bound` record is byte-identical and the 15-sample observation
 above is still an observation of the task it names. The file's digest moved all the same, which is

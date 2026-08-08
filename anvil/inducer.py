@@ -246,6 +246,25 @@ def inject_f8_memory_underrequest(script: str, task: Task) -> str | None:
     return "\n".join(out) + ("\n" if script.endswith("\n") else "")
 
 
+# Fault classes that no static check and no sandbox can decide, so a guard run without an
+# enforcing executor cannot tell a permissive verifier from an environment that simply
+# cannot see the fault. F8 is the one: the memory value stays well formed, the scheduler
+# accepts it, the script completes under bash, and only an enforced allocation refuses the
+# job. A no-op repair of an F8 therefore passes every level under bash *by construction*,
+# which is the property the class exists to demonstrate and not a hole in the verifier.
+NEEDS_ENFORCEMENT = frozenset({"F8"})
+
+
+def decidable(category: str, executor: str) -> bool:
+    """Can this environment decide whether a repair of this fault succeeded?
+
+    Called by the guards rather than by the verifier: a level the executor cannot judge is
+    already reported as skipped, and skipped is never passed. What this answers is the
+    different question of whether a *guard* may draw a conclusion from the result.
+    """
+    return executor == "sbatch" or category not in NEEDS_ENFORCEMENT
+
+
 INDUCERS: dict[str, Callable[[str, Task], str | None]] = {
     "F1": inject_f1_silent_underrequest,
     "F2": inject_f2_misplaced_directive,
