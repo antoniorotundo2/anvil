@@ -233,6 +233,11 @@ sys.exit('FAIL: no F8 sample in the set, enforcement is untested') if not f8 els
 lv=[l for r in f8 for l in r['levels'] if l['level']=='functional']; \
 sys.exit('FAIL: the under-requesting script was not stopped, so nothing is enforced: %s' % [l['detail'][:80] for l in lv]) if any(l['passed'] or l['skipped'] for l in lv) else None; \
 print('enforcement guards OK: the memory under-request is caught only by execution')"
+	@echo "note: this target runs --privileged --cgroupns=host and leaves state in the"
+	@echo "      host cgroup tree. A container started afterwards can fail to allocate"
+	@echo "      ('Requested node configuration is not available'), which looks like a"
+	@echo "      code regression and is not one. Run 'make docker-test' before this, as"
+	@echo "      .github/workflows/ci.yml does, or restart the Docker engine after it."
 
 # --- T2: diagnose-and-repair -------------------------------------------------
 induce-t2:

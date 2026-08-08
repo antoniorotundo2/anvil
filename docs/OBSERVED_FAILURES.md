@@ -161,6 +161,21 @@ repairs still pass all five levels there. When the ceiling does stop something, 
 `(sandbox ceiling 1024MB, not the requested allocation)`, so nobody reads machine protection as a
 verdict on the artifact.
 
+The ceiling alone was not the whole leak. The next run got six cells further and then died again,
+during a model load with no script running, which is the shape of something that had been left
+behind. **The sandbox never killed what a script started in the background.** Waiting for the shell
+reaps the shell; a generated artifact that backgrounds work and exits without waiting leaves the
+children running, holding whatever they allocated, and they accumulate across a matrix until the
+host kills something unrelated. This task set is the first whose prompts ask for background workers,
+so the leak is exactly as new as the allocation was. The sandbox now runs in its own session and
+kills the whole process group afterwards, on the ordinary path and not only on timeout.
+
+Fixing it turned up a second defect in the same lines, worse in a quieter way: the output was read
+from pipes, and background children inherit the write end, so reading to end-of-file waited for
+*them* rather than for the script. A job returning in a millisecond blocked for the entire timeout,
+and nothing said so. Output goes to files now, and the two regression tests assert both halves: a
+backgrounded child does not outlive the sandbox, and a script that backgrounds work returns at once.
+
 `ulimit -v` does nothing on Darwin, so the ceiling is platform-dependent and reported rather than
 assumed. `anvil doctor` prints `sandbox_mem_mb` and warns when it reads `uncapped`, and every report
 carries the value: a run whose sandbox was uncapped is one that could have been stopped by the host

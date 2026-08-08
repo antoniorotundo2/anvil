@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,7 @@ from anvil.parse import (
 )
 from anvil.schema import Level, Task
 from anvil.verifier import (
+    check_functional,
     check_resource_fit,
     check_safety,
     check_syntax,
@@ -1424,3 +1426,31 @@ def test_thinking_is_only_disabled_when_asked(monkeypatch):
 
     assert "enable_thinking" not in seen[0]
     assert seen[1]["enable_thinking"] is False
+
+
+# Both found by pointing the matrix at the execution task set, which is the first one whose
+# prompts ask for background workers. Six cells in, the run was killed during a model load
+# with no script running: the sandbox had been leaving orphans behind for every artifact
+# that backgrounded work and never waited for it.
+def test_the_sandbox_leaves_nothing_running_behind_it(tmp_path):
+    marker = tmp_path / "orphan_ran"
+    script = f"#!/bin/bash\n( sleep 2; touch {marker} ) &\necho ANVIL_OK\n"
+    task = Task(id="t", prompt="p", constraints={}, expects_in_body=["ANVIL_OK"])
+
+    result = check_functional(script, task)
+    assert result.passed, result.detail
+    time.sleep(3)
+    assert not marker.exists(), "a background child outlived the sandbox that started it"
+
+
+def test_a_script_that_backgrounds_work_returns_at_once(tmp_path):
+    """The second half of the same defect. Reading the sandbox's output to end-of-file waits
+    for every process holding the write end, so one background child made a job that returns
+    in a millisecond block for the whole timeout."""
+    script = "#!/bin/bash\n( sleep 30 ) &\necho ANVIL_OK\n"
+    task = Task(id="t", prompt="p", constraints={}, expects_in_body=["ANVIL_OK"])
+
+    start = time.monotonic()
+    result = check_functional(script, task, timeout=30)
+    assert result.passed, result.detail
+    assert time.monotonic() - start < 5

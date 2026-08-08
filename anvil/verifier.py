@@ -15,6 +15,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -522,6 +523,23 @@ def sandbox_mem_mb() -> int | None:
     return _sandbox_cap
 
 
+def _kill_session(proc: subprocess.Popen) -> None:
+    """Reap whatever the script left running, itself included.
+
+    `start_new_session` makes the shell a session leader, so its pid *is* its process group
+    id and one `killpg` reaches every descendant that outlived it. The pid is used directly
+    rather than looked up with `getpgid`, which fails once the leader has been reaped and
+    silently left every orphan running.
+
+    Called on the normal path as well as on timeout: a script that exits cleanly having
+    backgrounded work is the ordinary case, not the exceptional one.
+    """
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
 def _run_under_bash(workdir: str, script: str, task: Task, timeout: int) -> LevelResult:
     script_path = Path(workdir) / "job.sh"
     script_path.write_text(script, encoding="utf-8")
@@ -547,23 +565,40 @@ def _run_under_bash(workdir: str, script: str, task: Task, timeout: int) -> Leve
     else:
         argv = ["bash", "-c", f"ulimit -v {cap * 1024}; exec bash {shlex.quote(str(script_path))}"]
 
-    try:
-        proc = subprocess.run(
-            argv,
-            capture_output=True, text=True, timeout=timeout,
-            cwd=workdir, env=env,
+    # Its own session, so everything the script starts can be killed together. A generated
+    # script may background work and exit without waiting for it, and waiting only for the
+    # shell leaves the orphans alive, holding whatever they allocated, accumulating across a
+    # matrix until the host kills something unrelated. That is how a run died six cells in,
+    # during a model load, with no script running.
+    #
+    # Output goes to files rather than pipes for the same reason: the background children
+    # inherit the write end, so reading until end-of-file waits for *them* and not for the
+    # script, and a job that returns in a millisecond blocks for the whole timeout.
+    out_path, err_path = Path(workdir) / "stdout", Path(workdir) / "stderr"
+    with open(out_path, "w") as out_fh, open(err_path, "w") as err_fh:
+        proc = subprocess.Popen(
+            argv, stdout=out_fh, stderr=err_fh, text=True,
+            cwd=workdir, env=env, start_new_session=True,
         )
-    except subprocess.TimeoutExpired:
-        return LevelResult(Level.FUNCTIONAL, False, f"timed out after {timeout}s")
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_session(proc)
+            return LevelResult(Level.FUNCTIONAL, False, f"timed out after {timeout}s")
+        finally:
+            _kill_session(proc)
+
+    stdout = out_path.read_text(encoding="utf-8", errors="replace")
+    stderr = err_path.read_text(encoding="utf-8", errors="replace")
 
     if proc.returncode != 0:
-        detail = f"exit code {proc.returncode}: {proc.stderr.strip()[:200]}"
-        if cap is not None and "cannot allocate" in proc.stderr:
+        detail = f"exit code {proc.returncode}: {stderr.strip()[:200]}"
+        if cap is not None and "cannot allocate" in stderr:
             # Said out loud, or the reader takes it for a resource verdict on the artifact.
             detail += f" (sandbox ceiling {cap}MB, not the requested allocation)"
         return LevelResult(Level.FUNCTIONAL, False, detail)
 
-    combined = proc.stdout + proc.stderr
+    combined = stdout + stderr
     missing = [s for s in task.expects_in_body if s not in combined]
     if missing:
         return LevelResult(Level.FUNCTIONAL, False, f"expected output not found: {missing}")
