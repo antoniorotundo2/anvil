@@ -2,7 +2,7 @@
   "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
   "tasks_file": "tasks/t2_repair.jsonl",
   "tasks_sha": "723aa7ec4463",
-  "verifier_sha": "74e00ebdcced",
+  "verifier_sha": "20dd4a2e4159",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/regrade_floor",
+  "source": "results/regrade_mem",
   "scores": {
     "syntax": {
       "mean": 0.7924,
@@ -30,8 +30,8 @@
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.377267,
-      "half_range": 0.01135,
+      "mean": 0.3303,
+      "half_range": 0.0091,
       "cells": 3
     },
     "safety": {
@@ -40,8 +40,8 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.256033,
-      "half_range": 0.0068,
+      "mean": 0.2106,
+      "half_range": 0.00685,
       "cells": 3
     }
   }
