@@ -327,7 +327,8 @@ Fixed; short options (`-t`, `-N`, `-c`, ...) are now normalised to their long fo
 
 ## Multi-seed validation (T1 and T2)
 
-3 seeds (0/1/2), n=5, five models across three families and two Qwen generations, 4-bit on an RTX 3060. Generated on the experiment
+3 seeds (0/1/2), n=5, five models across three families and two Qwen generations, 4-bit on an RTX
+3060. Generated on the experiment
 machine, **graded inside the container**, which the first version of this table was not: see
 [A table measured against the wrong cluster](#a-table-measured-against-the-wrong-cluster) below.
 Generations in `results/20260802_091236/`, verdicts in `results/regrade_mem/`, verifier
@@ -453,6 +454,59 @@ binding, or a job step. Real submission has yet to catch a single artifact that 
 that was genuinely wrong, on any of the eight tasks. The one place it does is a task built for it,
 F8 above, which no static check and no sandbox can see.
 
+### What F3 actually measures
+
+F3 is the widest gap in the per-category table, 0.292 for the 1.5B against 0.800 to 0.983 for the
+other four, and the open question was whether that is small-model degeneracy or a stable semantic
+error. It is neither. **83 of the 1.5B's 85 F3 failures are `--mem`, and all of them are one
+mechanism.**
+
+The inducer replaces the value with `#SBATCH --mem=2 referencing the requested memory`, the same
+literal `2` on all eight tasks. What the model hands back, per task, is this:
+
+```
+--mem=2 referencing the requested memory   container, 15 of 15: the line comes back untouched
+--mem=2                                    cpus_per_task, 15 of 15: prose stripped, digit kept
+--mem=2G                                   array_job and output_paths, 15 of 15 each
+--mem=2G                                   dependency_chain, 15 of 15, and these pass
+--mem=512m                                 hello_serial, 15 of 15, and these pass
+```
+
+The digit is the inducer's, not the task's. Where the task happens to need 2GB the model appends `G`
+to what it was shown and is right; where it needs 1GB the same move is double; where it appends no
+unit at all the request is two megabytes. `t1_hello_serial` is the one task where it reads the
+prompt
+instead, and it passes every sample. **This is F10's mechanism on another field**: a digit carried
+across from the text in front of the model with the unit decided independently, right when the two
+happen to agree.
+
+The note above asks for the two diagnoses to be told apart before T2 induction relies on them, and
+the counts answer it. 52 failures read `--mem N MB below minimum N MB`, 31 read `--mem N MB above
+the
+N MB the task declares`, and only 15 are still legible as prose, the untouched container line caught
+at `submittability` with `Invalid directive found in batch script: referenc`. So degenerate prose
+does masquerade as a magnitude error, in 68 of 83 cases, and the category records a number problem
+where the fault was a language problem. Worth keeping in mind before any claim rests on F3 being
+about prose.
+
+**A constant digit makes a quarter of the category repairable by luck.** `t1_cpus_per_task` and
+`t1_dependency_chain` both declare 2048MB, which is exactly the inducer's `2` read as gigabytes,
+so a
+model that blindly appends `G` to the digit it was shown passes those two and fails the other six.
+The 1.5B does precisely that and collects `t1_dependency_chain`. An inducer whose value varies with
+the task would separate repairing from copying; the constant cannot. Changing it regenerates
+`tasks/t2_repair.jsonl`, so it joins the F9 and F10 list of things to fix in the one pass where that
+file is rebuilt.
+
+Granite 4.1 3B is the control, at 0.800 on the same category with 24 failures, and its mechanism is
+different rather than milder. Nine are `--mem not requested`: repairing a corrupted value, it
+deletes
+the directive instead of fixing it, which is a failed repair of the induced fault by another route.
+The other fifteen are `t1_container_apptainer` returning a payload that never prints `ANVIL_OK`, the
+same standing weakness that fails the task in from-scratch generation and under F4. So more than
+half
+of its F3 score is not about F3, which is the third model this holds for.
+
 ### What the audit settled
 
 The walltime gap surfaced by accident, while five models were being screened for F10, which is a
@@ -473,14 +527,17 @@ declares `gpus_min`, and no model in any run over-requests. Nothing to do.
 
 `--mem` had 30 passes above the declared value, 1.3%, and the shape of them decided it. All 30 are
 one model, Qwen2.5-Coder 1.5B, writing `--mem=2G` against the 1024MB that `t1_array_job` and
-`t1_output_paths` name, and all 30 are **F3 repairs**: prose had leaked into a value, and the model
-fixed that and rewrote the memory request as well. From scratch the same model writes the declared
-value on both tasks, every sample.
+`t1_output_paths` name, and all 30 are **F3 repairs**. So `--mem` now demands equality, like
+`--nodes`, `--ntasks`, `--cpus-per-task` and `--time` before it.
 
-That is the same behaviour as Gemma inventing `--mem-per-node` while repairing an F4, and the
-benchmark refuses Gemma's. A model altering a directive the induced fault never touched is what the
-repair set exists to expose, and over-requesting was the one way to do it and still pass. So `--mem`
-now demands equality, like `--nodes`, `--ntasks`, `--cpus-per-task` and `--time` before it.
+The reason given here at first was that the model had rewritten a directive the induced fault never
+touched, the way Gemma invents `--mem-per-node` while repairing an F4. That was wrong, and
+[the F3 dig](#what-f3-actually-measures) has the correct account: F3 replaces the `--mem` value with
+`2 referencing the requested memory`, so the directive is the broken one, and `2G` is the fault's
+own
+digit with a unit appended. The tightening is better justified than the reason first given for it,
+not worse. An artifact that keeps the digit it was shown is a failed repair, and under a floor-only
+check it passed whenever the guess landed above the requirement.
 
 The case was closer than the walltime one and the argument against is worth recording. `mem_min_mb`
 is named a minimum, F8 is a whole fault class about requesting *less* memory than the payload uses,
@@ -728,13 +785,11 @@ that does not know the rule and minus 6 to the one that does. See
   because the two families fail it for different reasons and one of the reasons is site-dependent
   while the other is not. Whether "invented values against invented syntax" is a real split or two
   points that happen to differ needs a third habit to compare against;
-- a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
-  error as model scale keeps increasing. The category now reads 0.292 for the 1.5B against 0.800
-  to 0.983 for the other four, the widest gap in the table, and 30 of its 85 failures are the
-  `--mem` rewrite the audit turned up rather than anything to do with prose in a value. The two
-  diagnoses [the F3 note](#f3-note-the-diagnosis-is-parser-dependent) asks to be told apart are
-  distinguishable in the reports, `--mem unparsable` against `--mem N MB below minimum`, and
-  `scripts/category_dig.py` reads them;
+- the F3 inducer's constant value. The category is measured and understood, see [What F3 actually
+  measures](#what-f3-actually-measures), and the finding is that its literal `2` is the right answer
+  in gigabytes on two of the eight tasks, so appending a unit blindly passes a quarter of the
+  category. A per-task value would separate repairing from copying. It regenerates
+  `tasks/t2_repair.jsonl`, so it waits for the same pass as the F9 and F10 inducers;
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;
