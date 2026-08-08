@@ -449,7 +449,11 @@ _CLUSTER_STATE = (
     "requested partition configuration not available",
     "nodes required for job are down",
 )
-_SUBMIT_ATTEMPTS = 3
+# Two, not more. Raising it was the wrong lever: a CI run where the condition recurred took
+# 324 seconds instead of 16 and still failed four tests. What decides is not how many times
+# the same question is asked but whether the scheduler can answer any question at all, which
+# is what the preflight below is re-run to find out.
+_SUBMIT_ATTEMPTS = 2
 
 
 def _about_the_cluster(detail: str) -> bool:
@@ -480,6 +484,20 @@ def check_submittability(script: str) -> LevelResult:
                 return LevelResult(Level.SUBMITTABILITY, proc.returncode == 0, detail)
             if attempt + 1 < _SUBMIT_ATTEMPTS:
                 time.sleep(1)
+
+        # Still refused, and still about the cluster. Ask the preflight again rather than
+        # counting the refusal against the artifact: the canary is a script this scheduler
+        # must accept, so if it is refused too then nothing here is being judged and the
+        # level is skipped, with the reason, exactly as when no scheduler is reachable at
+        # all. If the canary passes, the refusal really is about this script.
+        healthy_now, why_now = slurm_healthy(force=True)
+        if not healthy_now:
+            return LevelResult(
+                level=Level.SUBMITTABILITY,
+                passed=False,
+                skipped=True,
+                detail=f"level skipped (NOT counted as passed): {why_now}",
+            )
         return LevelResult(Level.SUBMITTABILITY, False, detail)
     except subprocess.TimeoutExpired:
         return LevelResult(Level.SUBMITTABILITY, False, "sbatch --test-only: timeout")

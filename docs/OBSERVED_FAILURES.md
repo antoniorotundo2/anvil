@@ -943,14 +943,24 @@ startup race being narrowly missed, it is a condition recurring throughout the r
 runner hosting four `slurmd` daemons and a test suite, a node drops out of service for a moment and
 `sbatch --test-only` answers an ordinary job with `Requested node configuration is not available`.
 
-So the fix belongs in the verifier rather than in the entrypoint, and the rule it needs is one the
-project already applies at a coarser grain. `slurm_healthy` refuses to score a scheduler that cannot
-judge at all, because those numbers would be the harness and not the model. The same holds for a
-single refusal that describes the cluster's state instead of the script: **`check_submittability`
-retries it, three attempts a second apart, and reports it only if it persists.** A request no node
-can satisfy answers identically every time and still fails; only a condition that clears within a
-couple of seconds is absorbed, and a refusal that names the artifact, an invalid partition, an
-unsatisfiable memory specification, an option SLURM does not have, is never retried at all.
+So the fix belongs in the verifier rather than in the entrypoint. The first attempt there was to
+retry a refusal that describes the cluster's state rather than the script, three attempts a second
+apart. It made things worse in an instructive way: the next run took **324 seconds instead of 16**
+and still failed four tests. Hundreds of calls were being refused and recovering, which is not the
+occasional flap the retry was written for, and the number of attempts was the wrong lever.
+
+What decides is not how many times the same question is asked but whether the scheduler can answer
+any question at all, and the project already has that rule at a coarser grain: `slurm_healthy`
+refuses to score a scheduler that cannot judge, because those numbers would be the harness and not
+the model. So a cluster-state refusal that survives one retry now **re-runs the preflight**. The
+canary is a script this scheduler must accept; if it is refused too, nothing is being judged and the
+level is **skipped with the reason**, exactly as when no scheduler is reachable. If the canary
+passes, the refusal really is about this script and it fails.
+
+Skipped is never passed, so nothing is masked: a level that cannot decide contributes nothing to
+`strict_all_levels` and says so in the report. And a refusal that names the artifact, an invalid
+partition, an unsatisfiable memory specification, an option SLURM does not have, is never retried at
+all, so the common path costs one call as before.
 
 What none of this does is prove the CI failure fixed. It was never reproduced locally, on either
 machine available here, and a resource-starvation flap on someone else's runner rarely is. What can

@@ -1483,7 +1483,8 @@ def test_a_persistent_cluster_refusal_still_fails(monkeypatch):
         stderr = "allocation failure: Requested node configuration is not available"
         stdout = ""
 
-    monkeypatch.setattr(v, "slurm_healthy", lambda: (True, "ok"))
+    # The canary keeps answering, so the refusal really is about this script.
+    monkeypatch.setattr(v, "slurm_healthy", lambda force=False: (True, "ok"))
     monkeypatch.setattr(v.subprocess, "run", lambda *a, **k: calls.append(1) or Refusal())
     monkeypatch.setattr(v.time, "sleep", lambda _: None)
 
@@ -1491,3 +1492,27 @@ def test_a_persistent_cluster_refusal_still_fails(monkeypatch):
     assert not result.passed
     assert not result.skipped
     assert len(calls) == v._SUBMIT_ATTEMPTS
+
+
+def test_a_scheduler_that_stopped_answering_skips_rather_than_fails(monkeypatch):
+    """The lever that matters. A refusal about the cluster that survives a retry is checked
+    against the canary, a script this scheduler must accept: if that is refused too, nothing
+    is being judged and the level is skipped with the reason, the same as when no scheduler
+    is reachable. Counting it against the artifact publishes the machine as the model.
+    """
+    from anvil import verifier as v
+
+    class Refusal:
+        returncode = 1
+        stderr = "allocation failure: Requested node configuration is not available"
+        stdout = ""
+
+    healthy = iter([(True, "ok"), (False, "the scheduler rejects even a minimal script")])
+    monkeypatch.setattr(v, "slurm_healthy", lambda force=False: next(healthy))
+    monkeypatch.setattr(v.subprocess, "run", lambda *a, **k: Refusal())
+    monkeypatch.setattr(v.time, "sleep", lambda _: None)
+
+    result = v.check_submittability("#!/bin/bash\n#SBATCH --mem=512M\necho hi\n")
+    assert result.skipped
+    assert not result.passed
+    assert "NOT counted as passed" in result.detail
