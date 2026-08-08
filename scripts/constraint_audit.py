@@ -103,7 +103,10 @@ def scan(paths: list[Path]) -> tuple[Counter, Counter, int, int]:
                     # The model belongs in the key: whether a loose bucket is one model's
                     # habit or everyone's decides whether tightening the check moves a
                     # ranking or shaves every row equally.
-                    written[(constraint, side, model, base, raw, value)] += 1
+                    # The full id, not the stripped base: `t1_array_job` and
+                    # `t1_array_job__F4` are a from-scratch artifact and a repair, and
+                    # pooling them hides which run a loose request came from.
+                    written[(constraint, side, model, r["task_id"], raw, value)] += 1
     return sides, written, passed, unknown
 
 
@@ -132,9 +135,9 @@ def main(argv: list[str]) -> int:
         print("\nnothing outside exact")
         return 0
     print("\nwhat was written where the value is not the declared one")
-    for (constraint, side, model, base, raw, value), n in written.most_common(20):
+    for (constraint, side, model, task, raw, value), n in written.most_common(20):
         label = KINDS[constraint][0]
-        print(f"  {n:4d}  {side:5s}  {model.split('/')[-1]:28s} {base:24s} "
+        print(f"  {n:4d}  {side:5s}  {model.split('/')[-1]:28s} {task:28s} "
               f"{label}={raw:10s} task declares {value:g}")
     return 0
 

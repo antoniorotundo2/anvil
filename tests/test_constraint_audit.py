@@ -73,6 +73,9 @@ def test_the_two_directions_are_separated(tmp_path):
 def test_a_sub_minute_request_is_read_as_seconds(tmp_path):
     _, written, _, _ = scan([_report(tmp_path)])
     assert written[("time_max_minutes", "below", "vendor/m", "t1_array_job", "00:15", 15)] == 1
+    # The repair record keeps its fault suffix, so the two runs stay apart.
+    assert written[("time_max_minutes", "below", "vendor/m", "t1_cpus_per_task__F4",
+                    "00:30", 30)] == 1
 
 
 def test_the_table_states_which_direction_each_check_refuses():
