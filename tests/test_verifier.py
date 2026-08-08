@@ -1454,3 +1454,40 @@ def test_a_script_that_backgrounds_work_returns_at_once(tmp_path):
     result = check_functional(script, task, timeout=30)
     assert result.passed, result.detail
     assert time.monotonic() - start < 5
+
+
+# Three CI runs went red on a different set of tests each time, all of them reporting
+# `allocation failure: Requested node configuration is not available` for scripts the
+# reference cluster accepts everywhere else. A node that has flapped out of service answers
+# an ordinary job that way, and the artifact then carries a failure that belongs to the host.
+def test_a_refusal_about_the_cluster_is_retried_and_one_about_the_script_is_not():
+    from anvil import verifier as v
+
+    assert v._about_the_cluster("allocation failure: Requested node configuration is not available")
+    assert v._about_the_cluster("Nodes required for job are DOWN, DRAINED or reserved")
+    # These name the artifact, and retrying them would only be slower.
+    assert not v._about_the_cluster("sbatch: error: invalid partition specified: gpu")
+    assert not v._about_the_cluster("Memory specification can not be satisfied")
+    assert not v._about_the_cluster("sbatch: unrecognized option '--walltime=30'")
+
+
+def test_a_persistent_cluster_refusal_still_fails(monkeypatch):
+    """The retry must not become a way for a machine that genuinely cannot place the job to
+    report a pass. A request no node can satisfy answers the same way every time."""
+    from anvil import verifier as v
+
+    calls = []
+
+    class Refusal:
+        returncode = 1
+        stderr = "allocation failure: Requested node configuration is not available"
+        stdout = ""
+
+    monkeypatch.setattr(v, "slurm_healthy", lambda: (True, "ok"))
+    monkeypatch.setattr(v.subprocess, "run", lambda *a, **k: calls.append(1) or Refusal())
+    monkeypatch.setattr(v.time, "sleep", lambda _: None)
+
+    result = v.check_submittability("#!/bin/bash\n#SBATCH --nodes=99\necho hi\n")
+    assert not result.passed
+    assert not result.skipped
+    assert len(calls) == v._SUBMIT_ATTEMPTS

@@ -937,9 +937,26 @@ every variant, since a skipped level is never a passed one: the file would be la
 would still carry a digest and look authoritative. A task set is the definition of the benchmark,
 so this is a refusal rather than a warning.
 
-What this does not do is prove the CI failure fixed. It was not reproduced locally, and a timing
-race on someone else's machine rarely is. What can be said is that a fixed sleep was an assumption
-and is now a check, and that the failure mode matches the assumption being wrong on a slower host.
+None of that fixed it. The third run came back with three failures again, on a third disjoint set
+of tests, all of them the same message. A defect that moves to different tests each time is not a
+startup race being narrowly missed, it is a condition recurring throughout the run: on a four-core
+runner hosting four `slurmd` daemons and a test suite, a node drops out of service for a moment and
+`sbatch --test-only` answers an ordinary job with `Requested node configuration is not available`.
+
+So the fix belongs in the verifier rather than in the entrypoint, and the rule it needs is one the
+project already applies at a coarser grain. `slurm_healthy` refuses to score a scheduler that cannot
+judge at all, because those numbers would be the harness and not the model. The same holds for a
+single refusal that describes the cluster's state instead of the script: **`check_submittability`
+retries it, three attempts a second apart, and reports it only if it persists.** A request no node
+can satisfy answers identically every time and still fails; only a condition that clears within a
+couple of seconds is absorbed, and a refusal that names the artifact, an invalid partition, an
+unsatisfiable memory specification, an option SLURM does not have, is never retried at all.
+
+What none of this does is prove the CI failure fixed. It was never reproduced locally, on either
+machine available here, and a resource-starvation flap on someone else's runner rarely is. What can
+be said is that the fixed sleeps were an assumption and are now checks, that the last probe tests
+the exact call that was failing rather than a proxy for it, and that a level now reports on the
+artifact or reports nothing, which is the property it was supposed to have all along.
 
 ## Next measurements needed
 

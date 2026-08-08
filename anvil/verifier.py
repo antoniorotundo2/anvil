@@ -434,6 +434,29 @@ def check_syntax(script: str) -> LevelResult:
 # --------------------------------------------------------------------------
 # L2 - submittability (would SLURM accept the job?)
 # --------------------------------------------------------------------------
+# Refusals that describe the cluster rather than the script. A node that has flapped out of
+# service answers a perfectly ordinary job with one of these, and the artifact then carries a
+# failure that belongs to the machine: three CI runs in a row went red this way, on a
+# different set of tests each time, while the same commit passed everywhere else.
+#
+# Retrying is safe in the direction that matters. A request no node can satisfy, `--nodes=99`
+# on a four-node cluster, answers the same way every time and still fails; only a condition
+# that clears within a couple of seconds is absorbed. The preflight already refuses to score
+# a scheduler that cannot judge at all, and this is the same rule at a finer grain: a level
+# reports on the artifact, or it reports nothing.
+_CLUSTER_STATE = (
+    "requested node configuration is not available",
+    "requested partition configuration not available",
+    "nodes required for job are down",
+)
+_SUBMIT_ATTEMPTS = 3
+
+
+def _about_the_cluster(detail: str) -> bool:
+    low = detail.lower()
+    return any(marker in low for marker in _CLUSTER_STATE)
+
+
 def check_submittability(script: str) -> LevelResult:
     healthy, why = slurm_healthy()
     if not healthy:
@@ -448,12 +471,16 @@ def check_submittability(script: str) -> LevelResult:
         fh.write(script)
         tmp = fh.name
     try:
-        proc = subprocess.run(
-            ["sbatch", "--test-only", tmp], capture_output=True, text=True, timeout=30
-        )
-        ok = proc.returncode == 0
-        detail = (proc.stderr or proc.stdout).strip()[:300] or "ok"
-        return LevelResult(Level.SUBMITTABILITY, ok, detail)
+        for attempt in range(_SUBMIT_ATTEMPTS):
+            proc = subprocess.run(
+                ["sbatch", "--test-only", tmp], capture_output=True, text=True, timeout=30
+            )
+            detail = (proc.stderr or proc.stdout).strip()[:300] or "ok"
+            if proc.returncode == 0 or not _about_the_cluster(detail):
+                return LevelResult(Level.SUBMITTABILITY, proc.returncode == 0, detail)
+            if attempt + 1 < _SUBMIT_ATTEMPTS:
+                time.sleep(1)
+        return LevelResult(Level.SUBMITTABILITY, False, detail)
     except subprocess.TimeoutExpired:
         return LevelResult(Level.SUBMITTABILITY, False, "sbatch --test-only: timeout")
     finally:
