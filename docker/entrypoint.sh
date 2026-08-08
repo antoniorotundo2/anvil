@@ -269,7 +269,22 @@ fi
 # slurmctld daemonises itself: no `&` (that would attach it to the session).
 rm -rf /var/spool/slurmctld/* 2>/dev/null || true
 ( setsid /usr/sbin/slurmctld >/dev/null 2>&1 </dev/null & )
-sleep 3
+
+# Wait for the controller to answer instead of sleeping a fixed three seconds. On a loaded
+# machine it needs longer, and what a not-yet-ready controller does is worse than being
+# slow: `sbatch --test-only` comes back "Requested node configuration is not available",
+# which reads as the artifact asking for something impossible. That refusal reached the
+# task set itself, because `induce_t2_tasks` keeps an induced variant only if the verifier
+# refuses it, so a controller that was still starting silently changed which faults exist.
+anvil_wait_for() {                        # $1 = what to wait for, $2 = the probe
+  for _ in $(seq 1 60); do
+    eval "$2" >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  echo "==> WARNING: $1 did not become ready in 60s; submittability will be unreliable" >&2
+  return 1
+}
+anvil_wait_for "slurmctld" "scontrol ping"
 
 # One slurmd per virtual node (multi-slurmd). If it fails, Anvil's preflight marks
 # `submittability` as SKIPPED with an explicit cause - never as a model failure.
@@ -277,9 +292,16 @@ for i in $(seq 1 "${ANVIL_NODES}"); do
   mkdir -p "/var/spool/slurmd/node${i}"
   ( setsid /usr/sbin/slurmd -N "node${i}" >/dev/null 2>&1 </dev/null & )
 done
-sleep 3
+# Same again for the nodes: the controller answering does not mean it has a node to place
+# a job on, and a job placed on nothing is refused with the message above.
+anvil_wait_for "the compute nodes" "sinfo -h -o %T | grep -qv down"
 scontrol update nodename="node[1-${ANVIL_NODES}]" state=resume >/dev/null 2>&1 || true
-sleep 1
+
+# No `sbatch --test-only` probe here, however much it is the call every level makes: a
+# test-only submission still takes a job id, and `FirstJobId=12345` plus the placeholder
+# below is what lets a task declare `--dependency=afterok:12345`. Probing with it moved the
+# placeholder off 12345 and every dependency task began failing with "Job dependency
+# problem". The placeholder submission a few lines down is the real placement check.
 
 # The placeholder takes id 12345 so that a task declaring --dependency=afterok:12345 has
 # something to point at. It used to be submitted with --hold, which is enough for

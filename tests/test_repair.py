@@ -222,3 +222,18 @@ def test_t2_repair_file_is_in_sync_with_current_inducers():
         "tasks/t2_repair.jsonl is stale: re-run `anvil induce` "
         "(anvil induce --out tasks/t2_repair.jsonl)"
     )
+
+
+def test_induction_refuses_a_machine_that_cannot_judge_submittability(tmp_path, monkeypatch):
+    """The T2 set keeps a variant when the verifier refuses it, and a skipped level is never
+    a passed one, so on a machine with no scheduler every variant is kept, including the ones
+    that verify clean. The file would be larger, silently, and would still carry a digest.
+    A task set is the definition of the benchmark, so this is a refusal and not a warning.
+    """
+    import anvil.cli as cli
+
+    monkeypatch.setattr(cli, "slurm_healthy", lambda: (False, "sbatch not available"))
+    out = tmp_path / "t2.jsonl"
+    rc = cli.main(["induce", "--tasks", str(TASKS), "--reference", str(REFS), "--out", str(out)])
+    assert rc == 2
+    assert not out.exists()

@@ -897,6 +897,43 @@ model run after it landed hit it on this same machine: `submittability` was skip
 `Invalid generic resource (gres) specification` given as the reason, rather than scored against a
 cluster that is not the reference one.
 
+### A task set that depended on how fast the scheduler started
+
+CI failed with four tests down and one of them explaining the rest: `tasks/t2_repair.jsonl` read
+stale, with `t1_hello_serial__F1` and `t1_container_apptainer__F1` as *extra* items. Regenerating
+the file on that machine produced faults that the committed file does not have.
+
+`induce_t2_tasks` keeps an induced variant only when the verifier refuses it, which is the right
+rule: an inducer that produces an accidentally valid script has induced nothing. But
+`submittability`
+is one of the levels doing the refusing, and on that runner `sbatch --test-only` was answering
+`Requested node configuration is not available` for the canonical `t1_hello_serial`. Dropping
+`--ntasks=1` from that task leaves the effective count at 1 and `resource_fit` passes it, so the
+variant is normally discarded; with the scheduler refusing everything it was kept instead. **A
+controller that was still starting changed which faults the benchmark contains.**
+
+The container's entrypoint waited for the scheduler with two fixed `sleep 3`. That is an assumption
+about how fast a machine is, and the assumption is what failed. It now waits for `scontrol ping` to
+answer and for a node to leave the down state, up to sixty seconds, and says so loudly if it never
+does.
+
+A first attempt at that fix probed readiness with `sbatch --test-only`, which broke every
+dependency task at once: a test-only submission still takes a job id, and the entrypoint relies on
+`FirstJobId=12345` plus a placeholder landing on exactly 12345 so that `--dependency=afterok:12345`
+resolves. The probe consumed the id, the placeholder moved, and `t1_dependency_chain` began failing
+with `Job dependency problem`. The readiness checks that survive are the ones that cost nothing.
+
+The deeper fix is not the timing. `anvil induce` now **refuses to run** where `submittability`
+cannot be judged, naming the reason, and `make induce-t2` builds the set inside the container the
+way `make induce-exec` already did. Without that, running it on a laptop with no scheduler keeps
+every variant, since a skipped level is never a passed one: the file would be larger, silently, and
+would still carry a digest and look authoritative. A task set is the definition of the benchmark,
+so this is a refusal rather than a warning.
+
+What this does not do is prove the CI failure fixed. It was not reproduced locally, and a timing
+race on someone else's machine rarely is. What can be said is that a fixed sleep was an assumption
+and is now a check, and that the failure mode matches the assumption being wrong on a slower host.
+
 ## Next measurements needed
 
 The gaps named above are resolved: multiple seeds, a scheduler-faithful environment, a larger

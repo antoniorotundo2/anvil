@@ -240,8 +240,13 @@ print('enforcement guards OK: the memory under-request is caught only by executi
 	@echo "      .github/workflows/ci.yml does, or restart the Docker engine after it."
 
 # --- T2: diagnose-and-repair -------------------------------------------------
-induce-t2:
-	$(PYTHON) -m anvil.cli induce --tasks $(TASKS) --reference $(REFERENCE) --out $(REPAIR_TASKS)
+# In the container, like induce-exec. A variant is kept when the verifier refuses it, and
+# submittability is one of the levels doing the refusing, so a host without the reference
+# cluster would build a different task set. `anvil induce` refuses outright there now, and
+# this target stops depending on whatever scheduler the developer's machine happens to run.
+induce-t2: docker-build
+	$(DOCKER_RUN) python -m anvil.cli induce --tasks $(TASKS) --reference $(REFERENCE) \
+		--out $(REPAIR_TASKS)
 
 repair:
 	$(PYTHON) -m anvil.cli repair --model $(MODEL) --repair-tasks $(REPAIR_TASKS) --tasks $(TASKS) -v

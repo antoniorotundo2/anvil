@@ -403,6 +403,22 @@ def cmd_induce(args: argparse.Namespace) -> int:
     # set whose faults only real execution can see belongs in a file of its own.
     set_functional_executor(getattr(args, "executor", None) or "bash")
 
+    # And it must not depend on whether a scheduler happened to be reachable either. A
+    # variant is kept when the verifier refuses it, and a skipped level is never a passed
+    # one, so inducing without a working scheduler keeps every variant including the ones
+    # that verify clean. The file would be larger, silently, and would still carry a digest.
+    # This is not a warning: a task set is the definition of the benchmark, and one built
+    # against a scheduler that was starting up is a different benchmark.
+    healthy, why = slurm_healthy()
+    if not healthy:
+        print(
+            f"refusing to induce: submittability cannot be judged here ({why}).\n"
+            "The kept variants would depend on this machine rather than on the faults, so "
+            "run this inside the container, where the reference cluster is the declared one.",
+            file=sys.stderr,
+        )
+        return 2
+
     tasks = Task.load_jsonl(args.tasks)
     reference: dict[str, str] = {}
     with open(args.reference, encoding="utf-8") as fh:
