@@ -123,7 +123,14 @@ def cmd_import(args: argparse.Namespace) -> int:
     # fails when the two disagree. Importing without regenerating them broke main once.
     print("entries changed: run ./scripts/paper_data.py and rebuild the paper", file=sys.stderr)
     ENTRIES.mkdir(parents=True, exist_ok=True)
-    path = ENTRIES / f"{_slug(entry['model'])}__{Path(entry['tasks_file']).stem}.json"
+    # The executor is part of the key, not just of the conditions column. Without it an
+    # import silently replaces a row with one graded the other way, and on
+    # `tasks/t1_exec.jsonl` that is the difference between publishing 0.967 and 0.000 for
+    # the same model: the set exists to show that the sandbox cannot judge it. Two rows for
+    # one model on one task file is the finding, not a duplicate.
+    path = ENTRIES / (
+        f"{_slug(entry['model'])}__{Path(entry['tasks_file']).stem}__{entry['executor']}.json"
+    )
     path.write_text(json.dumps(entry, indent=2) + "\n", encoding="utf-8")
     print(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)
     return 0
@@ -157,6 +164,12 @@ def render() -> str:
         "`strict_all_levels` is the ranking column: it requires every level either to pass or to",
         "be out of the machine's reach, and a skipped level is never a passed one.",
         "",
+        "A model can appear twice under one task file, once per executor, and on",
+        "`tasks/t1_exec.jsonl` it should: that set states no memory minimum, so what a script",
+        "needs is a property of the payload the model wrote and only real submission can",
+        "decide it. Reading the `bash` row there as the result is the mistake the set exists",
+        "to expose.",
+        "",
     ]
     by_tasks: dict[str, list[dict]] = {}
     for entry in entries:
@@ -167,7 +180,7 @@ def render() -> str:
         out.append("")
         out.append("| model | " + " | ".join(f"`{lv}`" for lv in LEVELS) + " | conditions |")
         out.append("|---" * (len(LEVELS) + 2) + "|")
-        for entry in group:
+        for entry in sorted(group, key=lambda e: (e["model"], e["executor"])):
             why = _not_comparable(entry, current.get(tasks_file))
             name = f"{entry['model']}{f' ({why})' if why else ''}"
             conditions = (

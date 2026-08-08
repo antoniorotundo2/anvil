@@ -6,6 +6,7 @@ wrong table survived here for weeks, so it is a test rather than a habit.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -15,7 +16,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from dataset_manifest import build as build_manifest  # noqa: E402
 
-from leaderboard import ENTRIES, PAGE, _load_entries, render  # noqa: E402
+from leaderboard import ENTRIES, LEVELS, PAGE, _load_entries, render  # noqa: E402
 
 
 def test_the_page_matches_its_entries():
@@ -79,3 +80,28 @@ def test_import_keeps_more_precision_than_it_displays(tmp_path):
 
     half = written["scores"]["strict_all_levels"]["half_range"]
     assert f"{half:.3f}" == "0.005", half
+
+
+def test_an_entry_is_keyed_by_its_executor_too(tmp_path, monkeypatch):
+    """Two gradings of one model on one task file are two rows, not one overwriting the
+    other. On `tasks/t1_exec.jsonl` the difference between the arms is the whole result, and
+    a key without the executor would publish whichever was imported last.
+    """
+    import leaderboard as lb
+
+    monkeypatch.setattr(lb, "ENTRIES", tmp_path)
+    written = []
+    for executor in ("bash", "sbatch"):
+        cell = {
+            "model": "vendor/m", "tasks_file": "tasks/t1_exec.jsonl",
+            "environment": {"functional_executor": executor, "base_image": "ubuntu:24.04"},
+            "summary": {lv: {"pass@1": 1.0} for lv in LEVELS},
+        }
+        path = tmp_path / "cell.json"
+        path.write_text(json.dumps(cell), encoding="utf-8")
+        args = argparse.Namespace(results=[str(path)], seeds=[0], n=5,
+                                  quantization="4-bit", source="")
+        assert lb.cmd_import(args) == 0
+        written.append(sorted(q.name for q in tmp_path.glob("vendor_m__*.json")))
+
+    assert len(written[-1]) == 2, written[-1]
