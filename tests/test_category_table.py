@@ -61,6 +61,27 @@ def test_the_denominator_is_per_model_not_the_pooled_total(tmp_path):
     assert row.endswith("| 6 |")
 
 
-def test_categories_absent_from_the_reports_read_as_such(tmp_path):
+def test_only_the_categories_the_reports_hold_become_rows(tmp_path):
+    """The row list used to be F1 to F7 written out here, which would have dropped F8 from
+    any table of the execution set without a word. It comes from the reports now."""
     table = render(*collect(_run(tmp_path)))
-    assert "| F1 omitted default | n/a | n/a |" in table
+    assert "F4 directive absent" in table
+    assert "F6 payload/spec mismatch" in table
+    assert "F1" not in table
+    assert "F8" not in table
+
+
+def test_a_category_one_model_lacks_reads_as_not_available(tmp_path):
+    """Deriving the rows from the reports must not hide an asymmetry: a category measured
+    for one model and not another is a gap in the comparison, not a row to drop."""
+    run = _run(tmp_path)
+    import json
+    path = run / "repair__Qwen_Qwen3.5-9B__seed0__bash.json"
+    report = json.loads(path.read_text(encoding="utf-8"))
+    report["by_category"]["F8"] = {"strict_all_levels": {"pass@1": 0.5}}
+    report["results"].append({"task_id": "t1_memory_bound__F8"})
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    table = render(*collect(run))
+    row = next(ln for ln in table.splitlines() if ln.startswith("| F8 "))
+    assert "0.500" in row and "n/a" in row

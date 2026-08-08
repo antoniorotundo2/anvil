@@ -27,8 +27,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from paper_data import PREFERRED, short  # noqa: E402
 
-CATEGORIES = ["F1", "F2", "F3", "F4", "F5", "F6", "F7"]
-
+# Read from the reports rather than listed here. The T1 repair set exercises F1 to F7 and
+# the execution set exercises F2, F4, F5, F7 and F8, so a hardcoded list drops a whole
+# category from the table without a word, which is the defect this script was written to
+# stop being possible by hand.
 LABELS = {
     "F1": "F1 omitted default",
     "F2": "F2 directive after the first command",
@@ -37,6 +39,7 @@ LABELS = {
     "F5": "F5 no `#SBATCH` at all",
     "F6": "F6 payload/spec mismatch",
     "F7": "F7 malformed value",
+    "F8": "F8 memory below what the payload uses",
 }
 
 
@@ -58,18 +61,25 @@ def collect(run: Path) -> tuple[dict[str, dict[str, list[float]]], Counter]:
     return scores, counts
 
 
+def categories(scores: dict) -> list[str]:
+    """Sorted, so F10 would land after F9 rather than after F1."""
+    seen = {c for per in scores.values() for c in per}
+    return sorted(seen, key=lambda c: (len(c), c))
+
+
 def render(scores: dict, counts: Counter) -> str:
     models = [m for m in PREFERRED if m in scores] + sorted(m for m in scores if m not in PREFERRED)
     header = "| category | " + " | ".join(short(m) for m in models) + " | n per model |"
     lines = [header, "|---" * (len(models) + 2) + "|"]
-    for category in CATEGORIES:
+    for category in categories(scores):
         cells = []
         for model in models:
             values = scores[model].get(category, [])
             cells.append(f"{sum(values) / len(values):.3f}" if values else "n/a")
         # `counts` pools every report, so the per-model denominator the table publishes is
         # that total divided by the models in it.
-        lines.append(f"| {LABELS[category]} | " + " | ".join(cells)
+        label = LABELS.get(category, category)
+        lines.append(f"| {label} | " + " | ".join(cells)
                      + f" | {counts[category] // len(models)} |")
     return "\n".join(lines)
 
