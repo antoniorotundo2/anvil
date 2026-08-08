@@ -126,9 +126,61 @@ and `functional` under the `bash` executor, all five levels, and comes back `OUT
 real submission with no other level failing.** Both tasks now do that, and
 `make docker-guards-enforcement` fails if either stops doing it.
 
-What this does not yet give is a rate. Extending the set means the models have to be run against it,
-and until they are, F8 is two tasks with the property and one observation of a model tripping over
-it.
+### On a task set where only execution knows the answer, a third of the verdicts change
+
+Five models, three seeds, `tasks/t1_exec.jsonl` and its repair set, graded twice in the same image,
+900 sample comparisons. Verdicts in `results/exec_matrix/`, verifier `1727a930156d`.
+
+**298 artifacts of 900 change their strict verdict with the executor.** On the main task set the
+same comparison reads 6 of 3900. The published claim that real submission was nearly redundant is
+not wrong about the runs it was made on, and it is wrong as a claim about the method: what changes
+is the task set, from 0.15% to 33%, and 357 of the 395 stopped artifacts come back
+`OUT_OF_MEMORY`.
+
+**T1, from scratch, `functional` per arm:**
+
+| model | `bash` | real submission |
+|---|---|---|
+| Qwen2.5-Coder 7B | 0.967 | **0.000** |
+| Gemma 4 12B | 1.000 | 1.000 |
+| Qwen3.5 9B | 0.467 | **0.700** |
+| Granite 4.1 3B | 0.467 | 0.467 |
+| Qwen2.5-Coder 1.5B | 0.333 | 0.167 |
+
+The 7B row is the whole argument in one line. **Every one of its from-scratch artifacts is
+OOM-killed under real submission, and the sandbox promotes 29 of the 30.** This is the model that
+scores 1.000 on `resource_fit` and 0.667 strict on the main T1 set: strong where the requirement is
+written in the prompt, and at floor where the requirement is a property of the payload it wrote
+itself. Its strict falls from 0.467 to 0.000.
+
+Gemma 4 12B is the only model that solves the set, 1.000 on every level under both executors. Its
+answer is not a lucky one: it is the only model whose memory request covers what its own script
+does.
+
+Qwen3.5-9B moves the other way, 0.467 to 0.700, and the reason is the false negative already
+recorded above: it writes `srun` inside the script, the sandbox has no allocation for it to attach
+to, and the step exits non-zero under `bash` while running cleanly under a real scheduler.
+
+**T2 repair, `strict` per arm:** 0.993 to 0.400 for the 7B, 0.880 to 0.560 for Gemma, 0.847 to
+0.587 for Qwen3.5, 0.660 to 0.247 for Granite, 0.393 to 0.173 for the 1.5B. Every model loses at
+least a third of its score when the allocation is enforced, and the ordering is preserved, so this
+is not a re-ranking: it is a level of difficulty that the sandbox cannot see at all.
+
+Two limits on the reading. The set is two T1 tasks and ten repairs, so a single task moves a number
+by 0.5 on T1; these are not the 3900-sample figures published elsewhere and are not comparable with
+them. And `t1_memory_workers` turned out to discriminate on `--ntasks` rather than on memory in the
+from-scratch arm: the prompt asks for one task on one node and the 7B writes `--ntasks=4`, reading
+four shell workers as four scheduler tasks, on all fifteen samples. That is a real spec violation
+and a fair failure, but it is not the axis the task was built for, and it is worth knowing before
+the numbers are read as being about memory alone. Rewording the prompt would move `tasks_sha` and
+invalidate the 900 generations, so it stays as measured and the caveat is written down instead.
+
+Two artifacts were stopped by the sandbox ceiling rather than by their own merits, and their
+detail says so. Both were allocating more than a gigabyte for a payload of 64MB, so they were
+already wrong; the note exists so that a reader does not mistake machine protection for a verdict
+on the requested allocation.
+
+
 
 Pointing the experiment runner at this set for the first time stopped it before it spent any GPU
 time, with `a no-op repair passes induced faults - the repair verifier is too permissive`. The

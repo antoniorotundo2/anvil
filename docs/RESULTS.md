@@ -114,6 +114,19 @@ earlier claim that real submission was nearly redundant was true of the models m
 method. See [Real submission was almost redundant until a model wrote
 `srun`](OBSERVED_FAILURES.md#real-submission-was-almost-redundant-until-a-model-wrote-srun).
 
+**The executor's value is a property of the task set, and it ranges over two orders of magnitude.**
+The 0.15% above is measured on tasks whose resource requirements are written in their prompts.
+`tasks/t1_exec.jsonl` states no memory minimum, so what a script needs is a property of the payload
+it wrote itself and only execution knows it. Graded the same way, five models and three seeds, the
+same comparison reads **298 artifacts of 900, 33%**, with 357 of the 395 stopped artifacts coming
+back `OUT_OF_MEMORY`. Qwen2.5-Coder 7B goes from 0.967 to **0.000** on `functional`: the sandbox
+promotes 29 of its 30 from-scratch artifacts and the scheduler kills every one. Gemma 4 12B is the
+only model that solves the set, 1.000 under both arms. See [On a task set where only execution knows
+the
+answer](OBSERVED_FAILURES.md#on-a-task-set-where-only-execution-knows-the-answer-a-third-of-the-verdicts-change).
+Two T1 tasks and ten repairs: a small set, reported as such, and not comparable with the
+3900-sample figures above.
+
 **Retrieval costs this model family, and the sign depends on what the model already knows.** Seven
 conditions across two sizes. Any attached text costs the 1.5B about 28 points of `resource_fit`,
 whether it is SLURM documentation or a passage about coastal tides; the 7B pays no such toll and
