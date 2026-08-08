@@ -5,7 +5,14 @@ running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
 Everything here was graded by verifier `74e00ebdcced`, which every report and every leaderboard
-entry records. An earlier grading of the same generations is superseded: it ran before
+entry records. **The current verifier is `20dd4a2e4159` and these numbers predate it**, which is
+why every leaderboard row reads *stale rules*: a constraint audit found `--mem` compared from below
+only, and it now demands equality. The effect is measured and confined, 30 verdicts in Qwen2.5-Coder
+1.5B's T2 cell, whose `strict` falls from 0.256 to about 0.21 with no ordering change. The tables
+below are left as graded until the run is reverified in one pass, see [What the audit
+settled](OBSERVED_FAILURES.md#what-the-audit-settled).
+
+An earlier grading of the same generations is superseded: it ran before
 `check_resource_fit` had a floor on `--time`, and adding one moved five of the ten cells and
 swapped two models on T1. What that cost is written up in [The mirror of
 F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-did-not-catch).

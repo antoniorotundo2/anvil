@@ -528,12 +528,12 @@ def test_multiple_options_on_one_sbatch_line():
 def test_multi_option_line_satisfies_resource_fit():
     """The regression this bug caused: a correct script scored as missing --time.
 
-    The walltime here used to be 00:05:00 against a declared 10, which passed while the
-    check had a ceiling and no floor. What this test is about is parsing several options
-    off one line, so it now names the declared value and leaves the floor to the tests
-    below.
+    The walltime here used to be 00:05:00 against a declared 10 and the memory 1G against a
+    declared 512, both of which passed while those checks were one-sided. What this test is
+    about is parsing several options off one line, so it names the declared values and
+    leaves the bounds to the tests below.
     """
-    script = "#!/bin/bash\n#SBATCH --ntasks=1 --time=00:10:00 --mem=1G\necho ANVIL_OK\n"
+    script = "#!/bin/bash\n#SBATCH --ntasks=1 --time=00:10:00 --mem=512M\necho ANVIL_OK\n"
     t = Task(id="x", prompt="p",
              constraints={"ntasks": 1, "time_max_minutes": 10, "mem_min_mb": 512},
              required_directives=["--time"])
@@ -561,6 +561,26 @@ def test_walltime_must_match_what_the_task_declares(value, declared, passes):
              required_directives=["--time"])
     r = check_resource_fit(script, t)
     assert r.passed is passes, r.detail
+
+
+# The other bound, settled by the same audit: `--mem` above the declared value read 30 of
+# 2298 passes, all of them repairs where the model rewrote a directive the induced fault had
+# not touched. See docs/OBSERVED_FAILURES.md, "What the audit settled".
+@pytest.mark.parametrize(
+    ("value", "declared", "passes"),
+    [
+        ("1G", 1024, True),
+        ("1024M", 1024, True),
+        ("2G", 1024, False),      # twice what the task names
+        ("512M", 1024, False),    # half of it, which was refused all along
+    ],
+)
+def test_memory_must_match_what_the_task_declares(value, declared, passes):
+    script = f"#!/bin/bash\n#SBATCH --time=00:10:00 --mem={value}\necho ANVIL_OK\n"
+    t = Task(id="x", prompt="p",
+             constraints={"time_max_minutes": 10, "mem_min_mb": declared},
+             required_directives=["--mem"])
+    assert check_resource_fit(script, t).passed is passes
 
 
 def test_an_under_request_is_named_as_such():

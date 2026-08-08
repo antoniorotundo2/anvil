@@ -82,7 +82,7 @@ def test_the_table_states_which_direction_each_check_refuses():
     """A populated bucket only matters against what the verifier does about it, so the two
     are printed together and the mapping is not allowed to drift silently."""
     assert KINDS["time_max_minutes"][3] == "both"
-    assert KINDS["mem_min_mb"][3] == "below"
+    assert KINDS["mem_min_mb"][3] == "both"
     assert KINDS["gpus_min"][3] == "below"
 
 

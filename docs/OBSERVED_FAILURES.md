@@ -451,6 +451,54 @@ binding, or a job step. Real submission has yet to catch a single artifact that 
 that was genuinely wrong, on any of the eight tasks. The one place it does is a task built for it,
 F8 above, which no static check and no sandbox can see.
 
+### What the audit settled
+
+The walltime gap surfaced by accident, while five models were being screened for F10, which is a
+bad way to find out that a check has a hole. `scripts/constraint_audit.py` asks the question on
+purpose, for every constraint at once: among the artifacts the verifier passed, how many requested
+less than the task declares, how many exactly, and how many more, printed beside the direction the
+check actually refuses. Over the 2298 passes of the regraded run:
+
+| constraint | below | exact | above | refused before the audit |
+|---|---|---|---|---|
+| `--time` | 0 | 2298 | 0 | either side |
+| `--mem` | 0 | 2268 | 30 | below only |
+| `--gpus` | 0 | 343 | 0 | below only |
+
+`--time` reading 2298 exact is the control: the floor holds and introduced no regression in the
+other direction. **`--gpus` is closed empirically.** Its loose side is a theoretical hole, one task
+declares `gpus_min`, and no model in any run over-requests. Nothing to do.
+
+`--mem` had 30 passes above the declared value, 1.3%, and the shape of them decided it. All 30 are
+one model, Qwen2.5-Coder 1.5B, writing `--mem=2G` against the 1024MB that `t1_array_job` and
+`t1_output_paths` name, and all 30 are **F3 repairs**: prose had leaked into a value, and the model
+fixed that and rewrote the memory request as well. From scratch the same model writes the declared
+value on both tasks, every sample.
+
+That is the same behaviour as Gemma inventing `--mem-per-node` while repairing an F4, and the
+benchmark refuses Gemma's. A model altering a directive the induced fault never touched is what the
+repair set exists to expose, and over-requesting was the one way to do it and still pass. So `--mem`
+now demands equality, like `--nodes`, `--ntasks`, `--cpus-per-task` and `--time` before it.
+
+The case was closer than the walltime one and the argument against is worth recording. `mem_min_mb`
+is named a minimum, F8 is a whole fault class about requesting *less* memory than the payload uses,
+and over-requesting wastes an allocation rather than killing a job. What settles it is that
+`resource_fit` is a conformance level and not a liveness one: a script asking two nodes where one
+was specified also runs, and is also refused. `functional` is the level that asks whether the job
+works.
+
+The measured cost is one cell. Qwen2.5-Coder 1.5B loses 30 of its T2 passes, its F3 goes from 0.542
+to about 0.29 and its T2 `strict` from 0.256 to about 0.21. No ordering moves; it is last on T2 by
+thirty points either way. The constraint keeps the name `mem_min_mb`, misleading as that now is,
+because renaming it moves `tasks_sha` and would invalidate every generation ever measured against
+it, which is a far larger price than a stale name.
+
+One thing happened by itself and is worth pointing at. Editing `verifier.py` moved `verifier_sha`
+from `74e00ebdcced` to `20dd4a2e4159`, and the next test run failed because the leaderboard page no
+longer matched its entries: all ten rows had become *stale rules*. Nothing was remembered, nobody
+had to notice. That is the mechanism built four commits earlier doing the exact job it was built
+for, on the first change after it landed.
+
 ### Which fault is hardest depends on the model, and on the level
 
 Per fault category, `bash` arm, three seeds pooled. F1 applies to three tasks and F6 to one, hence
@@ -674,11 +722,8 @@ that does not know the rule and minus 6 to the one that does. See
   points that happen to differ needs a third habit to compare against;
 - a genuine outlier check on F3, to separate small-model degeneracy from a stable semantic
   error as model scale keeps increasing;
-- a floor on `--mem`, which has the shape the walltime one had. `check_resource_fit` compares
-  `--mem` against `mem_min_mb` from below only, so a request far above what a task names passes,
-  and the reason to look is that the walltime gap was found by accident rather than by audit. The
-  other direction is not symmetric, since over-requesting memory wastes an allocation instead of
-  killing a job, so whether it should fail at all is the question to settle first;
+- the regrade under the `--mem` bound, which is measured at 30 verdicts in one cell and not yet
+  applied to the published figures, see [What the audit settled](#what-the-audit-settled);
 - F8 beyond one task and one model: the observation below is 15 samples of a 1.5B model on a
   single task whose payload sits on the boundary of what it requests. Whether larger models leave
   headroom, and whether the error survives a payload whose need is unambiguous, is unmeasured;

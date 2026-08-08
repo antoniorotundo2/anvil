@@ -4,17 +4,17 @@
 `check_resource_fit` compared `--time` against the walltime a task names from above only,
 so `#SBATCH --time=00:15` against a task naming 15 minutes was fifteen seconds and passed.
 123 of 2421 published passes were requests like that, and the whole thing surfaced by
-accident while five models were being screened for something else. Two comparisons are
-still one-sided, `--mem` and `--gpus`, and the point of this script is that nobody should
-have to trip over them the same way.
+accident while five models were being screened for something else. Running this is what
+settled `--mem`, which had the same shape and is now two-sided as well, and what closed
+`--gpus`, whose loose side holds nothing in 343 passes.
 
     ./scripts/constraint_audit.py 'results/RUN/*__bash.json'
 
 For every artifact the verifier passed, the requested value is compared with the one its
 task declares and filed under below, exact, or above. The direction the check currently
 enforces is printed beside each, so a bucket that is both populated and unenforced is the
-thing to look at. `--time` is kept in the output as the control: it should now read zero
-outside exact, and a non-zero bucket there means the floor regressed.
+thing to look at. `--time` and `--mem` are kept in the output as controls: both now demand
+equality, so a non-zero bucket outside exact means one of the two bounds regressed.
 
 This subsumes `walltime_floor.py`, which answered the same question for one constraint and
 produced the 123 above. Nothing here changes a verdict; it counts what the rules allow, so
@@ -46,7 +46,7 @@ TASKS = ROOT / "tasks" / "t1_slurm.jsonl"
 # direction check_resource_fit refuses). "both" means it demands equality.
 KINDS = {
     "time_max_minutes": ("--time", ("--time", "-t"), parse_time_to_minutes, "both"),
-    "mem_min_mb": ("--mem", ("--mem",), parse_mem_to_mb, "below"),
+    "mem_min_mb": ("--mem", ("--mem",), parse_mem_to_mb, "both"),
     "gpus_min": ("--gpus", ("--gpus", "-G", "--gres"), None, "below"),
 }
 

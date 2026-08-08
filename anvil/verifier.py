@@ -729,6 +729,17 @@ def check_resource_fit(script: str, task: Task) -> LevelResult:
                 problems.append(f"--mem unparsable: {raw!r}")
             elif mb < c["mem_min_mb"]:
                 problems.append(f"--mem {mb}MB below minimum {c['mem_min_mb']}MB")
+            elif mb > c["mem_min_mb"]:
+                # Same reading as `--time` above, arrived at from the opposite direction.
+                # The audit found nothing below this bound in 2298 passes and 30 above it,
+                # all of them repairs where the model changed a `--mem` the induced fault
+                # had not touched. Altering a sound directive while fixing another is what
+                # T2 exists to expose, and over-requesting was the one way to do it and
+                # pass. The constraint keeps the name `mem_min_mb` because renaming it
+                # moves `tasks_sha` and invalidates every generation measured against it.
+                problems.append(
+                    f"--mem {mb}MB above the {c['mem_min_mb']}MB the task declares"
+                )
 
     if "array" in c and "--array" not in d:
         problems.append("job array requested but --array missing")
