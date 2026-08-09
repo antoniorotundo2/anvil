@@ -22,6 +22,9 @@
 # Cells already on disk are skipped.
 
 set -euo pipefail
+
+# Same knob as the Makefile: RUNTIME=podman runs these against Podman instead.
+RUNTIME="${RUNTIME:-docker}"
 cd "$(dirname "$0")/.."
 
 # Prefer the project venv, same rule as the Makefile. Only the aggregation runs on the
@@ -35,7 +38,7 @@ REPAIR_TASKS="${REPAIR_TASKS:-tasks/t2_repair.jsonl}"
 SCHED_IMAGE="${SCHED_IMAGE:-anvil:sched}"
 # slurmd creates its cgroup scope under /sys/fs/cgroup, which a plain `docker run` mounts
 # read-only, and the enforcement this ablation measures needs the controllers delegated.
-DOCKER_RUN=(docker run --rm --privileged --cgroupns=host -v "$PWD":/work -w /work)
+DOCKER_RUN=("$RUNTIME" run --rm --privileged --cgroupns=host -v "$PWD":/work -w /work)
 
 RUN_DIR="${1:-}"
 if [[ -z "$RUN_DIR" || ! -d "$RUN_DIR" ]]; then
@@ -59,14 +62,14 @@ if [[ ${#GENERATIONS[@]} -eq 0 ]]; then
   exit 2
 fi
 
-# Two different problems with one symptom: `docker image inspect` fails the same way when
+# Two different problems with one symptom: `"$RUNTIME" image inspect` fails the same way when
 # the image is missing and when the daemon is down, and the second answer sends the reader
 # to build an image that is already there.
-if ! docker info >/dev/null 2>&1; then
-  echo "the docker daemon is not reachable: start it and run this again." >&2
+if ! "$RUNTIME" info >/dev/null 2>&1; then
+  echo "the ${RUNTIME} daemon is not reachable: start it and run this again." >&2
   exit 2
 fi
-if ! docker image inspect "$SCHED_IMAGE" >/dev/null 2>&1; then
+if ! "$RUNTIME" image inspect "$SCHED_IMAGE" >/dev/null 2>&1; then
   echo "${SCHED_IMAGE} is not built: run \`make docker-build-sched\` first." >&2
   exit 2
 fi
@@ -77,7 +80,7 @@ fi
 # shape a stale result can take: it looks like a finding. cksum is POSIX and behaves the
 # same on both machines this runs on.
 disk_sum="$(cksum <docker/entrypoint.sh | cut -d' ' -f1)"
-image_sum="$(docker run --rm --entrypoint cat "$SCHED_IMAGE" /usr/local/bin/entrypoint.sh \
+image_sum="$("$RUNTIME" run --rm --entrypoint cat "$SCHED_IMAGE" /usr/local/bin/entrypoint.sh \
   2>/dev/null | cksum | cut -d' ' -f1)"
 if [[ "$disk_sum" != "$image_sum" ]]; then
   echo "${SCHED_IMAGE} was built from a different docker/entrypoint.sh than the one here." >&2

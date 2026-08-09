@@ -8,6 +8,18 @@ PYTHON     ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo 
 
 .DEFAULT_GOAL := help
 
+# The container runtime, so a site that has Podman and not Docker can run the same targets:
+# `make RUNTIME=podman docker-test`. The target names keep the `docker-` prefix, which is what
+# CI and every note in this repository already say. Default unchanged, so nothing moves for
+# anyone already using Docker.
+#
+# Not verified with Podman: no machine here has it. Two differences are known and worth
+# checking first. On an SELinux host a bind mount needs `:z`, which this file does not add
+# because relabelling the user's checkout is not a side effect to introduce untested. And
+# `docker-guards-enforcement` needs delegated cgroup controllers, which rootless Podman does
+# not give: expect that one target to need a rootful invocation or to skip.
+RUNTIME    ?= docker
+
 IMAGE      ?= anvil
 APPTAINER_IMAGE ?= anvil:apptainer
 TASKS      ?= tasks/t1_slurm.jsonl
@@ -28,7 +40,7 @@ RECIPE_GENERATIONS ?= results/recipe_generations.jsonl
 VERIFY_OUT  ?= results/verification.json
 REPAIR_VERIFY_OUT ?= results/repair_verification.json
 RECIPE_VERIFY_OUT ?= results/recipe_verification.json
-DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
+DOCKER_RUN  = $(RUNTIME) run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 # Real submission needs slurmd, and slurmd needs to create its stepd scope under
 # /sys/fs/cgroup, which a plain `docker run` mounts read-only. Nothing else in the
 # project needs these two flags: `sbatch --test-only` never talks to a daemon.
@@ -37,7 +49,7 @@ DOCKER_RUN  = docker run --rm -v "$(PWD)":/work -w /work $(IMAGE)
 # every job with Reason=InvalidAccount. `docker-build-sched` adds one, see
 # docs/REFERENCE_CLUSTER.md.
 SCHED_IMAGE ?= anvil:sched
-DOCKER_RUN_SCHED = docker run --rm --privileged --cgroupns=host \
+DOCKER_RUN_SCHED = $(RUNTIME) run --rm --privileged --cgroupns=host \
 	-v "$(PWD)":/work -w /work $(SCHED_IMAGE)
 # apptainer's unprivileged build/run needs these two beyond the default image:
 # seccomp=unconfined for the build's user namespace, /dev/fuse to mount the
@@ -48,7 +60,7 @@ DOCKER_RUN_SCHED = docker run --rm --privileged --cgroupns=host \
 # byte-identical numbers. Default on: leaving it off made the default the one
 # configuration neither environment can run. Pass 0 for a host apptainer that is setuid.
 APPTAINER_UNPRIVILEGED ?= 1
-DOCKER_RUN_APPTAINER = docker run --rm --security-opt seccomp=unconfined \
+DOCKER_RUN_APPTAINER = $(RUNTIME) run --rm --security-opt seccomp=unconfined \
 	--security-opt apparmor=unconfined --security-opt systempaths=unconfined \
 	--device /dev/fuse \
 	-e ANVIL_APPTAINER_UNPRIVILEGED=$(APPTAINER_UNPRIVILEGED) \
@@ -171,7 +183,7 @@ print('sbatch guards OK: %d functional samples ran for real, %d skipped, broken 
 # a scheduler accepts jobs without running them every sample comes back skipped, and the
 # check below calls that a failure rather than passing vacuously.
 docker-build-sched:
-	docker build -t $(SCHED_IMAGE) --build-arg WITH_SLURMDBD=1 docker/
+	$(RUNTIME) build -t $(SCHED_IMAGE) --build-arg WITH_SLURMDBD=1 docker/
 
 docker-guards-sbatch: docker-build-sched
 	@mkdir -p results
@@ -295,7 +307,7 @@ print('T3 lenient guards OK (syntax/resource_fit/safety). Run docker-guards-t3 f
 
 # --- container (recommended) ------------------------------------------------
 docker-build:
-	docker build -t $(IMAGE) docker/
+	$(RUNTIME) build -t $(IMAGE) docker/
 
 docker-test: docker-build
 	$(DOCKER_RUN) python -m pytest -q
@@ -310,7 +322,7 @@ docker-repair: docker-build
 # apptainer is opt-in (see docker/Dockerfile): most anvil work never touches
 # it, and its PPA install adds real build time.
 docker-build-apptainer:
-	docker build -t $(APPTAINER_IMAGE) --build-arg WITH_APPTAINER=1 docker/
+	$(RUNTIME) build -t $(APPTAINER_IMAGE) --build-arg WITH_APPTAINER=1 docker/
 
 docker-recipe: docker-build-apptainer
 	$(DOCKER_RUN_APPTAINER) python -m anvil.cli recipe --model oracle --tasks $(RECIPE_TASKS) -v

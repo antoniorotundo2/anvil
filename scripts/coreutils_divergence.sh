@@ -13,6 +13,9 @@
 # It is evidence for a claim, not part of the bracket. Nothing here touches the verifier.
 
 set -euo pipefail
+
+# Same knob as the Makefile: RUNTIME=podman runs these against Podman instead.
+RUNTIME="${RUNTIME:-docker}"
 cd "$(dirname "$0")/.."
 
 BASES="${BASES:-ubuntu:24.04 ubuntu:26.04}"
@@ -147,7 +150,7 @@ PROBE_END
 work="$(dirname "$PROBE")"
 for base in $BASES; do
   echo "==> ${base}"
-  docker run --rm -v "${work}":/probe "$base" bash /probe/probe.sh \
+  "$RUNTIME" run --rm -v "${work}":/probe "$base" bash /probe/probe.sh \
     >"${work}/$(echo "$base" | tr ':/' '--').txt" 2>/dev/null
 done
 

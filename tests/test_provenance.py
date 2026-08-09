@@ -105,3 +105,20 @@ def test_no_test_reads_the_untracked_results_directory():
             if any(n.search(code) for n in needles):
                 offenders.append(f"{path.name}:{i}")
     assert not offenders, f"tests must build their own fixtures: {offenders}"
+
+
+def test_no_script_hardcodes_the_container_runtime():
+    """A site with Podman and not Docker should be able to run the same targets, and the way
+    that stops being true is one new `docker run` in one new script. The runtime is a
+    variable in the Makefile and in every shell script; this keeps it that way.
+
+    Written as a pattern rather than the literal, so the check does not report itself.
+    """
+    needle = re.compile("docker" + r"\s+(run|build|info|image)\b")
+    offenders = []
+    for path in [ROOT / "Makefile", *sorted((ROOT / "scripts").glob("*.sh"))]:
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            code = line.split("#", 1)[0]
+            if needle.search(code):
+                offenders.append(f"{path.name}:{i}")
+    assert not offenders, f"use $(RUNTIME) or $RUNTIME instead: {offenders}"

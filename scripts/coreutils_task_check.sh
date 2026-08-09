@@ -26,14 +26,17 @@
 # able to tell the implementations apart.
 
 set -euo pipefail
+
+# Same knob as the Makefile: RUNTIME=podman runs this against Podman instead.
+RUNTIME="${RUNTIME:-docker}"
 cd "$(dirname "$0")/.."
 
 BASES="${BASES:-ubuntu:24.04 ubuntu:26.04}"
 TASKS="tasks/t1_coreutils.jsonl"
 PYTHON="${PYTHON:-$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)}"
 
-if ! docker info >/dev/null 2>&1; then
-  echo "the docker daemon is not reachable: start it and run this again." >&2
+if ! "$RUNTIME" info >/dev/null 2>&1; then
+  echo "the ${RUNTIME} daemon is not reachable: start it and run this again." >&2
   exit 2
 fi
 
@@ -82,8 +85,8 @@ echo
 for base in $BASES; do
   tag="anvil:$(echo "$base" | tr ':.' '--')"
   echo "  [build] ${tag} from ${base}"
-  docker build -q -t "$tag" --build-arg BASE_IMAGE="$base" docker/ >/dev/null
-  docker run --rm -v "$PWD":/work -v "$WORK":/gen -w /work "$tag" \
+  "$RUNTIME" build -q -t "$tag" --build-arg BASE_IMAGE="$base" docker/ >/dev/null
+  "$RUNTIME" run --rm -v "$PWD":/work -v "$WORK":/gen -w /work "$tag" \
     python -m anvil.cli verify --generations /gen/gen.jsonl --tasks "$TASKS" \
     --out "/gen/$(echo "$base" | tr ':.' '--').json" >/dev/null
 done

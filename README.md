@@ -86,6 +86,29 @@ Verify what the environment can actually check:
 make doctor
 ```
 
+### Podman instead of Docker
+
+The runtime is a variable, so the same targets run against Podman:
+
+```
+make RUNTIME=podman docker-build docker-test
+```
+
+The `docker-` prefix stays on the target names, since that is what CI and every note in this
+repository already say. The scripts take the same variable:
+`RUNTIME=podman ./scripts/executor_ablation.sh results/<run>`.
+
+**Untested: no machine here has Podman.** What is done is the removal of the hardcoded runtime, and
+a test keeps it removed. Two differences are known and worth checking before trusting a number that
+came out of it. On an SELinux host a bind mount needs `:z`, which is not added here because
+relabelling a checkout is not a side effect to introduce untested. And `docker-guards-enforcement`
+needs delegated cgroup controllers, which rootless Podman does not provide: expect that target to
+need a rootful invocation, or to be unavailable.
+
+Anything measured under a runtime whose behaviour has not been checked should be treated the way
+this project treats a grading environment it has not verified, which is to say not published until
+it has been.
+
 ### Manually
 
 ```

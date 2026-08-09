@@ -16,6 +16,9 @@
 # Cells already on disk are skipped.
 
 set -euo pipefail
+
+# Same knob as the Makefile: RUNTIME=podman runs these against Podman instead.
+RUNTIME="${RUNTIME:-docker}"
 cd "$(dirname "$0")/.."
 
 # Prefer the project venv, same rule as the Makefile. Only the aggregation runs on the
@@ -60,7 +63,7 @@ echo "==> Images"
 for base in $BASES; do
   tag="anvil:$(echo "$base" | tr ':.' '--')"
   echo "  [build] ${tag} from ${base}"
-  docker build -q -t "$tag" --build-arg BASE_IMAGE="$base" docker/ >/dev/null
+  "$RUNTIME" build -q -t "$tag" --build-arg BASE_IMAGE="$base" docker/ >/dev/null
 done
 
 echo
@@ -76,7 +79,7 @@ for gen in "${GENERATIONS[@]}"; do
       continue
     fi
     echo "  [run ] ${cell} in ${base}"
-    docker run --rm -v "$PWD":/work -w /work "$tag" \
+    "$RUNTIME" run --rm -v "$PWD":/work -w /work "$tag" \
       python -m anvil.cli verify --generations "$gen" --tasks "$TASKS" --out "$dest" \
       >/dev/null || echo "  [FAIL] ${cell} in ${base}"
   done
