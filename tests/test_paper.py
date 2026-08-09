@@ -104,13 +104,14 @@ def test_a_model_the_generator_does_not_know_still_reaches_the_tables(tmp_path):
             "scores": {lv: {"mean": strict, "half_range": 0.0} for lv in LEVELS},
         }
 
-    # Keyed by (model, executor) since a task file can be graded twice.
+    # Keyed by (model, executor, quantization): a task file can be graded and loaded several
+    # ways, and each combination is a measurement of its own.
     models = {
-        ("Qwen/Qwen2.5-Coder-7B-Instruct", "bash"):
+        ("Qwen/Qwen2.5-Coder-7B-Instruct", "bash", "4-bit"):
             entry("Qwen/Qwen2.5-Coder-7B-Instruct", 0.667),
-        ("newcomer/Model-9B", "bash"): entry("newcomer/Model-9B", 0.5),
+        ("newcomer/Model-9B", "bash", "4-bit"): entry("newcomer/Model-9B", 0.5),
     }
-    assert pd.order(models)[-1] == ("newcomer/Model-9B", "bash")
+    assert pd.order(models)[-1] == ("newcomer/Model-9B", "bash", "4-bit")
     assert "Model-9B" in pd._table(models)
     assert "Model-9B" in pd._dat(models)
 

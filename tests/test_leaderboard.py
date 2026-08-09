@@ -108,10 +108,12 @@ def test_an_entry_is_keyed_by_its_executor_too(tmp_path, monkeypatch):
 
 
 def test_a_cell_measured_under_other_conditions_is_refused(tmp_path, monkeypatch):
-    """Quantization, base image, samples and seeds are recorded but not in the key, so an
-    fp16 arm of a model already imported at 4-bit would land on the same file and replace a
-    published number with one taken under other conditions. The import refuses and names the
-    field rather than widening the key every time a condition is added."""
+    """Base image, samples and seeds are recorded but not in the key, so a cell measured
+    under any of them would land on an existing file and replace a published number with one
+    taken under other conditions. The import refuses and names the field rather than widening
+    the key every time a condition is added. Quantization was the first to trip this and was
+    answered by widening the key instead, once there was a measurement showing the two arms
+    are a result: the rule is what turned that into a decision."""
     import leaderboard as lb
 
     monkeypatch.setattr(lb, "ENTRIES", tmp_path)
@@ -128,8 +130,9 @@ def test_a_cell_measured_under_other_conditions_is_refused(tmp_path, monkeypatch
             results=[str(path)], seeds=[0], n=5, quantization=quantization, source=""))
 
     assert run("4-bit") == 0
-    assert run("fp16") == 2, "an fp16 cell must not overwrite the 4-bit one"
-    # Re-importing the same conditions is not a collision: it is a refresh.
-    assert run("4-bit") == 0
-    stored = json.loads(next(tmp_path.glob("vendor_m__*.json")).read_text(encoding="utf-8"))
-    assert stored["quantization"] == "4-bit"
+    assert run("fp16") == 0, "quantization is in the key, so the two arms coexist"
+    assert len(list(tmp_path.glob("vendor_m__*.json"))) == 2
+    # What the refusal still covers is a condition that is not in the key.
+    args = argparse.Namespace(results=[str(path)], seeds=[0], n=9,
+                              quantization="4-bit", source="")
+    assert lb.cmd_import(args) == 2, "n=9 must not overwrite the n=5 measurement"

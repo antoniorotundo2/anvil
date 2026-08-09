@@ -128,20 +128,27 @@ def cmd_import(args: argparse.Namespace) -> int:
     # `tasks/t1_exec.jsonl` that is the difference between publishing 0.967 and 0.000 for
     # the same model: the set exists to show that the sandbox cannot judge it. Two rows for
     # one model on one task file is the finding, not a duplicate.
+    #
+    # Quantization joined it for the same reason and only once there was a measurement to
+    # justify it: the 1.5B at fp16 scores 0.750 on syntax against 0.575 at 4-bit, 1.000 on
+    # submittability against 0.842, and 0.617 on resource fit against 0.442. Publishing one
+    # of those as the model's number would be publishing how it was loaded.
     path = ENTRIES / (
-        f"{_slug(entry['model'])}__{Path(entry['tasks_file']).stem}__{entry['executor']}.json"
+        f"{_slug(entry['model'])}__{Path(entry['tasks_file']).stem}"
+        f"__{entry['executor']}__{_slug(entry['quantization'])}.json"
     )
 
-    # Four conditions travel with an entry and are not in its key: quantization, base image,
-    # samples per task, seeds. Two rows that differ in any of them are two measurements, and
+    # Three conditions travel with an entry and are not in its key: base image, samples per
+    # task, seeds. Two rows that differ in any of them are two measurements, and
     # importing the second over the first would replace a published number with one taken
     # under other conditions, silently. Rather than widen the key every time a condition is
-    # added, the collision is refused and the field is named. An fp16 arm of a model already
-    # imported at 4-bit is exactly this, and it is the next thing anyone would try.
+    # added, the collision is refused and the field is named. Quantization was the first to
+    # trip this and it was answered by widening the key, since the two arms turned out to be
+    # a result rather than a duplicate; the rule is what made that a decision.
     if path.exists():
         previous = json.loads(path.read_text(encoding="utf-8"))
         differing = [
-            k for k in ("quantization", "base_image", "n_per_task", "seeds")
+            k for k in ("base_image", "n_per_task", "seeds")
             if previous.get(k) != entry.get(k)
         ]
         if differing:

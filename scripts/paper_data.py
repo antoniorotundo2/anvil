@@ -59,7 +59,7 @@ def short(model: str) -> str:
     return SHORT.get(model, model.split("/", 1)[-1])
 
 
-def order(cells: dict[tuple[str, str], dict]) -> list[tuple[str, str]]:
+def order(cells: dict[tuple[str, ...], dict]) -> list[tuple[str, ...]]:
     """Cells are keyed by (model, executor), so a task file graded twice keeps both.
 
     Keying by model alone silently dropped one: `tasks/t1_exec.jsonl` has a `bash` and an
@@ -71,25 +71,31 @@ def order(cells: dict[tuple[str, str], dict]) -> list[tuple[str, str]]:
         key=lambda k: (
             PREFERRED.index(k[0]) if k[0] in PREFERRED else len(PREFERRED),
             cells[k]["scores"].get("strict_all_levels", {}).get("mean", 0.0),
-            k[1],
+            k[1:],
         ),
     )
     return ranked
 
 
-def _by_tasks() -> dict[str, dict[tuple[str, str], dict]]:
-    out: dict[str, dict[tuple[str, str], dict]] = {}
+def _by_tasks() -> dict[str, dict[tuple[str, ...], dict]]:
+    out: dict[str, dict[tuple[str, ...], dict]] = {}
     for entry in _load_entries():
-        out.setdefault(entry["tasks_file"], {})[(entry["model"], entry["executor"])] = entry
+        key = (entry["model"], entry["executor"], entry["quantization"])
+        out.setdefault(entry["tasks_file"], {})[key] = entry
     return out
 
 
-def label(cells: dict, key: tuple[str, str]) -> str:
-    """The executor is named only where a task file carries more than one, so the tables
-    that have always had a single arm read exactly as before."""
-    model, executor = key
-    arms = {k[1] for k in cells}
-    return short(model) + (f" ({executor})" if len(arms) > 1 else "")
+def label(cells: dict, key: tuple[str, str, str]) -> str:
+    """A condition is named only where a task file carries more than one value for it, so
+    the tables that have always had a single arm read exactly as before."""
+    model, executor, quantization = key
+    varying = [
+        value
+        for value, values in ((executor, {k[1] for k in cells}),
+                              (quantization, {k[2] for k in cells}))
+        if len(values) > 1
+    ]
+    return short(model) + (f" ({', '.join(varying)})" if varying else "")
 
 
 def _dat(models: dict[str, dict]) -> str:

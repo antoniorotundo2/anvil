@@ -977,6 +977,43 @@ be said is that the fixed sleeps were an assumption and are now checks, that the
 the exact call that was failing rather than a proxy for it, and that a level now reports on the
 artifact or reports nothing, which is the property it was supposed to have all along.
 
+### Quantization moves three levels and leaves the fourth alone
+
+Every figure this project publishes was measured with the model loaded in 4 bit, and nothing said
+whether that choice carried any of the result. Qwen2.5-Coder 1.5B run again at fp16, three seeds,
+n=5, same tasks, graded in the same container under the `bash` executor:
+
+| level | 4-bit | fp16 |
+|---|---|---|
+| `syntax` | 0.575±0.025 | 0.750±0.000 |
+| `submittability` | 0.842±0.013 | 1.000±0.000 |
+| `resource_fit` | 0.442±0.013 | 0.617±0.013 |
+| `functional` | 0.533±0.037 | 0.533±0.025 |
+| `strict_all_levels` | 0.308±0.025 | 0.408±0.025 |
+
+Three levels move by fifteen to eighteen points. **`functional` does not move at all**, the same
+0.533 on both, with overlapping ranges. Quantizing this model costs it the form of the artifact,
+valid shell, submittable directives, values that match the request, and costs it nothing measurable
+in whether the payload does what the task asked.
+
+The reading needs one qualification, because `functional` is not independent of `syntax`: a script
+that fails to parse is recorded as failing `functional` without being run. So fp16 sends more
+scripts to the executor, 0.750 of them against 0.575, and the pass rate stays where it was, which
+means the extra scripts that now parse fail at execution more often than the ones that already did.
+The two levels are not measuring the same thing, and the invariance is a real observation rather
+than an artifact of the ordering.
+
+`submittability` at 1.000 is worth its own line. That level [does not track model
+size](#submittability-does-not-track-model-size), which is one of this project's stranger findings,
+and here it tracks how the model was loaded, sharply: at fp16 the 1.5B writes a submittable script
+every time out of 120.
+
+One model. The 7B does not fit in fp16 on a 12GB card, so this is not a statement about the table,
+and the table stays 4-bit throughout with the condition recorded in every entry. What it does
+establish is that the condition is load-bearing for the smallest model, by ten points of strict, and
+that a leaderboard row without its quantization would be a number about how a model was loaded as
+much as about the model. Both arms are published, which is why the entry key now carries it.
+
 ## What to change when the T2 set is regenerated
 
 `tasks/t2_repair.jsonl` is the denominator of every T2 number published here, so nothing is
