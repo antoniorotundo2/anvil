@@ -255,7 +255,12 @@ repair:
 # must pass every T2 task; a no-op "repair" that returns the broken script
 # unchanged must fail every one. If either fails, t2_repair.jsonl or the
 # repair verifier is broken - not a model.
-guards-t2: induce-t2
+# Not `guards-t2: induce-t2` any more. Induction moved into the container, and depending on
+# it made one of the four mandatory pre-commit checks need Docker to run at all. The guard's
+# job is to bracket the committed task file, not to rebuild it; that the file is in sync with
+# the inducers is a test (`test_t2_repair_file_is_in_sync_with_current_inducers`), which is
+# where a mismatch belongs.
+guards-t2:
 	$(PYTHON) -m anvil.cli repair --model oracle --repair-tasks $(REPAIR_TASKS) --tasks $(TASKS) \
 		--out /tmp/anvil_repair_oracle.json
 	$(PYTHON) -m anvil.cli repair --model broken --repair-tasks $(REPAIR_TASKS) --tasks $(TASKS) \
