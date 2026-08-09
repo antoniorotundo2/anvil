@@ -9,7 +9,7 @@
     2
   ],
   "n_per_task": 5,
-  "executor": "bash",
+  "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
   "source": "results/4bit_1p5b_regraded",
@@ -25,8 +25,8 @@
       "cells": 3
     },
     "functional": {
-      "mean": 0.65,
-      "half_range": 0.025,
+      "mean": 0.658333,
+      "half_range": 0.0125,
       "cells": 3
     },
     "resource_fit": {
@@ -40,7 +40,7 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.45,
+      "mean": 0.475,
       "half_range": 0.025,
       "cells": 3
     }

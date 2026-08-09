@@ -1,5 +1,5 @@
 {
-  "model": "Qwen/Qwen3.5-9B",
+  "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
   "tasks_file": "tasks/t1_slurm.jsonl",
   "tasks_sha": "bbc74707a030",
   "verifier_sha": "d4af1eaf9809",
@@ -9,29 +9,29 @@
     2
   ],
   "n_per_task": 5,
-  "executor": "bash",
+  "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
   "source": "results/4bit_1p5b_regraded",
   "scores": {
     "syntax": {
-      "mean": 1.0,
-      "half_range": 0.0,
-      "cells": 3
-    },
-    "submittability": {
-      "mean": 0.875,
+      "mean": 0.575,
       "half_range": 0.025,
       "cells": 3
     },
+    "submittability": {
+      "mean": 0.841667,
+      "half_range": 0.0125,
+      "cells": 3
+    },
     "functional": {
-      "mean": 0.65,
+      "mean": 0.375,
       "half_range": 0.025,
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.6,
-      "half_range": 0.05,
+      "mean": 0.441667,
+      "half_range": 0.0125,
       "cells": 3
     },
     "safety": {
@@ -40,7 +40,7 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.45,
+      "mean": 0.308333,
       "half_range": 0.025,
       "cells": 3
     }

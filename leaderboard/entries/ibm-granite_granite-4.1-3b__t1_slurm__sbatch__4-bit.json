@@ -1,5 +1,5 @@
 {
-  "model": "Qwen/Qwen3.5-9B",
+  "model": "ibm-granite/granite-4.1-3b",
   "tasks_file": "tasks/t1_slurm.jsonl",
   "tasks_sha": "bbc74707a030",
   "verifier_sha": "d4af1eaf9809",
@@ -9,7 +9,7 @@
     2
   ],
   "n_per_task": 5,
-  "executor": "bash",
+  "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
   "source": "results/4bit_1p5b_regraded",
@@ -21,17 +21,17 @@
     },
     "submittability": {
       "mean": 0.875,
-      "half_range": 0.025,
+      "half_range": 0.0,
       "cells": 3
     },
     "functional": {
-      "mean": 0.65,
-      "half_range": 0.025,
+      "mean": 0.716667,
+      "half_range": 0.0375,
       "cells": 3
     },
     "resource_fit": {
-      "mean": 0.6,
-      "half_range": 0.05,
+      "mean": 0.55,
+      "half_range": 0.0,
       "cells": 3
     },
     "safety": {
@@ -40,8 +40,8 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.45,
-      "half_range": 0.025,
+      "mean": 0.425,
+      "half_range": 0.0,
       "cells": 3
     }
   }

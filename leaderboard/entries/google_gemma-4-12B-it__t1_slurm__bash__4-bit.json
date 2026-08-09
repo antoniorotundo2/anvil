@@ -2,7 +2,7 @@
   "model": "google/gemma-4-12B-it",
   "tasks_file": "tasks/t1_slurm.jsonl",
   "tasks_sha": "bbc74707a030",
-  "verifier_sha": "20dd4a2e4159",
+  "verifier_sha": "d4af1eaf9809",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/regrade_mem",
+  "source": "results/4bit_1p5b_regraded",
   "scores": {
     "syntax": {
       "mean": 0.875,
