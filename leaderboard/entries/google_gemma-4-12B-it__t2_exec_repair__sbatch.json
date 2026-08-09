@@ -1,0 +1,48 @@
+{
+  "model": "google/gemma-4-12B-it",
+  "tasks_file": "tasks/t2_exec_repair.jsonl",
+  "tasks_sha": "de1e9d60396f",
+  "verifier_sha": "1727a930156d",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "n_per_task": 5,
+  "executor": "sbatch",
+  "base_image": "ubuntu:24.04",
+  "quantization": "4-bit",
+  "source": "results/exec_matrix",
+  "scores": {
+    "syntax": {
+      "mean": 0.893333,
+      "half_range": 0.02,
+      "cells": 3
+    },
+    "submittability": {
+      "mean": 0.946667,
+      "half_range": 0.03,
+      "cells": 3
+    },
+    "functional": {
+      "mean": 0.56,
+      "half_range": 0.05,
+      "cells": 3
+    },
+    "resource_fit": {
+      "mean": 1.0,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "safety": {
+      "mean": 1.0,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "strict_all_levels": {
+      "mean": 0.56,
+      "half_range": 0.05,
+      "cells": 3
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+  "tasks_file": "tasks/t1_exec.jsonl",
+  "tasks_sha": "6a7c2fe00c37",
+  "verifier_sha": "1727a930156d",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "n_per_task": 5,
+  "executor": "bash",
+  "base_image": "ubuntu:24.04",
+  "quantization": "4-bit",
+  "source": "results/exec_matrix",
+  "scores": {
+    "syntax": {
+      "mean": 1.0,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "submittability": {
+      "mean": 0.5,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "functional": {
+      "mean": 0.966667,
+      "half_range": 0.05,
+      "cells": 3
+    },
+    "resource_fit": {
+      "mean": 0.5,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "safety": {
+      "mean": 1.0,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "strict_all_levels": {
+      "mean": 0.466667,
+      "half_range": 0.05,
+      "cells": 3
+    }
+  }
+}
