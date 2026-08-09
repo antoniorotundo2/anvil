@@ -278,8 +278,8 @@ equal to what the inducers produce by a test, so registering F9 regenerates it, 
 the denominator of every T2 number published here, including the tables below. The
 fault it would teach is also close to F7's: both are refused at `submittability`, and the three
 models that clear F7 between 0.742 and 0.875 would most likely clear this too. It stays an
-observed class, and joins the induced ones if the T2 set is ever regenerated for an independent
-reason.
+observed class, and joins the induced ones in the one pass where that file is rebuilt, see [What to
+change when the T2 set is regenerated](#what-to-change-when-the-t2-set-is-regenerated).
 
 ## F10: A unit confusion the scheduler accepts
 
@@ -323,9 +323,10 @@ rejects or, worse, admits and schedules badly.
 
 It has no inducer, for the reason given under F9: registering one regenerates
 `tasks/t2_repair.jsonl`, and that file is the denominator of every T2 number published here. It is
-the class most worth inducing when that regeneration happens for an independent reason, because it
-is the only one whose repair cannot be faked by any check cheaper than the one this benchmark
-runs.
+the class most worth inducing when that file is rebuilt, because it is the only one whose repair
+cannot be faked by any check cheaper than the one this benchmark runs, and it is first on the list
+in [What to change when the T2 set is
+regenerated](#what-to-change-when-the-t2-set-is-regenerated).
 
 ### The mirror of F10, which this verifier did not catch
 
@@ -967,6 +968,41 @@ machine available here, and a resource-starvation flap on someone else's runner 
 be said is that the fixed sleeps were an assumption and are now checks, that the last probe tests
 the exact call that was failing rather than a proxy for it, and that a level now reports on the
 artifact or reports nothing, which is the property it was supposed to have all along.
+
+## What to change when the T2 set is regenerated
+
+`tasks/t2_repair.jsonl` is the denominator of every T2 number published here, so nothing is
+regenerated for one improvement at a time: a new digest means the whole matrix has to be generated
+again with all five models, which is days of GPU rather than a re-verification. Four separate
+findings are waiting on that one pass and they are recorded in four different sections above. This
+is the list, in one place, so that the pass does not have to be repeated because one of them was
+missed.
+
+1. **Register F9 as an inducer.** An option this scheduler does not have, `--walltime` from Granite
+   and `--mem-per-node` from Gemma, both on the multi-node task. Two families reach it by different
+   routes, so it is not one model's quirk. See [F9](#f9-an-option-this-scheduler-does-not-have).
+2. **Register F10 as an inducer**, and first among the four. A unit confusion the scheduler accepts
+   is the only observed class that no level except `resource_fit` can see: well formed, submitted
+   without complaint, runs and prints what was asked. Its repair cannot be faked by any check
+   cheaper than the one this benchmark runs, which is exactly what a repair set should be made of.
+   See [F10](#f10-a-unit-confusion-the-scheduler-accepts).
+3. **Give F3 a per-task value.** The inducer writes the literal `2` on all eight tasks, and 2GB is
+   the correct answer on two of them, so a model that blindly appends `G` to the digit it was shown
+   passes a quarter of the category. A value that varies with the task separates repairing from
+   copying; a constant cannot. See [What F3 actually
+   measures](#what-f3-actually-measures).
+4. **Decide what F4 should exercise.** It is written to drop `--time`, `--mem` or `--gpus`,
+   whichever the task declares, in that order, and every T1 task declares a walltime, so the first
+   candidate always applies and the other two are never reached. As instantiated the category is
+   about one directive. That may be the right scope, but it should be a decision rather than a
+   consequence of the ordering.
+
+Two things that are *not* on this list, deliberately. The execution-sensitive set has its own file
+and its own digest, so `tasks/t1_exec.jsonl` and `tasks/t2_exec_repair.jsonl` can grow without
+touching any of this. And the walltime and memory bounds were fixed in the verifier rather than in
+the tasks, which is why those two corrections cost a re-verification and not a re-generation: a
+constraint whose name is now misleading, `mem_min_mb` demanding equality, is a smaller price than
+moving `tasks_sha`.
 
 ## Next measurements needed
 

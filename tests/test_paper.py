@@ -130,3 +130,20 @@ def test_a_task_file_graded_twice_keeps_both_arms():
     assert "(bash)" in table and "(sbatch)" in table
     # The single-arm tables must read exactly as they did, with no executor in the label.
     assert "(bash)" not in (DATA / "t1_slurm_table.tex").read_text(encoding="utf-8")
+
+
+def test_every_deferred_item_is_reachable_from_the_regeneration_list():
+    """Four findings wait on one rebuild of `tasks/t2_repair.jsonl`, which costs a full
+    re-generation with every model. They are argued in four different sections, so the list
+    that the pass has to follow is the thing that must not drift: a section that says it is
+    waiting has to be reachable from it, or the pass happens and one of them is missed.
+    """
+    doc = (ROOT / "docs" / "OBSERVED_FAILURES.md").read_text(encoding="utf-8")
+    listing = doc.split("## What to change when the T2 set is regenerated")[1]
+    listing = listing.split("## Next measurements needed")[0]
+    for anchor in ("#f9-an-option-this-scheduler-does-not-have",
+                   "#f10-a-unit-confusion-the-scheduler-accepts",
+                   "#what-f3-actually-measures"):
+        assert anchor in listing, anchor
+    # And the sections that defer must point back, so neither side can be edited alone.
+    assert doc.count("#what-to-change-when-the-t2-set-is-regenerated") >= 2
