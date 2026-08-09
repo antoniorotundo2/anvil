@@ -186,13 +186,18 @@ interval, and no significance is claimed anywhere in this paper.
 
 \begin{table}[t]
 \centering
-\small
-\setlength{\tabcolsep}{3.5pt}
-\caption{T1, writing a job script from scratch. $\mathrm{pass}@1$ per level. Safety is $1.000 \pm 0.000$ for every model and is omitted.}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{T1, writing a job script from scratch. $\mathrm{pass}@1$ per level. A row is a
+condition and not a model: the executor decides how \emph{functional} is judged and the
+quantization decides how the model was loaded, and both are measurements rather than settings, so
+each is published rather than one being chosen. Only the four other levels differ between the
+\texttt{bash} and \texttt{sbatch} rows of one model. Safety is $1.000 \pm 0.000$ throughout and is
+omitted.}
 \label{tab:t1}
 \begin{tabular}{lccccc}
 \toprule
-model & syntax & submit. & functional & res. fit & strict \\
+model, executor and loading & syntax & submit. & functional & res. fit & strict \\
 \midrule
 \input{data/t1_slurm_table.tex} \\
 \bottomrule
@@ -201,13 +206,14 @@ model & syntax & submit. & functional & res. fit & strict \\
 
 \begin{table}[t]
 \centering
-\small
-\setlength{\tabcolsep}{3.5pt}
-\caption{T2, diagnosing and repairing an induced fault. $\mathrm{pass}@1$ per level. Safety is $1.000 \pm 0.000$ for every model and is omitted.}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{T2, diagnosing and repairing an induced fault. $\mathrm{pass}@1$ per level, one row per
+condition as in Table~\ref{tab:t1}. Safety is $1.000 \pm 0.000$ throughout and is omitted.}
 \label{tab:t2}
 \begin{tabular}{lccccc}
 \toprule
-model & syntax & submit. & functional & res. fit & strict \\
+model, executor and loading & syntax & submit. & functional & res. fit & strict \\
 \midrule
 \input{data/t2_repair_table.tex} \\
 \bottomrule
@@ -295,8 +301,8 @@ it wrote itself. Gemma 4 12B is the only model that solves the set, $1.000$ unde
 
 \begin{table}[t]
 \centering
-\small
-\setlength{\tabcolsep}{3.5pt}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \caption{The execution-sensitive set from scratch, each model graded twice, $\mathrm{pass}@1$ per
 level. Two tasks, three seeds, $n=5$. The set states no memory minimum, so what a script needs is a
 property of the payload the model wrote and only running the job can decide it. Safety is
@@ -304,7 +310,7 @@ $1.000 \pm 0.000$ throughout and is omitted.}
 \label{tab:exec}
 \begin{tabular}{lccccc}
 \toprule
-model and executor & syntax & submit. & functional & res. fit & strict \\
+model, executor and loading & syntax & submit. & functional & res. fit & strict \\
 \midrule
 \input{data/t1_exec_table.tex} \\
 \bottomrule
