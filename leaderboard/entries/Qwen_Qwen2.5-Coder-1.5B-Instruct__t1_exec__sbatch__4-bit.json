@@ -2,7 +2,7 @@
   "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
   "tasks_file": "tasks/t1_exec.jsonl",
   "tasks_sha": "6a7c2fe00c37",
-  "verifier_sha": "1727a930156d",
+  "verifier_sha": "d4af1eaf9809",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/exec_matrix",
+  "source": "results/exec_matrix_regraded",
   "scores": {
     "syntax": {
       "mean": 1.0,

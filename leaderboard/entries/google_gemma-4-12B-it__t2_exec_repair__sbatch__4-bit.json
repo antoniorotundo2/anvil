@@ -2,7 +2,7 @@
   "model": "google/gemma-4-12B-it",
   "tasks_file": "tasks/t2_exec_repair.jsonl",
   "tasks_sha": "de1e9d60396f",
-  "verifier_sha": "1727a930156d",
+  "verifier_sha": "d4af1eaf9809",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/exec_matrix",
+  "source": "results/exec_matrix_regraded",
   "scores": {
     "syntax": {
       "mean": 0.893333,
