@@ -269,7 +269,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     policy_path = getattr(args, "policy", None)
     if policy_path:
         try:
-            policy = Policy.load(policy_path)
+            policy = Policy.load(resolve(policy_path))
         except (OSError, ValueError) as exc:
             print(f"cannot read the policy: {exc}", file=sys.stderr)
             return 2

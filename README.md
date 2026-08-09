@@ -252,6 +252,9 @@ the bracket the rest of this project uses: it must accept every canonical soluti
 still refuse a script that asks for too much. An example policy that rejected the benchmark's own
 reference answers would be defective rather than strict, which the first version of that file was.
 
+The example travels with the package, so that command works from a checkout and from a
+`pip install` alike. Your own file is a path like any other, and a path that exists always wins.
+
 Every field is optional and an absent field is not a rule. A field that is not recognised is an
 error rather than a silence: a misspelled `max_mem_gb` would otherwise read as a site with no
 memory limit at all. See [`policies/reference_cluster.json`](policies/reference_cluster.json).

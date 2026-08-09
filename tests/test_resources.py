@@ -13,6 +13,8 @@ from pathlib import Path
 from anvil import resources
 from anvil.resources import resolve
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def test_an_existing_path_is_used_unchanged(tmp_path):
     """A checkout keeps behaving exactly as before, and an explicit --tasks pointing
@@ -50,3 +52,38 @@ def test_the_repository_task_files_resolve_to_the_repository(tmp_path):
     for name in ("t1_slurm.jsonl", "t2_repair.jsonl", "retrieval_corpus.jsonl"):
         given = root / "tasks" / name
         assert resolve(given) == given
+
+
+def test_the_example_policy_travels_like_the_task_files(tmp_path, monkeypatch):
+    """`--policy policies/reference_cluster.json` is the command the README prints, and from
+    a wheel it failed on a missing file: the policy is a `.json` under `policies/` and the
+    packaging glob only ever covered `tasks/*.jsonl`. Found by installing from the repository
+    URL and running what the README says, which is the only way that class shows up.
+    """
+    from anvil import resources
+
+    shipped = tmp_path / "policies"
+    shipped.mkdir()
+    # A name the checkout does not have, or the first rule would answer and prove nothing:
+    # a path that exists is always used unchanged, which is what keeps a clone behaving as
+    # it always has.
+    (shipped / "some_site.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(resources, "PACKAGED_POLICIES", shipped)
+
+    assert resources.resolve("policies/some_site.json") == shipped / "some_site.json"
+    assert resources.resolve("policies/reference_cluster.json") == Path(
+        "policies/reference_cluster.json"
+    ), "the checkout must still win over the packaged copy"
+
+
+def test_the_shipped_policy_is_declared_for_packaging():
+    """The lookup above only helps if the file is in the wheel. Pinned beside the task-file
+    pattern, since the two travel by the same mechanism and broke for the same reason."""
+    import re
+
+    body = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    section = body.split("[tool.setuptools.package-data]", 1)[1]
+    line = re.search(r'"anvil\.policies"\s*=\s*\[([^\]]*)\]', section)
+    assert line, "the shipped policy is no longer declared as package data"
+    assert re.findall(r'"([^"]+)"', line.group(1)) == ["*.json"]
+    assert {p.suffix for p in (ROOT / "policies").iterdir() if p.is_file()} == {".json"}

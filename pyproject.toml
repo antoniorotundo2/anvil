@@ -42,13 +42,15 @@ anvil = "anvil.cli:main"
 # package as `anvil/data` at build time and `anvil/resources.py` falls back to it. Nothing
 # moves, and a checkout keeps reading `tasks/` exactly as before.
 [tool.setuptools]
-packages = ["anvil", "anvil.data"]
+packages = ["anvil", "anvil.data", "anvil.policies"]
 
 [tool.setuptools.package-dir]
 "anvil.data" = "tasks"
+"anvil.policies" = "policies"
 
 [tool.setuptools.package-data]
 "anvil.data" = ["*.jsonl"]
+"anvil.policies" = ["*.json"]
 
 [tool.ruff]
 line-length = 100
