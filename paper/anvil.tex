@@ -64,11 +64,13 @@ as size rises. Real job submission looked nearly redundant against a \texttt{bas
 verdict in $3120$ artifacts, until a fifth model wrote \texttt{srun} inside its scripts: the
 sandbox has no allocation for a job step to attach to, and the count moved to six in $3900$ with
 $32$ samples failing in the sandbox and passing on the scheduler. On a task set whose memory need
-only the payload knows, the same comparison reads $297$ of $900$. Retrieved documentation costs the smaller model $28$ points of resource fit whatever the
+only the payload knows, the same comparison reads $297$ of $900$. Retrieved documentation costs
+the smaller model $28$ points of resource fit whatever the
 text says, while the larger one is unaffected by irrelevant text and loses $6$ points to the one
 document that addresses the level it concerns. A task built so that GNU coreutils and
 \texttt{uutils} must judge it differently is failed by all three models asked for reasons that
-precede the difference. We also report, rather than conceal, three measurement faults found and corrected
+precede the difference. We also report, rather than conceal, three measurement faults found and
+corrected
 during the work, one of which had already been published.
 \end{abstract}
 
@@ -180,9 +182,10 @@ the task file, and the verifier refuses any whose digest does not match.
 
 \section{Results}
 
-Three seeds, $n=5$ samples per task, 4-bit quantization on an RTX 3060, graded inside the container
-under the \texttt{bash} executor. The $\pm$ is half the range across seeds. It is not a confidence
-interval, and no significance is claimed anywhere in this paper.
+Three seeds, $n=5$ samples per task, on an RTX 3060, graded inside the container. Every model was
+loaded in 4 bit, which is the condition the tables carry unless a row says otherwise. The $\pm$ is
+half the range across seeds. It is not a confidence interval, and no significance is claimed
+anywhere in this paper.
 
 \begin{table}[t]
 \centering
@@ -246,7 +249,8 @@ submittability, where the 3B, the 9B and the 12B lead and the 7B trails all four
 
 On T1 the level reads $0.875$ for a 3B model and for a 9B of a third generation, $0.867$ for a 12B,
 $0.842$ for a 1.5B and $0.792$ for a 7B. Four models sit within eight points of each other at the
-top and the 7B is alone at the bottom, while within the Qwen family the level falls as size rises and every
+top and the 7B is alone at the bottom, while within the Qwen family the level falls as size rises
+and every
 other level improves, which Figure~\ref{fig:t1} shows as the one bar group running against the
 others. Two families of three are above Qwen across a range from 3B to 12B, so the shortfall is not
 one model's quirk.
@@ -408,10 +412,15 @@ $343$ cases and needed nothing.
 \section{Threats to validity}
 
 Eight T1 tasks, which makes each one worth $0.125$ of every T1 figure. Three seeds, so the ranges
-are spread rather than intervals. Three model families at five sizes, from 1.5B to 12B, all
-quantized to 4 bit; one of the five reasons by default and was measured with that disabled, since
-under this token budget it would otherwise be cut off before producing a script. One reference topology, declared by this work rather than borrowed from a centre in
-production. All prompts written by one author, in one language and one style. No result here has
+are spread rather than intervals. Three model families at five sizes, from 1.5B to 12B, quantized to
+4 bit except where a row says otherwise, and that exception is not decoration: the 1.5B loaded in
+fp16 gains $17$ points of syntax, $16$ of submittability and $17$ of resource fit while
+\emph{functional} does not move at all, so the loading is part of what a row measures rather than a
+setting behind it. Only the 1.5B fits in fp16 on this card, so how far that generalises is unknown.
+One of the five models reasons by default and was measured with that disabled, since under this
+token budget it would otherwise be cut off before producing a script. One reference topology,
+declared by this work rather than borrowed from a centre in production. All prompts written by one
+author, in one language and one style. No result here has
 been replicated independently.
 
 \section{Availability}

@@ -41,7 +41,8 @@ scheduler is is a deliberate split, not a convenience: see
 
 Numbers produced outside the container are not on this page. One earlier table was, and it was
 wrong; that correction is recorded in
-[A table measured against the wrong cluster](OBSERVED_FAILURES.md#a-table-measured-against-the-wrong-cluster).
+[A table measured against the wrong
+cluster](OBSERVED_FAILURES.md#a-table-measured-against-the-wrong-cluster).
 
 ## T1: writing a job script from scratch
 
@@ -86,7 +87,7 @@ one, hence the smaller denominators.
 | F6 payload/spec mismatch | 0.933 | 1.000 | 1.000 | 1.000 | 1.000 | 15 |
 | F7 malformed value | 0.358 | 0.817 | 0.575 | 0.742 | 0.875 | 120 |
 
-## Seven findings
+## Eight findings
 
 **`submittability` is not ordered by model size.** T1 reads 0.875 for Granite at 3B, 0.867 for
 Gemma at 12B, 0.842 for Qwen at 1.5B and 0.792 for Qwen at 7B: the largest model in the set and the
@@ -168,6 +169,16 @@ reordering rather than an offset. Every report and entry now records a `verifier
 `tasks_sha`, so two gradings of one set of generations can no longer read as one series. See [The
 mirror of F10](OBSERVED_FAILURES.md#the-mirror-of-f10-which-this-verifier-did-not-catch).
 
+**Loading the model in 4 bit costs three levels and leaves the fourth untouched.** Every figure
+here was measured at 4 bit, and nothing said whether that carried any of the result. Qwen2.5-Coder
+1.5B run again at fp16, same tasks, same seeds, same container, gains 17 points of `syntax`, 16 of
+`submittability` and 17 of `resource_fit`, and 10 of `strict`. **`functional` does not move**, 0.533
+on both with overlapping ranges. Quantizing this model costs it the form of the artifact and costs
+it nothing measurable in whether the payload does what was asked. One model: only the 1.5B fits in
+fp16 on a 12GB card, so this qualifies the table rather than restating it, and both arms are
+published because the loading is part of what a row measures. See [Quantization moves three
+levels](OBSERVED_FAILURES.md#quantization-moves-three-levels-and-leaves-the-fourth-alone).
+
 **Two coreutils implementations are not interchangeable, and no model has reached the difference.**
 101 invocations run in Ubuntu 24.04 (GNU 9.4) and 26.04 (`uutils` 0.8.0): 91 agree exactly. Of the
 rest, three are behavioural and need no misconfigured locale, `wc -m` and `expand` on a non-ASCII
@@ -195,8 +206,9 @@ make guards && make guards-t2 && make docker-guards-enforcement && make docker-g
 ## What these numbers are not
 
 Three seeds and 24 to 220 verifications per cell. Three model families at four sizes, from 1.5B to
-12B, all quantized to 4 bit. Eight T1 tasks, which is a small denominator and makes each task
-worth 0.125 of every T1 figure on this page. One reference topology, declared rather than borrowed
+12B, quantized to 4 bit except where a row says otherwise. Eight T1 tasks, which is a small
+denominator and makes each task worth 0.125 of every T1 figure on this page. One reference
+topology, declared rather than borrowed
 from a real centre. Nothing here has been replicated by anybody else.
 
 Every figure moved at least once while being measured, and the corrections are recorded next to the
