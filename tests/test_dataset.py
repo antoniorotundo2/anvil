@@ -43,3 +43,30 @@ def test_the_digest_the_harness_writes_is_the_manifest_digest(tmp_path):
         MANIFEST.read_text(encoding="utf-8"))["files"]}
     for rel, digest in recorded.items():
         assert _file_sha(ROOT / rel) == digest[:12], rel
+
+
+def test_every_task_file_is_covered_by_the_package_data_pattern():
+    """The claim in the README, that the task files travel with `pip install`, rests on one
+    glob in `pyproject.toml`. Verified by installing the package from the repository URL into
+    a clean environment: all eleven files arrive and are byte-identical to `tasks/`. What
+    that check cannot do is run from a checkout, where `anvil/data` does not exist until a
+    build creates it, so what is pinned here is the declaration the claim depends on.
+
+    A task file with any other extension would be dropped from the wheel without a word, and
+    `anvil check --task ...` would work for whoever has the repository and fail for whoever
+    followed the README.
+    """
+    import re
+
+    # Read with a regex rather than by splitting on the next `[`, which is the opening
+    # bracket of the list itself and leaves nothing to match. No `tomllib`: it arrived in
+    # 3.11 and this package supports 3.10.
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    body = pyproject.split("[tool.setuptools.package-data]", 1)[1]
+    line = re.search(r'"anvil\.data"\s*=\s*\[([^\]]*)\]', body)
+    assert line, "the package-data entry for anvil.data is gone"
+    patterns = re.findall(r'"([^"]+)"', line.group(1))
+    assert patterns == ["*.jsonl"], patterns
+
+    suffixes = {p.suffix for p in (ROOT / "tasks").iterdir() if p.is_file()}
+    assert suffixes == {".jsonl"}, f"not covered by {patterns}: {sorted(suffixes - {'.jsonl'})}"
