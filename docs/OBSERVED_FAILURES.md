@@ -991,14 +991,14 @@ n=5, same tasks, graded in the same container under the `bash` executor:
 | `functional` | 0.533±0.037 | 0.533±0.025 |
 | `strict_all_levels` | 0.308±0.025 | 0.408±0.025 |
 
-**The two arms were graded by different verifiers, and two of the five rows above are not yet a
-clean comparison.** The 4-bit figures come from `20dd4a2e4159` and the fp16 ones from
-`d4af1eaf9809`; between them `functional` gained the sandbox ceiling and the session reaping, and
-`submittability` gained the retry and the skip. `syntax` and `resource_fit` are governed by
-unchanged rules and stand as they are. The 4-bit cells are being reverified under the current
-verifier so the other three rows rest on one grading rather than on an argument that the changes
-were probably inert; the leaderboard already marks them, which is what that machinery is for and
-what this table failed to say on its own.
+Both arms are graded by `d4af1eaf9809`. They were not at first: the 4-bit figures came from
+`20dd4a2e4159`, and between the two verifiers `functional` gained the sandbox ceiling and the
+session reaping while `submittability` gained the retry and the skip. Putting them side by side
+without saying so was a mistake, and it was the leaderboard that caught it, marking 34 rows *stale
+rules* next to one fresh one. Rather than argue the four changes were inert, the whole run was
+reverified: **every cell of all five models on both task sets came back identical to the digit**,
+and so did the executor comparison, 6 changed verdicts of 3900 and the same 245 and 32. Four
+changes to the verifier, zero verdicts moved, measured rather than assumed.
 
 Three levels move by fifteen to eighteen points. **`functional` does not move at all**, the same
 0.533 on both, with overlapping ranges. Quantizing this model costs it the form of the artifact,
