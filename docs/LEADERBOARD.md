@@ -40,6 +40,7 @@ An entry marked *stale tasks* was measured against a different version of this t
 
 | model | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | `strict_all_levels` | conditions |
 |---|---|---|---|---|---|---|---|
+| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.750±0.000 | 1.000±0.000 | 0.533±0.025 | 0.617±0.013 | 1.000±0.000 | 0.408±0.025 | 3 seeds, n=5, bash, fp16 |
 | Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.442±0.013 | 1.000±0.000 | 0.308±0.025 | 3 seeds, n=5, bash, 4-bit |
 | Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 1.000±0.000 | 1.000±0.000 | 0.667±0.025 | 3 seeds, n=5, bash, 4-bit |
 | Qwen/Qwen3.5-9B (stale rules) | 1.000±0.000 | 0.875±0.025 | 0.650±0.025 | 0.600±0.050 | 1.000±0.000 | 0.450±0.025 | 3 seeds, n=5, bash, 4-bit |

@@ -1,0 +1,48 @@
+{
+  "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+  "tasks_file": "tasks/t1_slurm.jsonl",
+  "tasks_sha": "bbc74707a030",
+  "verifier_sha": "d4af1eaf9809",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "n_per_task": 5,
+  "executor": "bash",
+  "base_image": "ubuntu:24.04",
+  "quantization": "fp16",
+  "source": "results/fp16_graded",
+  "scores": {
+    "syntax": {
+      "mean": 0.75,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "submittability": {
+      "mean": 1.0,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "functional": {
+      "mean": 0.533333,
+      "half_range": 0.025,
+      "cells": 3
+    },
+    "resource_fit": {
+      "mean": 0.616667,
+      "half_range": 0.0125,
+      "cells": 3
+    },
+    "safety": {
+      "mean": 1.0,
+      "half_range": 0.0,
+      "cells": 3
+    },
+    "strict_all_levels": {
+      "mean": 0.408333,
+      "half_range": 0.025,
+      "cells": 3
+    }
+  }
+}
