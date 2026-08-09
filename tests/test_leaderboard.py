@@ -105,3 +105,31 @@ def test_an_entry_is_keyed_by_its_executor_too(tmp_path, monkeypatch):
         written.append(sorted(q.name for q in tmp_path.glob("vendor_m__*.json")))
 
     assert len(written[-1]) == 2, written[-1]
+
+
+def test_a_cell_measured_under_other_conditions_is_refused(tmp_path, monkeypatch):
+    """Quantization, base image, samples and seeds are recorded but not in the key, so an
+    fp16 arm of a model already imported at 4-bit would land on the same file and replace a
+    published number with one taken under other conditions. The import refuses and names the
+    field rather than widening the key every time a condition is added."""
+    import leaderboard as lb
+
+    monkeypatch.setattr(lb, "ENTRIES", tmp_path)
+    cell = {
+        "model": "vendor/m", "tasks_file": "tasks/t1_slurm.jsonl",
+        "environment": {"functional_executor": "bash", "base_image": "ubuntu:24.04"},
+        "summary": {lv: {"pass@1": 1.0} for lv in LEVELS},
+    }
+    path = tmp_path / "cell.json"
+    path.write_text(json.dumps(cell), encoding="utf-8")
+
+    def run(quantization):
+        return lb.cmd_import(argparse.Namespace(
+            results=[str(path)], seeds=[0], n=5, quantization=quantization, source=""))
+
+    assert run("4-bit") == 0
+    assert run("fp16") == 2, "an fp16 cell must not overwrite the 4-bit one"
+    # Re-importing the same conditions is not a collision: it is a refresh.
+    assert run("4-bit") == 0
+    stored = json.loads(next(tmp_path.glob("vendor_m__*.json")).read_text(encoding="utf-8"))
+    assert stored["quantization"] == "4-bit"

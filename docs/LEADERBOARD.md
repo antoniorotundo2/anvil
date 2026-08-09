@@ -8,6 +8,11 @@ seeds no significance is claimed anywhere on this page.
 `strict_all_levels` is the ranking column: it requires every level either to pass or to
 be out of the machine's reach, and a skipped level is never a passed one.
 
+An import refuses to replace an entry measured under other conditions, so a cell
+taken at fp16 cannot quietly overwrite one taken at 4-bit. Quantization, base image,
+samples per task and seeds are recorded but not in the key: publishing both means
+widening the key, and the refusal is what makes that a decision.
+
 A model can appear twice under one task file, once per executor, and on
 `tasks/t1_exec.jsonl` it should: that set states no memory minimum, so what a script
 needs is a property of the payload the model wrote and only real submission can

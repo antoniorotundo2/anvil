@@ -131,6 +131,31 @@ def cmd_import(args: argparse.Namespace) -> int:
     path = ENTRIES / (
         f"{_slug(entry['model'])}__{Path(entry['tasks_file']).stem}__{entry['executor']}.json"
     )
+
+    # Four conditions travel with an entry and are not in its key: quantization, base image,
+    # samples per task, seeds. Two rows that differ in any of them are two measurements, and
+    # importing the second over the first would replace a published number with one taken
+    # under other conditions, silently. Rather than widen the key every time a condition is
+    # added, the collision is refused and the field is named. An fp16 arm of a model already
+    # imported at 4-bit is exactly this, and it is the next thing anyone would try.
+    if path.exists():
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        differing = [
+            k for k in ("quantization", "base_image", "n_per_task", "seeds")
+            if previous.get(k) != entry.get(k)
+        ]
+        if differing:
+            print(
+                f"refusing to overwrite {path.name}: it holds "
+                + ", ".join(f"{k}={previous.get(k)!r}" for k in differing)
+                + " and this cell has "
+                + ", ".join(f"{k}={entry.get(k)!r}" for k in differing)
+                + ".\nTwo conditions are two measurements. Move the existing entry aside if it "
+                "is being replaced, or widen the key if both should be published.",
+                file=sys.stderr,
+            )
+            return 2
+
     path.write_text(json.dumps(entry, indent=2) + "\n", encoding="utf-8")
     print(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)
     return 0
@@ -163,6 +188,11 @@ def render() -> str:
         "",
         "`strict_all_levels` is the ranking column: it requires every level either to pass or to",
         "be out of the machine's reach, and a skipped level is never a passed one.",
+        "",
+        "An import refuses to replace an entry measured under other conditions, so a cell",
+        "taken at fp16 cannot quietly overwrite one taken at 4-bit. Quantization, base image,",
+        "samples per task and seeds are recorded but not in the key: publishing both means",
+        "widening the key, and the refusal is what makes that a decision.",
         "",
         "A model can appear twice under one task file, once per executor, and on",
         "`tasks/t1_exec.jsonl` it should: that set states no memory minimum, so what a script",
