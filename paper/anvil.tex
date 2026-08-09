@@ -287,26 +287,26 @@ way, five models and three seeds and $900$ sample comparisons, the same executor
 \textbf{$298$ artifacts of $900$}, with $357$ of the $395$ stopped artifacts returning
 \texttt{OUT\_OF\_MEMORY}. From $0.15\%$ to $33\%$, on the same harness and the same models.
 
-Table~\ref{tab:exec} gives the from-scratch half. Qwen2.5-Coder 7B is the case: the sandbox
-promotes $29$ of its $30$ artifacts and the scheduler kills every one, so \emph{functional} falls
-from $0.967$ to $0.000$. It is the model with $1.000$ resource fit on the main T1 set, strong
+Table~\ref{tab:exec} gives the from-scratch half, one row per arm. Qwen2.5-Coder 7B is the case:
+the sandbox promotes $29$ of its $30$ artifacts and the scheduler kills every one, so
+\emph{functional} falls from $0.967$ to $0.000$ between its two rows. It is the model with $1.000$ resource fit on the main T1 set, strong
 wherever the requirement is written down and at floor wherever the requirement is a property of what
 it wrote itself. Gemma 4 12B is the only model that solves the set, $1.000$ under both arms.
 
 \begin{table}[t]
 \centering
-\caption{\emph{functional} pass@1 per executor on the execution-sensitive set, two tasks, three
-seeds, $n=5$. The set states no memory minimum, so only running the job can decide.}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\caption{The execution-sensitive set from scratch, each model graded twice, $\mathrm{pass}@1$ per
+level. Two tasks, three seeds, $n=5$. The set states no memory minimum, so what a script needs is a
+property of the payload the model wrote and only running the job can decide it. Safety is
+$1.000 \pm 0.000$ throughout and is omitted.}
 \label{tab:exec}
-\begin{tabular}{lcc}
+\begin{tabular}{lccccc}
 \toprule
-model & \texttt{bash} & real submission \\
+model and executor & syntax & submit. & functional & res. fit & strict \\
 \midrule
-Qwen2.5-Coder 7B & $0.967$ & $0.000$ \\
-Gemma 4 12B & $1.000$ & $1.000$ \\
-Qwen3.5 9B & $0.467$ & $0.700$ \\
-Granite 4.1 3B & $0.467$ & $0.467$ \\
-Qwen2.5-Coder 1.5B & $0.333$ & $0.167$ \\
+\input{data/t1_exec_table.tex} \\
 \bottomrule
 \end{tabular}
 \end{table}

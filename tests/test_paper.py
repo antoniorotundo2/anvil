@@ -111,3 +111,20 @@ def test_a_model_the_generator_does_not_know_still_reaches_the_tables(tmp_path):
     assert pd.order(models)[-1] == "newcomer/Model-9B"
     assert "Model-9B" in pd._table(models)
     assert "Model-9B" in pd._dat(models)
+
+
+def test_a_task_file_graded_twice_keeps_both_arms():
+    """`tasks/t1_exec.jsonl` carries a `bash` and an `sbatch` entry per model, and the point
+    of the set is the distance between them. Keyed by model alone the second overwrote the
+    first and the table published one arm without saying which, which is the shape of every
+    silent-drop defect this project has had to correct."""
+    import paper_data
+
+    cells = paper_data._by_tasks()["tasks/t1_exec.jsonl"]
+    assert {key[1] for key in cells} == {"bash", "sbatch"}
+    assert len(cells) == 10
+
+    table = (DATA / "t1_exec_table.tex").read_text(encoding="utf-8")
+    assert "(bash)" in table and "(sbatch)" in table
+    # The single-arm tables must read exactly as they did, with no executor in the label.
+    assert "(bash)" not in (DATA / "t1_slurm_table.tex").read_text(encoding="utf-8")
