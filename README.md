@@ -136,17 +136,30 @@ under `/sys/fs/cgroup`, which a plain `docker run` mounts read-only. See
 
 With `slurmd` running, the container also enforces the allocation through cgroups, so a job that
 uses more memory than it requested is killed instead of finishing. Nothing in the eight T1 tasks
-allocates enough to notice, so `tasks/t1_exec.jsonl` adds one that holds 64MB and asks for enough
-memory to fit it, with no number in the specification: the payload's real need is the ground truth.
-The fault induced from it (F8, `--mem` cut to 16M) is well formed, within spec, accepted by the
-scheduler, and passes under `bash`. It fails only here:
+allocates enough to notice, so `tasks/t1_exec.jsonl` holds two tasks that do, neither of them
+stating a memory number: the payload's real need is the ground truth. They under-spend for
+different reasons, which is what keeps them from being one task measured twice. The first builds
+64MB inside a command substitution, so the pipe and the variable are resident at once. The second
+starts four workers at the same time, each holding 32MB, and `--mem` is the allocation for the whole
+node, so a model that reasons correctly about a single worker still under-requests by a factor of
+four.
+
+The fault induced from them (F8, `--mem` cut to 16M) is well formed, within spec, accepted by the
+scheduler, and passes every level under `bash`. It fails only here:
 
 ```
 make docker-guards-enforcement
 ```
 
-The set lives in its own file so that adding it changes no digest: `tasks/t1_slurm.jsonl` and
+The set lives in its own file so that adding to it changes no digest: `tasks/t1_slurm.jsonl` and
 `tasks/t2_repair.jsonl` are untouched, and every published number stays comparable.
+
+Graded with five models it is where the executor earns its cost: **298 artifacts of 900 change
+their strict verdict between the two arms**, against 6 of 3900 on the sets whose requirements are
+written in their prompts. Qwen2.5-Coder 7B, which scores 1.000 on `resource_fit` from scratch on
+T1, has 29 of its 30 artifacts here promoted by the sandbox and every one of them killed by the
+scheduler. See [what the two arms disagree
+about](docs/OBSERVED_FAILURES.md#on-a-task-set-where-only-execution-knows-the-answer-a-third-of-the-verdicts-change).
 
 CPU and GPU binding remain outside this level: a job is confined to its cores, but no task asks
 what it was given.
@@ -390,6 +403,10 @@ promotes and the scheduler stops, grouped by what stopped them (`OUT_OF_MEMORY`,
 refused submission, missing output). It also counts the samples real submission cannot judge, such
 as the dependency task waiting on a job that never completes, which are skipped rather than
 charged to the model.
+
+How large that disagreement is turns out to be a property of the task set rather than of the
+method: 0.15% where the requirements are stated in the prompt, 33% where only the payload knows
+them. Run it against both before concluding anything about how much real submission is worth.
 
 ## Documentation
 
