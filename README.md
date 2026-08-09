@@ -50,6 +50,11 @@ To work on the benchmark, from a checkout:
 make install
 ```
 
+That builds `.venv/` and installs into it, without touching the interpreter you invoked it with,
+so the command lives at `.venv/bin/anvil` rather than on your `PATH`. Every `anvil ...` below is
+written without a prefix; from a checkout it is `.venv/bin/anvil ...`, or activate the environment
+once with `source .venv/bin/activate` and drop the prefix for good.
+
 To generate scripts with a real model, also install the model extras:
 
 ```
@@ -62,7 +67,8 @@ To use the verifier without a checkout, install the package:
 pip install git+https://github.com/antoniorotundo2/anvil
 ```
 
-That gives you the `anvil` command with no dependencies beyond the standard library. The task
+That gives you the `anvil` command on the `PATH` of whatever environment you install it into,
+with no dependencies beyond the standard library. The task
 files travel with it, so `anvil check job.sh --task t1_gpu_single` works from any directory. A
 checkout still reads `tasks/` from the working directory, which is where every published number
 was measured, and the packaged copy is only consulted when that path does not exist.

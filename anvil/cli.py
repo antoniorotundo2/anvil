@@ -149,8 +149,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "          The `functional` level executes generated scripts: on a non-GNU\n"
             "          implementation the outcome may diverge from the cluster.\n"
             "          For valid results run inside the container:\n"
-            "            docker build -t anvil docker/\n"
-            '            docker run --rm -v "$PWD":/work -w /work anvil pytest -q'
+            "            make docker-build && make docker-test\n"
+            "          (both take RUNTIME=podman if that is what you have)"
         )
 
     if notes:
