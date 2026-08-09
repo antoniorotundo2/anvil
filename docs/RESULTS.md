@@ -118,7 +118,7 @@ method. See [Real submission was almost redundant until a model wrote
 The 0.15% above is measured on tasks whose resource requirements are written in their prompts.
 `tasks/t1_exec.jsonl` states no memory minimum, so what a script needs is a property of the payload
 it wrote itself and only execution knows it. Graded the same way, five models and three seeds, the
-same comparison reads **298 artifacts of 900, 33%**, with 357 of the 395 stopped artifacts coming
+same comparison reads **297 artifacts of 900, 33%**, with 356 of the 394 stopped artifacts coming
 back `OUT_OF_MEMORY`. Qwen2.5-Coder 7B goes from 0.967 to **0.000** on `functional`: the sandbox
 promotes 29 of its 30 from-scratch artifacts and the scheduler kills every one. Gemma 4 12B is the
 only model that solves the set, 1.000 under both arms. See [On a task set where only execution knows

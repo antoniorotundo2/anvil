@@ -186,7 +186,7 @@ make docker-guards-enforcement
 The set lives in its own file so that adding to it changes no digest: `tasks/t1_slurm.jsonl` and
 `tasks/t2_repair.jsonl` are untouched, and every published number stays comparable.
 
-Graded with five models it is where the executor earns its cost: **298 artifacts of 900 change
+Graded with five models it is where the executor earns its cost: **297 artifacts of 900 change
 their strict verdict between the two arms**, against 6 of 3900 on the sets whose requirements are
 written in their prompts. Qwen2.5-Coder 7B, which scores 1.000 on `resource_fit` from scratch on
 T1, has 29 of its 30 artifacts here promoted by the sandbox and every one of them killed by the

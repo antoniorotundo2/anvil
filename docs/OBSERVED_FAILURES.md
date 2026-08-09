@@ -131,10 +131,10 @@ real submission with no other level failing.** Both tasks now do that, and
 Five models, three seeds, `tasks/t1_exec.jsonl` and its repair set, graded twice in the same image,
 900 sample comparisons. Verdicts in `results/exec_matrix/`, verifier `1727a930156d`.
 
-**298 artifacts of 900 change their strict verdict with the executor.** On the main task set the
+**297 artifacts of 900 change their strict verdict with the executor.** On the main task set the
 same comparison reads 6 of 3900. The published claim that real submission was nearly redundant is
 not wrong about the runs it was made on, and it is wrong as a claim about the method: what changes
-is the task set, from 0.15% to 33%, and 357 of the 395 stopped artifacts come back
+is the task set, from 0.15% to 33%, and 356 of the 394 stopped artifacts come back
 `OUT_OF_MEMORY`.
 
 **T1, from scratch, `functional` per arm:**
@@ -162,9 +162,18 @@ recorded above: it writes `srun` inside the script, the sandbox has no allocatio
 to, and the step exits non-zero under `bash` while running cleanly under a real scheduler.
 
 **T2 repair, `strict` per arm:** 0.993 to 0.400 for the 7B, 0.880 to 0.560 for Gemma, 0.847 to
-0.587 for Qwen3.5, 0.660 to 0.247 for Granite, 0.393 to 0.173 for the 1.5B. Every model loses at
+0.593 for Qwen3.5, 0.660 to 0.247 for Granite, 0.393 to 0.173 for the 1.5B. Every model loses at
 least a third of its score when the allocation is enforced, and the ordering is preserved, so this
 is not a re-ranking: it is a level of difficulty that the sandbox cannot see at all.
+
+One counter did move, and it is the sandbox getting better rather than the models. Graded under
+the verifier this set was first measured with, 32 artifacts failed under `bash` and passed under
+real submission; under the current one, **11**. The difference is the session reaping added the
+same day: a script that backgrounds work and exits used to leave its children holding the output
+pipe, so reading to end-of-file waited for them and the job was recorded as timing out. Twenty-one
+of the thirty-two disagreements were the sandbox failing a script for a defect of its own, on the
+one task set whose prompts ask for background workers. The headline moved by one artifact, 298 to
+297, and the false negatives fell by two thirds.
 
 Two limits on the reading. The set is two T1 tasks and ten repairs, so a single task moves a number
 by 0.5 on T1; these are not the 3900-sample figures published elsewhere and are not comparable with
