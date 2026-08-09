@@ -98,16 +98,25 @@ The `docker-` prefix stays on the target names, since that is what CI and every 
 repository already say. The scripts take the same variable:
 `RUNTIME=podman ./scripts/executor_ablation.sh results/<run>`.
 
-**Untested: no machine here has Podman.** What is done is the removal of the hardcoded runtime, and
-a test keeps it removed. Two differences are known and worth checking before trusting a number that
-came out of it. On an SELinux host a bind mount needs `:z`, which is not added here because
-relabelling a checkout is not a side effect to introduce untested. And `docker-guards-enforcement`
-needs delegated cgroup controllers, which rootless Podman does not provide: expect that target to
-need a rootful invocation, or to be unavailable.
+Verified on Podman 4.9.3, rootless, Ubuntu 24.04 under WSL2. `docker-build` and `docker-test` pass
+there, 302 tests, and the short name `ubuntu:24.04` resolves without help, so no fully-qualified
+image is needed. Everything that grades under the `bash` executor works.
 
-Anything measured under a runtime whose behaviour has not been checked should be treated the way
-this project treats a grading environment it has not verified, which is to say not published until
-it has been.
+**Real submission does not.** `docker-guards-sbatch` builds the scheduler image and then stops:
+
+```
+==> WARNING: a placeable job did not become ready in 60s; submittability will be unreliable
+```
+
+`slurmd` has to create its step scope under `/sys/fs/cgroup`, and rootless Podman does not delegate
+the controllers that needs, so no job is ever placeable. It stops rather than grading, which is the
+point: without that check the run would have gone ahead and produced numbers with `submittability`
+quietly unreliable. A rootful `sudo podman` is the obvious thing to try and has not been tried here,
+since root keeps a separate image store and the image would be built again from scratch.
+
+So: `RUNTIME=podman` for anything under the `bash` executor, Docker for the arms that need an
+enforced allocation. On an SELinux host a bind mount may also need `:z`, which is not added here
+because relabelling a checkout is not a side effect to introduce untested.
 
 ### Manually
 

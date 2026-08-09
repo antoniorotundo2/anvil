@@ -938,6 +938,14 @@ every variant, since a skipped level is never a passed one: the file would be la
 would still carry a digest and look authoritative. A task set is the definition of the benchmark,
 so this is a refusal rather than a warning.
 
+A footnote worth keeping, because it is the only time today a defence paid for itself somewhere
+other than where it was built. The readiness wait added here is what stopped a Podman run from
+grading: under rootless Podman `slurmd` cannot create its step scope, no job is ever placeable, and
+the container reported `a placeable job did not become ready in 60s` and refused to continue rather
+than producing a table with `submittability` quietly unreliable. The check was written for a CI
+race on a loaded runner and caught an unrelated limitation of a different container runtime, which
+is what a check on a precondition does and an assumption about timing does not.
+
 None of that fixed it. The third run came back with three failures again, on a third disjoint set
 of tests, all of them the same message. A defect that moves to different tests each time is not a
 startup race being narrowly missed, it is a condition recurring throughout the run: on a four-core
