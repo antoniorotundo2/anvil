@@ -76,6 +76,46 @@ def test_the_example_policy_travels_like_the_task_files(tmp_path, monkeypatch):
     ), "the checkout must still win over the packaged copy"
 
 
+def test_every_oracle_reads_its_reference_the_same_way(tmp_path, monkeypatch):
+    """T2's oracle opened its reference path directly while T1's and T3's resolved theirs, so
+    `anvil repair --model oracle` (the command the README prints) came back as a
+    FileNotFoundError traceback from an installed package and worked fine in a checkout.
+
+    All three are built here, not just the one that broke: the defect is a reader that skips
+    `resolve`, and it was found by running the documented command from a wheel rather than by
+    reading the code, which is a check nothing in the suite performed.
+    """
+    from anvil.models import build_model, build_recipe_model
+    from anvil.repair import build_repair_model
+    from anvil.schema import RecipeTask, Task
+
+    packaged = tmp_path / "data"
+    packaged.mkdir()
+    # The real files under names this checkout does not have, so `tasks/` cannot answer and
+    # the packaged copy is the only source. Copied rather than synthesised: the oracles match
+    # a generated prompt against the task prompt, and a stub would pass without exercising it.
+    for real, boxed in (
+        ("t1_slurm", "t1_boxed"),
+        ("t1_reference", "t1_boxed_reference"),
+        ("t3_apptainer", "t3_boxed"),
+        ("t3_reference", "t3_boxed_reference"),
+    ):
+        (packaged / f"{boxed}.jsonl").write_bytes((ROOT / "tasks" / f"{real}.jsonl").read_bytes())
+    monkeypatch.setattr(resources, "PACKAGED", packaged)
+
+    t1_tasks = Task.load_jsonl("tasks/t1_boxed.jsonl")
+    t3_tasks = RecipeTask.load_jsonl("tasks/t3_boxed.jsonl")
+
+    oracles = [
+        build_repair_model("oracle", "tasks/t1_boxed_reference.jsonl", t1_tasks),
+        build_model("oracle", "tasks/t1_boxed.jsonl"),
+        build_recipe_model("oracle", "tasks/t3_boxed.jsonl"),
+    ]
+    prompts = [t1_tasks[0].prompt, t1_tasks[0].prompt, t3_tasks[0].prompt]
+    for oracle, prompt in zip(oracles, prompts, strict=True):
+        assert oracle.generate(prompt)[0].strip(), type(oracle).__name__
+
+
 def test_the_shipped_policy_is_declared_for_packaging():
     """The lookup above only helps if the file is in the wheel. Pinned beside the task-file
     pattern, since the two travel by the same mechanism and broke for the same reason."""

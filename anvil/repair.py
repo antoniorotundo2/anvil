@@ -27,6 +27,7 @@ from pathlib import Path
 
 from .inducer import FAULT_CATEGORIES, induce
 from .models import Model
+from .resources import resolve
 from .schema import RepairTask, Task
 from .verifier import verify
 
@@ -60,7 +61,10 @@ class RepairOracleModel(Model):
 
     def __init__(self, reference_path: str | Path, t1_tasks: list[Task]):
         by_id: dict[str, str] = {}
-        with open(reference_path, encoding="utf-8") as fh:
+        # Resolved, like every other loader: the default is a repository-relative path, and
+        # from an installed package the oracle used to die on a traceback while the T1 and T3
+        # oracles beside it worked. It was the only reader in the package left unresolved.
+        with open(resolve(reference_path), encoding="utf-8") as fh:
             for line in fh:
                 if line.strip():
                     rec = json.loads(line)
