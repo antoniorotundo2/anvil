@@ -312,6 +312,13 @@ Rebuild it after changing a T1 task or its reference solution:
 make induce-t2
 ```
 
+That target builds the image and runs inside it, and `anvil induce` refuses to run anywhere the
+`submittability` level cannot be judged. The reason is that a variant is kept when the verifier
+refuses it, and a skipped level is never a passed one: on a machine with no scheduler every variant
+survives, including the ones that verify clean, and the file comes out larger while still carrying
+a digest that makes it look authoritative. Which faults the benchmark contains is not something to
+decide by accident.
+
 Run a model against it and verify, same shape as T1:
 
 ```
