@@ -791,7 +791,7 @@ Both disagreements run the same direction, and it is not the one a sandbox is us
 neither is the scheduler catching something the sandbox missed, both are the sandbox rejecting what
 the scheduler accepts. What the four-model version of this section described was a property of what
 those models happened to write, not of the method. The numbers are in
-[`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-moves-functional-and-barely-touches-the-verdict).
+[`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#real-submission-was-almost-redundant-until-a-model-wrote-srun).
 
 That is a statement about these eight tasks, not about the executor. A task built to need real
 execution does need it: F8 below is invisible to every static level and to bash, and there the
