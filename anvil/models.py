@@ -17,6 +17,7 @@ import zlib
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from .errors import UnsupportedRequest
 from .resources import resolve
 
 SYSTEM_PROMPT = (
@@ -154,7 +155,7 @@ class HFModel(Model):
         self._info = info
 
         if self.load_in_4bit and not info.supports_4bit:
-            raise RuntimeError(
+            raise UnsupportedRequest(
                 f"4-bit quantization requested but unavailable on device "
                 f"'{info.device}' ({info.name}). Requires CUDA + bitsandbytes. "
                 f"On Apple Silicon use fp16 with small models, or run on an NVIDIA GPU."

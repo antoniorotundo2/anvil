@@ -11,12 +11,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import time
 from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 
+from .errors import UnsupportedRequest
 from .inducer import FAULT_CATEGORIES
 from .metrics import aggregate, aggregate_by_category, aggregate_recipes
 from .models import build_model, build_recipe_model, reference_path_for
@@ -838,6 +840,23 @@ def _report_recipe(model_name, tasks_file, tasks, results, args, elapsed) -> Non
         print(f"Full results written to {args.out}")
 
 
+def _check_executor_env() -> None:
+    """`--executor` is filtered by argparse `choices`, ANVIL_FUNCTIONAL_EXECUTOR by nothing,
+    so a typo in the variable surfaced as a traceback out of the verifier once something
+    happened to ask which executor was selected.
+
+    Checked here and not at the point of use: `verifier.py` feeds `verifier_sha`, and
+    editing it to improve an error message would stamp a new digest on every report and mark
+    every published entry as graded by different rules.
+    """
+    name = os.environ.get("ANVIL_FUNCTIONAL_EXECUTOR")
+    if name and name not in FUNCTIONAL_EXECUTORS:
+        raise UnsupportedRequest(
+            f"ANVIL_FUNCTIONAL_EXECUTOR={name!r} is not an executor: "
+            f"pick one of {', '.join(FUNCTIONAL_EXECUTORS)}"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="anvil", description="Executable benchmark of HPC operational artifacts"
@@ -997,11 +1016,16 @@ def main(argv: list[str] | None = None) -> int:
     vc.set_defaults(func=cmd_verify_recipe)
 
     args = p.parse_args(argv)
-    # One place, so no subcommand can forget it: the executor is module state in the
-    # verifier, read back by the environment report that travels with every result.
-    if getattr(args, "executor", None):
-        set_functional_executor(args.executor)
-    return args.func(args)
+    try:
+        _check_executor_env()
+        # One place, so no subcommand can forget it: the executor is module state in the
+        # verifier, read back by the environment report that travels with every result.
+        if getattr(args, "executor", None):
+            set_functional_executor(args.executor)
+        return args.func(args)
+    except UnsupportedRequest as exc:
+        print(f"anvil: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
