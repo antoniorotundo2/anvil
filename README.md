@@ -141,9 +141,17 @@ make guards
 
 ### Real submission
 
-`functional` executes the script with `bash` in a sandbox by default. `--executor sbatch` submits
-it to the scheduler for real instead, waits for the job and reads its outcome from `scontrol`, so
-the walltime the script requested is enforced and the payload sees every variable SLURM injects:
+`functional` executes the script with `bash` in a sandbox by default. That sandbox has a memory
+ceiling, `ANVIL_SANDBOX_MEM_MB`, 1024 by default and applied with `ulimit -v`, so it does nothing
+on macOS. It exists to protect the machine, not to judge the artifact: it is deliberately not
+derived from `--mem`, or a script under-requesting memory would be stopped by the sandbox and the
+`bash` executor would start reporting the enforcement only real submission can measure. A script
+stopped by it says so in its detail, and raising it is the right answer for a task whose payload
+genuinely needs more.
+
+`--executor sbatch` submits it to the scheduler for real instead, waits for the job and reads its
+outcome from `scontrol`, so the walltime the script requested is enforced and the payload sees
+every variable SLURM injects:
 
 ```
 anvil run --model oracle --tasks tasks/t1_slurm.jsonl --executor sbatch -v
