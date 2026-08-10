@@ -66,6 +66,19 @@ def test_every_anchor_reaches_a_heading():
     assert not missing, missing
 
 
+def test_both_indexes_list_every_document():
+    """There are two: the README's Documentation section, and `docs/README.md`, which is the
+    page GitHub renders to anyone who clicks into the directory. Kept by hand in two places,
+    they drifted, and the one nothing links to was the one that fell behind: it listed four
+    of the seven files. Adding a document is now the moment both are checked.
+    """
+    present = {p.name for p in (ROOT / "docs").glob("*.md")} - {"README.md"}
+    for index in (ROOT / "README.md", ROOT / "docs" / "README.md"):
+        body = index.read_text(encoding="utf-8")
+        missing = sorted(n for n in present if n not in body)
+        assert not missing, f"{index.relative_to(ROOT)} does not list {missing}"
+
+
 def test_the_check_covers_the_documents_that_exist():
     """A regex that stopped matching would make both tests above pass by finding nothing,
     which is the failure mode of every check written as an empty list."""
