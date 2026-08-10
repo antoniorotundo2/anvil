@@ -282,6 +282,21 @@ make docker-verify
 every number carries the environment that produced it. This also enables the cross-distribution
 ablation: generate once, verify against several base images.
 
+Two machines also means two checkouts, so the report carries two digests beside that environment:
+`tasks_sha` for the questions and `verifier_sha` for the rules that graded them. The generations
+carry the first, and `verify` exits 2 rather than score answers to questions nobody asked:
+
+```
+[ERROR] these generations were produced against a different task file
+        (theirs: ['deadbeef1234'], current: bbc74707a030).
+```
+
+The second is stamped on the report, since it is only known once the grading happens. Nothing
+refuses at that point, because the run is internally consistent. The leaderboard is where it
+matters: a row whose digest differs from the rest of its column is printed marked *stale rules*
+rather than dropped, and marked means not comparable with the column, not merely older. The fix in
+both cases is to verify again from one checkout, which costs a verification and not a generation.
+
 ### Base image
 
 The container defaults to `ubuntu:24.04`, not the newest LTS: Ubuntu 26.04 replaces GNU coreutils
