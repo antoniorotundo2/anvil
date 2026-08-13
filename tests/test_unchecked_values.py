@@ -97,7 +97,10 @@ def test_a_pattern_that_matches_nothing_says_what_does(tmp_path, capsys, monkeyp
     assert uv.main([str(tmp_path / "results" / "RUN" / "*__bash.json")]) == 1
     err = capsys.readouterr().err
     assert "no report matched" in err
-    assert "results/20260101_000000" in err
+    # The run's own name, without the directory that holds it: a literal starting with the
+    # name of the untracked results directory is what `test_provenance.py` refuses, and it
+    # refused this line when it read the fuller path.
+    assert "20260101_000000" in err
 
 
 def test_it_says_so_when_there_is_no_run_at_all(tmp_path, capsys, monkeypatch):
