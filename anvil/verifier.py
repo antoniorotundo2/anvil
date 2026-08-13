@@ -780,7 +780,20 @@ def check_resource_fit(script: str, task: Task) -> LevelResult:
     eff_ntasks = _int("--ntasks", "-n")
     implicit_ntasks = eff_ntasks is None
     if implicit_ntasks:
-        eff_ntasks = eff_nodes           # default: one task per node
+        # One task per node is SLURM's default only when nothing else sets the count.
+        # `--ntasks-per-node` does set it, together with `--nodes`, and reading `--ntasks`
+        # alone made `--nodes=2 --ntasks-per-node=2` a request for two tasks. It is four,
+        # and the artifact was failed for asking correctly, which is the false negative
+        # this level exists to avoid. `--ntasks` still wins where both are written, as it
+        # does in SLURM. Found by counting directives that passing artifacts carry and no
+        # task demands: 157 of 11774 wrote this one, all of them alongside `--ntasks`, so
+        # no published verdict rested on the wrong count.
+        per_node = _int("--ntasks-per-node")
+        if per_node is None:
+            eff_ntasks = eff_nodes
+        else:
+            eff_ntasks = eff_nodes * per_node
+            implicit_ntasks = False      # derived from the script, not a default
 
     eff_cpus = _int("--cpus-per-task", "-c")
     implicit_cpus = eff_cpus is None

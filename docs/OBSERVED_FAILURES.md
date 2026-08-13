@@ -1032,6 +1032,24 @@ establish is that the condition is load-bearing for the smallest model, by ten p
 that a leaderboard row without its quantization would be a number about how a model was loaded as
 much as about the model. Both arms are published, which is why the entry key now carries it.
 
+### Two spellings of one request, one of them refused
+
+`--nodes=2 --ntasks=4` and `--nodes=2 --ntasks-per-node=2` ask SLURM for the same four tasks.
+`check_resource_fit` read only the first: `--ntasks-per-node` was absent from the effective-request
+computation, so the second was judged as two tasks and refused. A correct artifact failed for
+writing the request in the other spelling, which is the false negative the level was built to avoid
+and the one the section it lives under names as the reason for computing effective values at all.
+
+It surfaced from the other direction. Counting the directives that passing artifacts carry and no
+task demands, over the same 11774 that settled the unchecked values, put `--ntasks-per-node` at 157
+occurrences across three models. Every one of the 157 also wrote `--ntasks`, which wins in SLURM and
+wins here, so no published verdict rested on the wrong count: the defect was reachable and never
+reached. What made it visible was asking what artifacts carry, rather than what they omit.
+
+The fix is in the verifier and not in the tasks, like the walltime and memory bounds before it, so
+it costs a re-verification rather than a regeneration. It does move `verifier_sha`, and every entry
+measured under the previous digest reads *stale rules* until the matrix is verified again.
+
 ## What to change when the T2 set is regenerated
 
 `tasks/t2_repair.jsonl` is the denominator of every T2 number published here, so nothing is
@@ -1083,9 +1101,9 @@ place, so that the pass does not have to be repeated because one of them was mis
 Two things that are *not* on this list, deliberately. The execution-sensitive set has its own file
 and its own digest, so `tasks/t1_exec.jsonl` and `tasks/t2_exec_repair.jsonl` can grow without
 touching any of this. And the walltime and memory bounds were fixed in the verifier rather than in
-the tasks, which is why those two corrections cost a re-verification and not a re-generation: a
-constraint whose name is now misleading, `mem_min_mb` demanding equality, is a smaller price than
-moving `tasks_sha`.
+the tasks, as was the effective count above, which is why those corrections cost a re-verification
+and not a re-generation: a constraint whose name is now misleading, `mem_min_mb` demanding equality,
+is a smaller price than moving `tasks_sha`.
 
 ## Next measurements needed
 

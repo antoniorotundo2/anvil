@@ -1516,3 +1516,38 @@ def test_a_scheduler_that_stopped_answering_skips_rather_than_fails(monkeypatch)
     assert result.skipped
     assert not result.passed
     assert "NOT counted as passed" in result.detail
+
+
+def test_ntasks_per_node_counts_toward_the_effective_request():
+    """`--nodes=2 --ntasks-per-node=2` is four tasks in SLURM and was read as two, so a
+    correct artifact was failed for asking in the other spelling. `--ntasks` still wins
+    where both appear, as it does in SLURM, and a per-node count that really is short is
+    still refused."""
+    task = Task(id="t", prompt="p", constraints={"nodes": 2, "ntasks": 4},
+                expects_in_body=["ANVIL_OK"])
+    body = "#SBATCH --time=00:30:00\necho ANVIL_OK\n"
+
+    equivalent = "#!/bin/bash\n#SBATCH --nodes=2\n#SBATCH --ntasks-per-node=2\n" + body
+    assert check_resource_fit(equivalent, task).passed
+
+    short = "#!/bin/bash\n#SBATCH --nodes=2\n#SBATCH --ntasks-per-node=1\n" + body
+    result = check_resource_fit(short, task)
+    assert not result.passed
+    assert "effective 2" in result.detail
+
+    wins = ("#!/bin/bash\n#SBATCH --nodes=2\n#SBATCH --ntasks=4\n"
+            "#SBATCH --ntasks-per-node=99\n" + body)
+    assert check_resource_fit(wins, task).passed
+
+
+def test_a_derived_count_is_not_reported_as_a_default():
+    """The hint says `(SLURM default, not declared)` where the value was never written.
+    A count derived from `--ntasks-per-node` was written, in another spelling, and telling
+    the reader their script declared nothing would send them looking for the wrong thing."""
+    task = Task(id="t", prompt="p", constraints={"nodes": 2, "ntasks": 8},
+                expects_in_body=["ANVIL_OK"])
+    script = ("#!/bin/bash\n#SBATCH --nodes=2\n#SBATCH --ntasks-per-node=3\n"
+              "#SBATCH --time=00:30:00\necho ANVIL_OK\n")
+    detail = check_resource_fit(script, task).detail
+    assert "effective 6" in detail
+    assert "SLURM default" not in detail
