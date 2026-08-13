@@ -1071,8 +1071,9 @@ place, so that the pass does not have to be repeated because one of them was mis
    here. The shape it should take is already in the repository: T3, written later, compares
    `Bootstrap` and `From` by value in `resource_fit` and leaves each section's substance to what
    the container prints, so `%environment` is judged by `GREETING=hello` appearing and not by the
-   section being present. How often a model took the opening is unmeasured: those generations are
-   on the experiment machine.
+   section being present. How often a model took the opening is unmeasured, the generations being
+   on the experiment machine, and `./scripts/unchecked_values.py 'results/RUN/*__bash.json'`
+   is what answers it there.
 
 Two things that are *not* on this list, deliberately. The execution-sensitive set has its own file
 and its own digest, so `tasks/t1_exec.jsonl` and `tasks/t2_exec_repair.jsonl` can grow without
