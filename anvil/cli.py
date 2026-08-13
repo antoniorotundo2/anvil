@@ -357,12 +357,24 @@ def cmd_verify(args: argparse.Namespace) -> int:
             if not line.strip():
                 continue
             g = json.loads(line)
+            # The digest is read before the lookup, so generations aimed at another task
+            # set entirely are diagnosed as such: collected only after a successful lookup,
+            # it stayed empty in that case, the check below could not fire, and the run
+            # ended on "No generations verified", the least informative message available
+            # where the cause is fully knowable. Sixty cells were verified against the
+            # wrong task file before this moved. An absent digest is still recorded after
+            # the lookup: unstamped is a different thing from graded against something
+            # else, and saying the second when the ids simply do not match misnames it.
+            sha = g.get("tasks_sha")
+            if sha is not None:
+                shas.add(sha)
             task = tasks.get(g["task_id"])
             if task is None:
                 unknown.add(g["task_id"])
                 continue
             models.add(g.get("model", "?"))
-            shas.add(g.get("tasks_sha", "unknown"))
+            if sha is None:
+                shas.add("unknown")
             results.append(verify(g["script"], task, run_functional=not args.no_exec))
             if args.verbose:
                 _print_task_detail(task, results[-1:])
@@ -378,7 +390,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
             f"[ERROR] these generations were produced against a different task file "
             f"(theirs: {sorted(stale)}, current: {expected_sha}).\n"
             f"        Verifying them would score answers to questions that were never "
-            f"asked. Re-run `make generate`.",
+            f"asked. Either --tasks names the wrong file for these generations,\n"
+            f"        or the file moved under them and they need generating again.",
             file=sys.stderr,
         )
         return 2
@@ -538,13 +551,25 @@ def cmd_verify_repair(args: argparse.Namespace) -> int:
             if not line.strip():
                 continue
             g = json.loads(line)
+            # The digest is read before the lookup, so generations aimed at another task
+            # set entirely are diagnosed as such: collected only after a successful lookup,
+            # it stayed empty in that case, the check below could not fire, and the run
+            # ended on "No generations verified", the least informative message available
+            # where the cause is fully knowable. Sixty cells were verified against the
+            # wrong task file before this moved. An absent digest is still recorded after
+            # the lookup: unstamped is a different thing from graded against something
+            # else, and saying the second when the ids simply do not match misnames it.
+            sha = g.get("repair_tasks_sha")
+            if sha is not None:
+                shas.add(sha)
             rt = repair_tasks.get(g.get("repair_task_id"))
             base_task = t1_tasks.get(g.get("base_task_id"))
             if rt is None or base_task is None:
                 unknown.add(g.get("repair_task_id", "?"))
                 continue
             models.add(g.get("model", "?"))
-            shas.add(g.get("repair_tasks_sha", "unknown"))
+            if sha is None:
+                shas.add("unknown")
             results.append(
                 verify_repair(g["script"], rt, base_task, run_functional=not args.no_exec)
             )
@@ -660,12 +685,24 @@ def cmd_verify_recipe(args: argparse.Namespace) -> int:
             if not line.strip():
                 continue
             g = json.loads(line)
+            # The digest is read before the lookup, so generations aimed at another task
+            # set entirely are diagnosed as such: collected only after a successful lookup,
+            # it stayed empty in that case, the check below could not fire, and the run
+            # ended on "No generations verified", the least informative message available
+            # where the cause is fully knowable. Sixty cells were verified against the
+            # wrong task file before this moved. An absent digest is still recorded after
+            # the lookup: unstamped is a different thing from graded against something
+            # else, and saying the second when the ids simply do not match misnames it.
+            sha = g.get("tasks_sha")
+            if sha is not None:
+                shas.add(sha)
             task = tasks.get(g["task_id"])
             if task is None:
                 unknown.add(g["task_id"])
                 continue
             models.add(g.get("model", "?"))
-            shas.add(g.get("tasks_sha", "unknown"))
+            if sha is None:
+                shas.add("unknown")
             results.append(verify_recipe(g["recipe"], task, run_functional=not args.no_exec))
             if args.verbose:
                 _print_recipe_detail(task, results[-1:])

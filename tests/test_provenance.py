@@ -122,3 +122,29 @@ def test_no_script_hardcodes_the_container_runtime():
             if needle.search(code):
                 offenders.append(f"{path.name}:{i}")
     assert not offenders, f"use $(RUNTIME) or $RUNTIME instead: {offenders}"
+
+
+def test_a_total_task_mismatch_reports_the_digest_and_not_silence(tmp_path, capsys):
+    """The digest was collected only for generations whose id was found, so generations
+    aimed at another task set entirely left the set empty, the check could not fire, and
+    the run ended on "No generations verified". That is the least informative message
+    available in the one case where the cause is fully knowable, and it cost sixty cells
+    verified against the wrong file before anyone read it as a task-file mistake.
+    """
+    from anvil.cli import _file_sha, main
+
+    exec_tasks = ROOT / "tasks" / "t1_exec.jsonl"
+    generations = tmp_path / "g.jsonl"
+    generations.write_text(json.dumps({
+        "task_id": "t1_memory_bound", "sample": 0, "model": "m", "seed": 0,
+        "tasks_sha": _file_sha(exec_tasks),
+        "script": "#!/bin/bash\necho ANVIL_OK\n",
+    }) + "\n", encoding="utf-8")
+
+    rc = main(["verify", "--generations", str(generations),
+               "--tasks", str(ROOT / "tasks" / "t1_slurm.jsonl"), "--no-exec"])
+    err = capsys.readouterr().err
+    assert rc == 2, err
+    assert _file_sha(exec_tasks) in err
+    assert "--tasks names the wrong file" in err
+    assert "No generations verified" not in err
