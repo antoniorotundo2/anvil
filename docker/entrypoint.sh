@@ -276,18 +276,41 @@ rm -rf /var/spool/slurmctld/* 2>/dev/null || true
 # which reads as the artifact asking for something impossible. That refusal reached the
 # task set itself, because `induce_t2_tasks` keeps an induced variant only if the verifier
 # refuses it, so a controller that was still starting silently changed which faults exist.
+#
+# On timeout the container stops. That is what `set -e` above has always done with these
+# calls, but the message used to announce a degraded run ("submittability will be
+# unreliable") that never happened, which sent the one reader who hit it looking for
+# results that were never produced. Stopping is the right outcome and now says so: the
+# alternative is numbers measured against a cluster that is still starting.
+anvil_scheduler_state() {
+  # Printed where the failure happens, since the container is gone by the time anyone
+  # reads the log and a state collected afterwards would describe a different container.
+  live="$(pgrep -xc slurmd 2>/dev/null || true)"
+  echo "    slurmd running : ${live:-0} of ${ANVIL_NODES}"
+  echo "    scontrol ping  : $(scontrol ping 2>&1 | tr '\n' ' ' || true)"
+  echo "    sinfo          : $(sinfo -h -o '%N %t %C' 2>&1 | tr '\n' ' ' || true)"
+  tail -n 3 /var/log/slurm/slurmctld.log 2>/dev/null | sed 's/^/    log > /' || true
+}
+
 anvil_wait_for() {                        # $1 = what to wait for, $2 = the probe
   for _ in $(seq 1 60); do
     eval "$2" >/dev/null 2>&1 && return 0
     sleep 1
   done
-  echo "==> WARNING: $1 did not become ready in 60s; submittability will be unreliable" >&2
-  return 1
+  echo "==> ERROR: $1 did not become ready in 60s, stopping." >&2
+  echo "    Nothing was measured. Every level below would be judged against a cluster" >&2
+  echo "    that is still starting, and that refusal is indistinguishable from an" >&2
+  echo "    artifact asking for something impossible." >&2
+  anvil_scheduler_state >&2
+  exit 1
 }
 anvil_wait_for "slurmctld" "scontrol ping"
 
-# One slurmd per virtual node (multi-slurmd). If it fails, Anvil's preflight marks
-# `submittability` as SKIPPED with an explicit cause - never as a model failure.
+# One slurmd per virtual node (multi-slurmd). A node that starts and never registers is
+# not a timeout: `SlurmdTimeout=0` keeps it reading `idle`, the wait below is satisfied and
+# the container carries on, and Anvil's preflight is what marks `submittability` SKIPPED
+# with an explicit cause, never as a model failure. Not becoming ready at all is the other
+# case, and stops the container.
 for i in $(seq 1 "${ANVIL_NODES}"); do
   mkdir -p "/var/spool/slurmd/node${i}"
   ( setsid /usr/sbin/slurmd -N "node${i}" >/dev/null 2>&1 </dev/null & )
