@@ -25,6 +25,18 @@ def test_the_page_matches_its_entries():
     )
 
 
+def test_the_entries_are_found_at_all():
+    """Six tests in this file are written `for entry in _load_entries()`, and every one of
+    them reports success when the directory yields nothing. `ENTRIES` is monkeypatched to a
+    temporary path by two of the tests below, so a restore that fails to run leaves the rest
+    of the session looking at an empty directory and passing on it.
+
+    A floor rather than the current count: the entries are a record of measurements and grow,
+    but pruning a few stale rows is legitimate and should not fail here."""
+    found = _load_entries()
+    assert len(found) >= 10, f"{len(found)} entries under {ENTRIES}"
+
+
 def test_every_entry_was_measured_against_the_current_task_files():
     """An entry graded against a different version of a task file is not comparable with
     the rest of its column. The page marks it stale; this says whether any are."""

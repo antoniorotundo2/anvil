@@ -49,6 +49,24 @@ def test_every_input_and_data_file_the_paper_names_exists():
         assert (ROOT / "paper" / rel).exists(), rel
 
 
+def test_the_patterns_these_checks_read_the_paper_with_still_match():
+    """The two checks around this one, and the citation check below, are loops over
+    `re.findall` on the sources. A renamed macro or a reformat that puts a brace on the
+    next line makes the pattern match nothing, and a loop over nothing passes: the checks
+    would go quiet exactly when the paper had changed enough to need them.
+
+    Floors of one, not the current counts, so writing the paper is not an edit here. What
+    they catch is a pattern that has stopped seeing the document at all."""
+    tex = _tex()
+    for pattern, what in (
+        (r"\\input\{([^}]+)\}", "included sources"),
+        (r"table\[[^\]]*\]\s*\{([^}]+)\}", "data files behind the tables"),
+        (r"\\ref\{([^}]+)\}", "cross-references"),
+        (r"\\label\{([^}]+)\}", "labels"),
+    ):
+        assert re.findall(pattern, tex), f"the pattern for {what} matches nothing"
+
+
 def test_every_reference_has_a_label():
     tex = _tex()
     labels = set(re.findall(r"\\label\{([^}]+)\}", tex))
