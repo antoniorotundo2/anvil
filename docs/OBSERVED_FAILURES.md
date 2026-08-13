@@ -1068,8 +1068,11 @@ place, so that the pass does not have to be repeated because one of them was mis
    Neither executor closes it, the sandbox simulating a single `SLURM_ARRAY_TASK_ID` and real
    submission accepting the array and completing it, both checked. Closing any of the four means
    execution rather than matching, and an edit to `tasks/t1_slurm.jsonl`, which is what puts this
-   here. How often a model took the opening is unmeasured: those generations are on the
-   experiment machine.
+   here. The shape it should take is already in the repository: T3, written later, compares
+   `Bootstrap` and `From` by value in `resource_fit` and leaves each section's substance to what
+   the container prints, so `%environment` is judged by `GREETING=hello` appearing and not by the
+   section being present. How often a model took the opening is unmeasured: those generations are
+   on the experiment machine.
 
 Two things that are *not* on this list, deliberately. The execution-sensitive set has its own file
 and its own digest, so `tasks/t1_exec.jsonl` and `tasks/t2_exec_repair.jsonl` can grow without
