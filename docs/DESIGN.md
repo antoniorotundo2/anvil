@@ -60,6 +60,35 @@ The distinction is the point. Checking whether a string appears is surface-form 
 precisely what this benchmark exists to replace. An early version did exactly that, and failed
 scripts that `sbatch` accepted.
 
+### What that choice leaves unchecked
+
+`required_directives` therefore asks whether a directive is written, never what it says, and the
+resource spec covers only the seven keys in `constraints`. Everything else a prompt names is left
+to execution, and execution does not always reach it. Measured on the reference solutions, with one
+value changed at a time and every other line untouched:
+
+| task | changed to | strict, `bash` | strict, `sbatch` |
+|---|---|---|---|
+| `t1_hello_serial` | `--job-name=wrong-name` | pass | not measured |
+| `t1_output_paths` | `--output=nope_%j.txt` | pass | pass |
+| `t1_dependency_chain` | `--dependency=afterany:99999` | pass | pass |
+| `t1_container_apptainer` | another image and another bind mount | pass | not measured |
+| `t1_array_job` | `--array=1-1`, one task instead of five | pass | pass |
+
+A job name is cosmetic and belongs on that list without embarrassment. The other four are the
+substance of the task that carries them: `t1_output_paths` exists to ask for two specific paths,
+and a script that writes neither of them passes it. The gap is not that the surface is unchecked,
+which is the deliberate choice above; it is that nothing else checks it either, because the
+sandbox cannot see a path SLURM never applied, and real submission is not asked whether the file
+arrived where the spec said.
+
+Closing it means execution rather than matching, which is the same argument that opened this
+section: have the payload print what it resolved, or assert the artefact where the spec put it.
+Both are edits to `tasks/t1_slurm.jsonl`, so both move `tasks_sha` and cost a regeneration, which
+is why they are listed with the other deferred changes in
+[`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#what-to-change-when-the-t2-set-is-regenerated) rather
+than done here.
+
 ## Oracle and broken model
 
 Every benchmark should ship both. Few do.

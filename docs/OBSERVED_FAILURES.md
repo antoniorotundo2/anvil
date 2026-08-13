@@ -1038,8 +1038,8 @@ much as about the model. Both arms are published, which is why the entry key now
 regenerated for one improvement at a time: a new digest means the whole matrix has to be generated
 again with all five models, which is days of GPU rather than a re-verification. Five separate
 findings are waiting on that one pass, four of them recorded in four different sections above and
-the fifth stated here, having no section of its own. This is the list, in one place, so that the
-pass does not have to be repeated because one of them was missed.
+the fifth in `DESIGN.md`, where the choice it follows from is argued. This is the list, in one
+place, so that the pass does not have to be repeated because one of them was missed.
 
 1. **Register F9 as an inducer.** An option this scheduler does not have, `--walltime` from Granite
    and `--mem-per-node` from Gemma, both on the multi-node task. Two families reach it by different
@@ -1059,16 +1059,17 @@ pass does not have to be repeated because one of them was missed.
    candidate always applies and the other two are never reached. As instantiated the category is
    about one directive. That may be the right scope, but it should be a decision rather than a
    consequence of the ordering.
-5. **Encode the size of the array, or stop naming one in the prompt.** `t1_array_job` declares
-   `"array": true`, a boolean, so `resource_fit` can check only that `--array` is there. The
-   prompt asks for five tasks indexed 1 to 5, and `--array=1-1` passes every level strictly, as
-   does `--array=0-99`. Neither executor closes it: the sandbox simulates a single
-   `SLURM_ARRAY_TASK_ID`, so `functional` under bash runs the payload once whatever the range
-   says, and under real submission the array is accepted, runs and completes, checked on
-   `anvil:sched` with no level skipped. It is the one constraint of the seven that no change to
-   the verifier can reach, since there is no declared value to compare against, and that is what
-   puts it on this list instead of beside the walltime and memory bounds. How often a model took
-   the opening is unmeasured: those generations are on the experiment machine.
+5. **Decide what verifies the values a prompt names.** `required_directives` asks whether a
+   directive is written, never what it says, which is the deliberate refusal of surface-form
+   matching argued in [`DESIGN.md`](DESIGN.md#what-that-choice-leaves-unchecked); the measured
+   consequence is that four T1 tasks accept a script that does not do what their prompt asked.
+   The sharpest is `t1_array_job`: it declares `"array": true`, a boolean, so `--array=1-1`, one
+   task where the prompt asks for five, passes every level strictly, and so does `--array=0-99`.
+   Neither executor closes it, the sandbox simulating a single `SLURM_ARRAY_TASK_ID` and real
+   submission accepting the array and completing it, both checked. Closing any of the four means
+   execution rather than matching, and an edit to `tasks/t1_slurm.jsonl`, which is what puts this
+   here. How often a model took the opening is unmeasured: those generations are on the
+   experiment machine.
 
 Two things that are *not* on this list, deliberately. The execution-sensitive set has its own file
 and its own digest, so `tasks/t1_exec.jsonl` and `tasks/t2_exec_repair.jsonl` can grow without
