@@ -33,6 +33,36 @@ def test_every_released_file_exists_and_carries_records():
         assert any(line.strip() for line in path.read_text(encoding="utf-8").splitlines()), rel
 
 
+def test_the_loaders_the_guards_iterate_over_return_the_task_sets():
+    """Nearly every guard in this suite is written `for task in load(...)`, and a loop over
+    an empty list reports success. The manifest above catches a file that changed on disk
+    and cannot see a loader that stopped reading one, which is the way the count actually
+    reaches zero: a constant pointed somewhere else, a resolver aimed at an empty directory,
+    a schema that quietly skips lines it no longer recognises.
+
+    Floors rather than counts, so adding a task is not an edit here. They are the sizes the
+    published figures were measured against, so a set that shrinks fails and asks why.
+
+    The reference files are absent because they are not task files: they hold `{id, script}`
+    and are read by the oracle's own loader, whose coverage is what
+    `test_oracle_passes_every_task` measures.
+    """
+    from anvil.retrieval import Document  # noqa: PLC0415
+    from anvil.schema import RecipeTask, RepairTask, Task  # noqa: PLC0415
+
+    counts = {
+        "tasks/t1_slurm.jsonl": (Task, 8),
+        "tasks/t1_exec.jsonl": (Task, 2),
+        "tasks/t2_repair.jsonl": (RepairTask, 44),
+        "tasks/t2_exec_repair.jsonl": (RepairTask, 10),
+        "tasks/t3_apptainer.jsonl": (RecipeTask, 3),
+        "tasks/retrieval_corpus.jsonl": (Document, 8),
+    }
+    for name, (kind, floor) in counts.items():
+        loaded = kind.load_jsonl(ROOT / name)
+        assert len(loaded) >= floor, f"{name}: {len(loaded)} records, expected at least {floor}"
+
+
 def test_the_digest_the_harness_writes_is_the_manifest_digest(tmp_path):
     """`tasks_sha` in a generations file is the first twelve characters of the same
     SHA-256. One number identifies the dataset in the manifest, in saved generations and
