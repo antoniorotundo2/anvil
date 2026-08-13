@@ -81,3 +81,30 @@ def test_the_audit_still_tracks_the_tasks_it_was_written_for():
                                "t1_dependency_chain", "t1_array_job"}
     assert set(BODY) == {"t1_container_apptainer"}
     assert sum(len(v) for v in DIRECTIVES.values()) + sum(len(v) for v in BODY.values()) == 10
+
+
+def test_a_pattern_that_matches_nothing_says_what_does(tmp_path, capsys, monkeypatch):
+    """The usage line names a placeholder, and a placeholder gets pasted: `results/RUN/...`
+    went in literally twice. The message now answers the question it provokes, which the
+    empty-glob message on its own did not."""
+    import unchecked_values as uv
+
+    monkeypatch.setattr(uv, "ROOT", tmp_path)
+    run = tmp_path / "results" / "20260101_000000"
+    run.mkdir(parents=True)
+    (run / "m__bash.json").write_text('{"model": "m", "results": []}', encoding="utf-8")
+
+    assert uv.main([str(tmp_path / "results" / "RUN" / "*__bash.json")]) == 1
+    err = capsys.readouterr().err
+    assert "no report matched" in err
+    assert "results/20260101_000000" in err
+
+
+def test_it_says_so_when_there_is_no_run_at_all(tmp_path, capsys, monkeypatch):
+    """The other half: an empty `results/` is a different problem from a mistyped pattern,
+    and pointing at runs that do not exist would be no better than the message it replaced."""
+    import unchecked_values as uv
+
+    monkeypatch.setattr(uv, "ROOT", tmp_path)
+    assert uv.main([str(tmp_path / "results" / "*" / "*__bash.json")]) == 1
+    assert "run scripts/run_experiments.sh first" in capsys.readouterr().err

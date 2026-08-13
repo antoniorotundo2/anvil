@@ -7,7 +7,7 @@ that four T1 tasks accept an artifact that does not do what their prompt asked: 
 paths, the dependency target, the container image and bind mount, and the size of the job
 array all pass unread, under `bash` and under real submission alike.
 
-    ./scripts/unchecked_values.py 'results/RUN/*__bash.json'
+    ./scripts/unchecked_values.py 'results/*/*__bash.json'
 
 Only artifacts the verifier passed are counted, since the question is what the rules let
 through. Nothing here changes a verdict. It exists because the fix costs a regeneration of
@@ -109,13 +109,32 @@ def report(verdicts: Counter, written: Counter, passed: int, untracked: int) -> 
             print(f"  {task_id:<26} {label:<12} {raw:<28} {model} x{n}")
 
 
+def _runs_that_exist(limit: int = 8) -> list[str]:
+    """Directories under `results/` holding reports this script can read. Printed when a
+    pattern matches nothing, because `RUN` in the usage line is a placeholder and reads as
+    a name: it was pasted literally twice before this existed, on a machine where the
+    answer was one `ls` away and the message did not say so."""
+    runs = {p.parent for p in (ROOT / "results").glob("*/*__bash.json")}
+    return sorted(str(p.relative_to(ROOT)) for p in runs)[:limit]
+
+
 def main(argv: list[str]) -> int:
     if not argv:
-        print("usage: unchecked_values.py 'results/RUN/*__bash.json' ...", file=sys.stderr)
+        print("usage: unchecked_values.py 'results/<run>/*__bash.json' ...", file=sys.stderr)
+        print("       <run> is a directory name, not a literal. Try 'results/*/*__bash.json'",
+              file=sys.stderr)
         return 2
     paths = [Path(p) for pattern in argv for p in sorted(glob.glob(pattern))]
     if not paths:
         print(f"no report matched: {' '.join(argv)}", file=sys.stderr)
+        found = _runs_that_exist()
+        if found:
+            print("runs that do hold reports:", file=sys.stderr)
+            for run in found:
+                print(f"  {run}", file=sys.stderr)
+        else:
+            print("no directory under results/ holds a *__bash.json report either: "
+                  "run scripts/run_experiments.sh first", file=sys.stderr)
         return 1
     report(*scan(paths))
     return 0
