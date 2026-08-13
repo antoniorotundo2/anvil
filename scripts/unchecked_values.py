@@ -31,6 +31,20 @@ sys.path.insert(0, str(ROOT))
 
 from anvil.parse import directive_value, parse_directives  # noqa: E402
 
+
+def _index_set(raw: str) -> str:
+    """`--array=1-5%5` and `--array=1-5` name the same five tasks. The `%N` suffix caps how
+    many run at once and leaves the index set alone, so comparing the raw string filed 229
+    artifacts as deviating when none of them was: every one of the five tasks the prompt asks
+    for is there. A step, `1-5:2`, does change the set and is deliberately left in place.
+    """
+    return raw.split("%", 1)[0].strip()
+
+
+# Values that need reading before comparing, because more than one spelling means the same
+# request. Everything else is compared as written.
+NORMALISE = {"--array": _index_set}
+
 # task -> label -> (directives to read, the value the prompt names)
 DIRECTIVES: dict[str, dict[str, tuple[tuple[str, ...], str]]] = {
     "t1_hello_serial": {"--job-name": (("--job-name", "-J"), "hello")},
@@ -82,9 +96,12 @@ def scan(paths: list[Path]) -> tuple[Counter, Counter, int, int]:
                 if raw is None:
                     verdict = "absent"
                 else:
-                    verdict = "as asked" if raw.strip() == want else "other"
+                    got = NORMALISE.get(label, str)(raw.strip())
+                    verdict = "as asked" if got == want else "other"
                 verdicts[(base, label, verdict)] += 1
                 if verdict == "other":
+                    # The raw string, not the normalised one: the point of this list is to
+                    # be read, and a value stripped of what made it differ cannot be.
                     written[(base, label, model, r["task_id"], raw.strip())] += 1
             for label, want in BODY.get(base, {}).items():
                 verdict = "as asked" if want in r["script"] else "absent"

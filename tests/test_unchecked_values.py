@@ -111,3 +111,28 @@ def test_it_says_so_when_there_is_no_run_at_all(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(uv, "ROOT", tmp_path)
     assert uv.main([str(tmp_path / "results" / "*" / "*__bash.json")]) == 1
     assert "run scripts/run_experiments.sh first" in capsys.readouterr().err
+
+
+def test_a_concurrency_throttle_is_not_a_different_array(tmp_path):
+    """The four values a 7B model actually wrote on the array task, 229 artifacts across the
+    matrix. `%N` caps how many array tasks run at once and leaves the index set alone, so all
+    five the prompt asks for are there and the artifact is doing what was asked. Counting
+    them as deviations was the audit's own defect, and it pointed at the one task where the
+    opening is real, which is the worst place to raise a false alarm."""
+    refs = _references()
+    base = refs["t1_array_job"]
+    scripts = {f"t1_array_job__{i}": base.replace("--array=1-5", f"--array={v}")
+               for i, v in enumerate(("1-5", "1-5%5", "1-5%1"))}
+    verdicts, written, _, _ = scan([_report(tmp_path, scripts)])
+    assert verdicts[("t1_array_job", "--array", "as asked")] == 3
+    assert not written
+
+
+def test_a_step_does_change_the_set_and_is_reported(tmp_path):
+    """`1-5:2` runs tasks 1, 3 and 5: three of the five, which is the opening this audit
+    exists to count. Normalising the throttle must not quietly swallow it too."""
+    refs = _references()
+    scripts = {"t1_array_job": refs["t1_array_job"].replace("--array=1-5", "--array=1-5:2")}
+    verdicts, written, _, _ = scan([_report(tmp_path, scripts)])
+    assert verdicts[("t1_array_job", "--array", "other")] == 1
+    assert {w[4] for w in written} == {"1-5:2"}

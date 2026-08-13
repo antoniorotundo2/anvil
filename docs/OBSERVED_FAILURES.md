@@ -1071,9 +1071,14 @@ place, so that the pass does not have to be repeated because one of them was mis
    here. The shape it should take is already in the repository: T3, written later, compares
    `Bootstrap` and `From` by value in `resource_fit` and leaves each section's substance to what
    the container prints, so `%environment` is judged by `GREETING=hello` appearing and not by the
-   section being present. How often a model took the opening is unmeasured, the generations being
-   on the experiment machine, and `./scripts/unchecked_values.py 'results/RUN/*__bash.json'`
-   is what answers it there.
+   section being present. How often the opening was taken is now measured, by
+   `./scripts/unchecked_values.py 'results/*/*__bash.json'` over the full matrix: on 11774
+   passing artifacts, all ten values were written exactly as their prompt names them, on every
+   task and every model. The only apparent exception was 229 artifacts writing `--array=1-5%5`
+   or `1-5%1`, all from one 7B model, and the `%N` there caps how many array tasks run at once
+   and leaves the five indices alone, so the audit was wrong and not the artifacts. The opening
+   is therefore real and unexploited, which lowers its priority against the four items above
+   without closing it: five models writing the obvious thing is not a property of the check.
 
 Two things that are *not* on this list, deliberately. The execution-sensitive set has its own file
 and its own digest, so `tasks/t1_exec.jsonl` and `tasks/t2_exec_repair.jsonl` can grow without
