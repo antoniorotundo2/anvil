@@ -2,7 +2,7 @@
   "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
   "tasks_file": "tasks/t2_exec_repair.jsonl",
   "tasks_sha": "de1e9d60396f",
-  "verifier_sha": "d4af1eaf9809",
+  "verifier_sha": "bbaa1665c35e",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/exec_matrix_regraded",
+  "source": "results/regrade_race_exec",
   "scores": {
     "syntax": {
       "mean": 1.0,

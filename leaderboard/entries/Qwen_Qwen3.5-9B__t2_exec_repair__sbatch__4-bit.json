@@ -2,7 +2,7 @@
   "model": "Qwen/Qwen3.5-9B",
   "tasks_file": "tasks/t2_exec_repair.jsonl",
   "tasks_sha": "de1e9d60396f",
-  "verifier_sha": "d4af1eaf9809",
+  "verifier_sha": "bbaa1665c35e",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/exec_matrix_regraded",
+  "source": "results/regrade_race_exec",
   "scores": {
     "syntax": {
       "mean": 0.993333,
@@ -25,7 +25,7 @@
       "cells": 3
     },
     "functional": {
-      "mean": 0.74,
+      "mean": 0.733333,
       "half_range": 0.02,
       "cells": 3
     },
@@ -40,7 +40,7 @@
       "cells": 3
     },
     "strict_all_levels": {
-      "mean": 0.593333,
+      "mean": 0.586667,
       "half_range": 0.01,
       "cells": 3
     }
