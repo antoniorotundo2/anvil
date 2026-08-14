@@ -2,7 +2,7 @@
   "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
   "tasks_file": "tasks/t1_slurm.jsonl",
   "tasks_sha": "bbc74707a030",
-  "verifier_sha": "bbaa1665c35e",
+  "verifier_sha": "81106f3da7a1",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "fp16",
-  "source": "results/regrade_race_fp16",
+  "source": "results/regrade_gpus_fp16",
   "scores": {
     "syntax": {
       "mean": 0.75,

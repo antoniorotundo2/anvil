@@ -38,7 +38,7 @@ to expose.
 
 | model | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | `strict_all_levels` | conditions |
 |---|---|---|---|---|---|---|---|
-| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.750±0.000 | 1.000±0.000 | 0.533±0.025 | 0.617±0.013 | 1.000±0.000 | 0.408±0.025 | 3 seeds, n=5, bash, fp16 |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.750±0.000 | 1.000±0.000 | 0.533±0.025 | 0.617±0.013 | 1.000±0.000 | 0.408±0.025 | 3 seeds, n=5, bash, fp16 |
 | Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.442±0.013 | 1.000±0.000 | 0.308±0.025 | 3 seeds, n=5, bash, 4-bit |
 | Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.375±0.025 | 0.442±0.013 | 1.000±0.000 | 0.308±0.025 | 3 seeds, n=5, sbatch, 4-bit |
 | Qwen/Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 1.000±0.000 | 1.000±0.000 | 0.667±0.025 | 3 seeds, n=5, bash, 4-bit |
@@ -49,8 +49,6 @@ to expose.
 | google/gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.742±0.013 | 0.917±0.050 | 1.000±0.000 | 0.658±0.062 | 3 seeds, n=5, sbatch, 4-bit |
 | ibm-granite/granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.550±0.000 | 1.000±0.000 | 0.425±0.000 | 3 seeds, n=5, bash, 4-bit |
 | ibm-granite/granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.717±0.037 | 0.550±0.000 | 1.000±0.000 | 0.425±0.000 | 3 seeds, n=5, sbatch, 4-bit |
-
-An entry marked *stale tasks* was measured against a different version of this task file; one marked *stale rules* was graded by a different verifier, and *unstamped* predates the digest being recorded at all. Any of the three means the row is not comparable with the rest of the column. They are shown rather than deleted.
 
 ## `tasks/t2_exec_repair.jsonl`
 
