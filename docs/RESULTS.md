@@ -5,9 +5,7 @@ running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
 Everything here was graded by verifier `81106f3da7a1`, which this checkout carries and which every
-report and every leaderboard entry records, with one exception: the fp16 row is still at
-`bbaa1665c35e` and is marked *stale rules* until that arm is graded again. A regrade lands one arm
-at a time, each being its own run on the machine that holds the generations.
+report and every leaderboard entry records. No row is marked *stale rules*.
 
 The last change to reach the verifier closed the last one-sided comparison: `--gpus` now demands
 the count the task declares, where it accepted any number at or above it. Its loose side had been
