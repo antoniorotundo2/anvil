@@ -5,7 +5,13 @@ running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
 Everything here was graded by verifier `bbaa1665c35e`, which every report and every leaderboard
-entry records, and which is the verifier this checkout carries: no row is marked *stale rules*.
+entry records. This checkout carries `81106f3da7a1`, so every row is marked *stale rules* until the
+generations are graded again on the machine that holds them. What moved is the last one-sided
+comparison: `--gpus` now demands the count the task declares, where it accepted any number at or
+above it. Its loose side was measured before being closed, 343 passes and every one exact, so the
+figures below are expected to survive unchanged. Expected, not verified, and the regrade is what
+settles it: the same sentence stood here before the previous two changes and was right both times,
+which is a reason to check and not a reason to skip checking.
 
 Three changes to the verifier have landed since the figures were first measured, and all three
 have now been answered by regrading the same generations rather than by expectation. A ceiling on

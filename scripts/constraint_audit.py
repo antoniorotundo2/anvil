@@ -5,16 +5,16 @@
 so `#SBATCH --time=00:15` against a task naming 15 minutes was fifteen seconds and passed.
 123 of 2421 published passes were requests like that, and the whole thing surfaced by
 accident while five models were being screened for something else. Running this is what
-settled `--mem`, which had the same shape and is now two-sided as well, and what closed
-`--gpus`, whose loose side holds nothing in 343 passes.
+settled `--mem`, which had the same shape and is now two-sided as well, and what measured
+`--gpus`, whose loose side held nothing in 343 passes and was closed anyway.
 
     ./scripts/constraint_audit.py 'results/RUN/*__bash.json'
 
 For every artifact the verifier passed, the requested value is compared with the one its
 task declares and filed under below, exact, or above. The direction the check currently
 enforces is printed beside each, so a bucket that is both populated and unenforced is the
-thing to look at. `--time` and `--mem` are kept in the output as controls: both now demand
-equality, so a non-zero bucket outside exact means one of the two bounds regressed.
+thing to look at. All three are now controls rather than questions: every one of them
+demands equality, so any bucket outside exact means a bound regressed.
 
 This subsumes `walltime_floor.py`, which answered the same question for one constraint and
 produced the 123 above. Nothing here changes a verdict; it counts what the rules allow, so
@@ -47,7 +47,7 @@ TASKS = ROOT / "tasks" / "t1_slurm.jsonl"
 KINDS = {
     "time_max_minutes": ("--time", ("--time", "-t"), parse_time_to_minutes, "both"),
     "mem_min_mb": ("--mem", ("--mem",), parse_mem_to_mb, "both"),
-    "gpus_min": ("--gpus", ("--gpus", "-G", "--gres"), None, "below"),
+    "gpus_min": ("--gpus", ("--gpus", "-G", "--gres"), None, "both"),
 }
 
 

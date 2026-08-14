@@ -23,62 +23,70 @@ to expose.
 
 | model | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | `strict_all_levels` | conditions |
 |---|---|---|---|---|---|---|---|
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 1.000±0.000 | 0.500±0.200 | 0.333±0.150 | 0.167±0.050 | 1.000±0.000 | 0.133±0.050 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 1.000±0.000 | 0.500±0.200 | 0.167±0.100 | 0.167±0.050 | 1.000±0.000 | 0.133±0.050 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.500±0.000 | 0.967±0.050 | 0.500±0.000 | 1.000±0.000 | 0.467±0.050 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.500±0.000 | 0.000±0.000 | 0.500±0.000 | 1.000±0.000 | 0.000±0.000 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen3.5-9B | 0.833±0.100 | 0.833±0.100 | 0.467±0.050 | 1.000±0.000 | 1.000±0.000 | 0.467±0.050 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen3.5-9B | 0.833±0.100 | 0.833±0.100 | 0.700±0.100 | 1.000±0.000 | 1.000±0.000 | 0.700±0.100 | 3 seeds, n=5, sbatch, 4-bit |
-| google/gemma-4-12B-it | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 3 seeds, n=5, bash, 4-bit |
-| google/gemma-4-12B-it | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 3 seeds, n=5, sbatch, 4-bit |
-| ibm-granite/granite-4.1-3b | 1.000±0.000 | 1.000±0.000 | 0.467±0.200 | 0.133±0.050 | 1.000±0.000 | 0.067±0.100 | 3 seeds, n=5, bash, 4-bit |
-| ibm-granite/granite-4.1-3b | 1.000±0.000 | 1.000±0.000 | 0.467±0.200 | 0.133±0.050 | 1.000±0.000 | 0.067±0.100 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 1.000±0.000 | 0.500±0.200 | 0.333±0.150 | 0.167±0.050 | 1.000±0.000 | 0.133±0.050 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 1.000±0.000 | 0.500±0.200 | 0.167±0.100 | 0.167±0.050 | 1.000±0.000 | 0.133±0.050 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 1.000±0.000 | 0.500±0.000 | 0.967±0.050 | 0.500±0.000 | 1.000±0.000 | 0.467±0.050 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 1.000±0.000 | 0.500±0.000 | 0.000±0.000 | 0.500±0.000 | 1.000±0.000 | 0.000±0.000 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 0.833±0.100 | 0.833±0.100 | 0.467±0.050 | 1.000±0.000 | 1.000±0.000 | 0.467±0.050 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 0.833±0.100 | 0.833±0.100 | 0.700±0.100 | 1.000±0.000 | 1.000±0.000 | 0.700±0.100 | 3 seeds, n=5, sbatch, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 3 seeds, n=5, bash, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 3 seeds, n=5, sbatch, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 1.000±0.000 | 1.000±0.000 | 0.467±0.200 | 0.133±0.050 | 1.000±0.000 | 0.067±0.100 | 3 seeds, n=5, bash, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 1.000±0.000 | 1.000±0.000 | 0.467±0.200 | 0.133±0.050 | 1.000±0.000 | 0.067±0.100 | 3 seeds, n=5, sbatch, 4-bit |
+
+An entry marked *stale tasks* was measured against a different version of this task file; one marked *stale rules* was graded by a different verifier, and *unstamped* predates the digest being recorded at all. Any of the three means the row is not comparable with the rest of the column. They are shown rather than deleted.
 
 ## `tasks/t1_slurm.jsonl`
 
 | model | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | `strict_all_levels` | conditions |
 |---|---|---|---|---|---|---|---|
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.750±0.000 | 1.000±0.000 | 0.533±0.025 | 0.617±0.013 | 1.000±0.000 | 0.408±0.025 | 3 seeds, n=5, bash, fp16 |
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.442±0.013 | 1.000±0.000 | 0.308±0.025 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.575±0.025 | 0.842±0.013 | 0.375±0.025 | 0.442±0.013 | 1.000±0.000 | 0.308±0.025 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 1.000±0.000 | 1.000±0.000 | 0.667±0.025 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 0.792±0.025 | 0.667±0.025 | 1.000±0.000 | 1.000±0.000 | 0.667±0.025 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen3.5-9B | 1.000±0.000 | 0.875±0.025 | 0.650±0.025 | 0.600±0.050 | 1.000±0.000 | 0.450±0.025 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen3.5-9B | 1.000±0.000 | 0.875±0.025 | 0.658±0.013 | 0.600±0.050 | 1.000±0.000 | 0.475±0.025 | 3 seeds, n=5, sbatch, 4-bit |
-| google/gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.917±0.050 | 1.000±0.000 | 0.658±0.062 | 3 seeds, n=5, bash, 4-bit |
-| google/gemma-4-12B-it | 0.875±0.000 | 0.867±0.013 | 0.742±0.013 | 0.917±0.050 | 1.000±0.000 | 0.658±0.062 | 3 seeds, n=5, sbatch, 4-bit |
-| ibm-granite/granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.550±0.000 | 1.000±0.000 | 0.425±0.000 | 3 seeds, n=5, bash, 4-bit |
-| ibm-granite/granite-4.1-3b | 1.000±0.000 | 0.875±0.000 | 0.717±0.037 | 0.550±0.000 | 1.000±0.000 | 0.425±0.000 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.750±0.000 | 1.000±0.000 | 0.533±0.025 | 0.617±0.013 | 1.000±0.000 | 0.408±0.025 | 3 seeds, n=5, bash, fp16 |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.575±0.025 | 0.842±0.013 | 0.533±0.037 | 0.442±0.013 | 1.000±0.000 | 0.308±0.025 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.575±0.025 | 0.842±0.013 | 0.375±0.025 | 0.442±0.013 | 1.000±0.000 | 0.308±0.025 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 1.000±0.000 | 0.792±0.025 | 0.875±0.000 | 1.000±0.000 | 1.000±0.000 | 0.667±0.025 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 1.000±0.000 | 0.792±0.025 | 0.667±0.025 | 1.000±0.000 | 1.000±0.000 | 0.667±0.025 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 1.000±0.000 | 0.875±0.025 | 0.650±0.025 | 0.600±0.050 | 1.000±0.000 | 0.450±0.025 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 1.000±0.000 | 0.875±0.025 | 0.658±0.013 | 0.600±0.050 | 1.000±0.000 | 0.475±0.025 | 3 seeds, n=5, sbatch, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 0.875±0.000 | 0.867±0.013 | 0.875±0.000 | 0.917±0.050 | 1.000±0.000 | 0.658±0.062 | 3 seeds, n=5, bash, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 0.875±0.000 | 0.867±0.013 | 0.742±0.013 | 0.917±0.050 | 1.000±0.000 | 0.658±0.062 | 3 seeds, n=5, sbatch, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 1.000±0.000 | 0.875±0.000 | 0.842±0.037 | 0.550±0.000 | 1.000±0.000 | 0.425±0.000 | 3 seeds, n=5, bash, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 1.000±0.000 | 0.875±0.000 | 0.717±0.037 | 0.550±0.000 | 1.000±0.000 | 0.425±0.000 | 3 seeds, n=5, sbatch, 4-bit |
+
+An entry marked *stale tasks* was measured against a different version of this task file; one marked *stale rules* was graded by a different verifier, and *unstamped* predates the digest being recorded at all. Any of the three means the row is not comparable with the rest of the column. They are shown rather than deleted.
 
 ## `tasks/t2_exec_repair.jsonl`
 
 | model | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | `strict_all_levels` | conditions |
 |---|---|---|---|---|---|---|---|
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.880±0.020 | 0.993±0.010 | 0.847±0.010 | 0.407±0.050 | 1.000±0.000 | 0.287±0.040 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.880±0.020 | 0.993±0.010 | 0.267±0.040 | 0.407±0.050 | 1.000±0.000 | 0.127±0.010 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 0.993±0.010 | 1.000±0.000 | 0.993±0.010 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 1.000±0.000 | 1.000±0.000 | 0.400±0.000 | 0.993±0.010 | 1.000±0.000 | 0.400±0.000 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen3.5-9B | 0.993±0.010 | 0.993±0.010 | 0.993±0.010 | 0.847±0.010 | 1.000±0.000 | 0.847±0.010 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen3.5-9B | 0.993±0.010 | 0.993±0.010 | 0.733±0.020 | 0.847±0.010 | 1.000±0.000 | 0.587±0.010 | 3 seeds, n=5, sbatch, 4-bit |
-| google/gemma-4-12B-it | 0.893±0.020 | 0.947±0.030 | 0.880±0.020 | 1.000±0.000 | 1.000±0.000 | 0.880±0.020 | 3 seeds, n=5, bash, 4-bit |
-| google/gemma-4-12B-it | 0.893±0.020 | 0.947±0.030 | 0.560±0.050 | 1.000±0.000 | 1.000±0.000 | 0.560±0.050 | 3 seeds, n=5, sbatch, 4-bit |
-| ibm-granite/granite-4.1-3b | 0.900±0.000 | 0.887±0.020 | 0.900±0.000 | 0.660±0.040 | 1.000±0.000 | 0.660±0.040 | 3 seeds, n=5, bash, 4-bit |
-| ibm-granite/granite-4.1-3b | 0.900±0.000 | 0.887±0.020 | 0.280±0.020 | 0.660±0.040 | 1.000±0.000 | 0.247±0.010 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.880±0.020 | 0.993±0.010 | 0.847±0.010 | 0.407±0.050 | 1.000±0.000 | 0.287±0.040 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.880±0.020 | 0.993±0.010 | 0.267±0.040 | 0.407±0.050 | 1.000±0.000 | 0.127±0.010 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 1.000±0.000 | 1.000±0.000 | 1.000±0.000 | 0.993±0.010 | 1.000±0.000 | 0.993±0.010 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 1.000±0.000 | 1.000±0.000 | 0.400±0.000 | 0.993±0.010 | 1.000±0.000 | 0.400±0.000 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 0.993±0.010 | 0.993±0.010 | 0.993±0.010 | 0.847±0.010 | 1.000±0.000 | 0.847±0.010 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 0.993±0.010 | 0.993±0.010 | 0.733±0.020 | 0.847±0.010 | 1.000±0.000 | 0.587±0.010 | 3 seeds, n=5, sbatch, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 0.893±0.020 | 0.947±0.030 | 0.880±0.020 | 1.000±0.000 | 1.000±0.000 | 0.880±0.020 | 3 seeds, n=5, bash, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 0.893±0.020 | 0.947±0.030 | 0.560±0.050 | 1.000±0.000 | 1.000±0.000 | 0.560±0.050 | 3 seeds, n=5, sbatch, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 0.900±0.000 | 0.887±0.020 | 0.900±0.000 | 0.660±0.040 | 1.000±0.000 | 0.660±0.040 | 3 seeds, n=5, bash, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 0.900±0.000 | 0.887±0.020 | 0.280±0.020 | 0.660±0.040 | 1.000±0.000 | 0.247±0.010 | 3 seeds, n=5, sbatch, 4-bit |
+
+An entry marked *stale tasks* was measured against a different version of this task file; one marked *stale rules* was graded by a different verifier, and *unstamped* predates the digest being recorded at all. Any of the three means the row is not comparable with the rest of the column. They are shown rather than deleted.
 
 ## `tasks/t2_repair.jsonl`
 
 | model | `syntax` | `submittability` | `functional` | `resource_fit` | `safety` | `strict_all_levels` | conditions |
 |---|---|---|---|---|---|---|---|
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.330±0.009 | 1.000±0.000 | 0.211±0.007 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-1.5B-Instruct | 0.792±0.016 | 0.886±0.005 | 0.595±0.009 | 0.330±0.009 | 1.000±0.000 | 0.212±0.005 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.965±0.007 | 1.000±0.000 | 0.824±0.002 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen2.5-Coder-7B-Instruct | 0.983±0.002 | 0.977±0.000 | 0.847±0.002 | 0.965±0.007 | 1.000±0.000 | 0.824±0.002 | 3 seeds, n=5, sbatch, 4-bit |
-| Qwen/Qwen3.5-9B | 0.982±0.005 | 0.982±0.005 | 0.947±0.011 | 0.711±0.009 | 1.000±0.000 | 0.691±0.009 | 3 seeds, n=5, bash, 4-bit |
-| Qwen/Qwen3.5-9B | 0.982±0.005 | 0.982±0.005 | 0.950±0.009 | 0.711±0.009 | 1.000±0.000 | 0.694±0.009 | 3 seeds, n=5, sbatch, 4-bit |
-| google/gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.932±0.005 | 1.000±0.000 | 0.726±0.002 | 3 seeds, n=5, bash, 4-bit |
-| google/gemma-4-12B-it | 1.000±0.000 | 0.876±0.002 | 0.762±0.002 | 0.932±0.005 | 1.000±0.000 | 0.726±0.002 | 3 seeds, n=5, sbatch, 4-bit |
-| ibm-granite/granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.621±0.016 | 1.000±0.000 | 0.529±0.016 | 3 seeds, n=5, bash, 4-bit |
-| ibm-granite/granite-4.1-3b | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.621±0.016 | 1.000±0.000 | 0.529±0.016 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.792±0.016 | 0.886±0.005 | 0.664±0.005 | 0.330±0.009 | 1.000±0.000 | 0.211±0.007 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-1.5B-Instruct (stale rules) | 0.792±0.016 | 0.886±0.005 | 0.595±0.009 | 0.330±0.009 | 1.000±0.000 | 0.212±0.005 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 0.983±0.002 | 0.977±0.000 | 0.870±0.002 | 0.965±0.007 | 1.000±0.000 | 0.824±0.002 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen2.5-Coder-7B-Instruct (stale rules) | 0.983±0.002 | 0.977±0.000 | 0.847±0.002 | 0.965±0.007 | 1.000±0.000 | 0.824±0.002 | 3 seeds, n=5, sbatch, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 0.982±0.005 | 0.982±0.005 | 0.947±0.011 | 0.711±0.009 | 1.000±0.000 | 0.691±0.009 | 3 seeds, n=5, bash, 4-bit |
+| Qwen/Qwen3.5-9B (stale rules) | 0.982±0.005 | 0.982±0.005 | 0.950±0.009 | 0.711±0.009 | 1.000±0.000 | 0.694±0.009 | 3 seeds, n=5, sbatch, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 1.000±0.000 | 0.876±0.002 | 0.885±0.002 | 0.932±0.005 | 1.000±0.000 | 0.726±0.002 | 3 seeds, n=5, bash, 4-bit |
+| google/gemma-4-12B-it (stale rules) | 1.000±0.000 | 0.876±0.002 | 0.762±0.002 | 0.932±0.005 | 1.000±0.000 | 0.726±0.002 | 3 seeds, n=5, sbatch, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.621±0.016 | 1.000±0.000 | 0.529±0.016 | 3 seeds, n=5, bash, 4-bit |
+| ibm-granite/granite-4.1-3b (stale rules) | 0.862±0.002 | 1.000±0.000 | 0.750±0.000 | 0.621±0.016 | 1.000±0.000 | 0.529±0.016 | 3 seeds, n=5, sbatch, 4-bit |
+
+An entry marked *stale tasks* was measured against a different version of this task file; one marked *stale rules* was graded by a different verifier, and *unstamped* predates the digest being recorded at all. Any of the three means the row is not comparable with the rest of the column. They are shown rather than deleted.
 
 ## Getting on it
 

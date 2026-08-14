@@ -83,7 +83,7 @@ def test_the_table_states_which_direction_each_check_refuses():
     are printed together and the mapping is not allowed to drift silently."""
     assert KINDS["time_max_minutes"][3] == "both"
     assert KINDS["mem_min_mb"][3] == "both"
-    assert KINDS["gpus_min"][3] == "below"
+    assert KINDS["gpus_min"][3] == "both"
 
 
 def test_artifacts_of_another_task_file_are_reported_not_silently_dropped(tmp_path):

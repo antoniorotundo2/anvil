@@ -663,8 +663,12 @@ check actually refuses. Over the 2298 passes of the regraded run:
 | `--gpus` | 0 | 343 | 0 | below only |
 
 `--time` reading 2298 exact is the control: the floor holds and introduced no regression in the
-other direction. **`--gpus` is closed empirically.** Its loose side is a theoretical hole, one task
-declares `gpus_min`, and no model in any run over-requests. Nothing to do.
+other direction. **`--gpus` was closed by
+measurement first and in the check afterwards.** Its loose side was a theoretical hole, one task
+declares `gpus_min`, and no model in any run over-requested, so the measurement said there was
+nothing to correct. It was tightened anyway, once the other two were done: a hole nobody has
+fallen into is still a hole, and this one costs a re-verification rather than a regeneration.
+All six constraints carrying a value now demand equality.
 
 `--mem` had 30 passes above the declared value, 1.3%, and the shape of them decided it. All 30 are
 one model, Qwen2.5-Coder 1.5B, writing `--mem=2G` against the 1024MB that `t1_array_job` and

@@ -95,8 +95,9 @@ The mirror of the section above. `check_resource_fit` compares a constraint only
 declares one, so a task that says nothing about a resource accepts any request for it. On
 `t1_gpu_single`, which declares nodes, cpus, gpus, walltime and memory but not tasks,
 `--ntasks=64` passes, and so does `--exclusive`, which asks for the whole node. `--gres=gpu:8`
-passes too, for the separate reason that `gpus_min` is the one constraint still compared from one
-side only.
+no longer passes: `gpus_min` was the last constraint compared from one side only and now demands
+the count the task declares, which leaves the silence and not the comparison as what permits an
+over-request.
 
 Whether that is a defect depends on what a task's silence is taken to mean, and the honest answer
 is that it currently means nothing at all rather than anything deliberate. What can be settled

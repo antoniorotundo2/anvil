@@ -1585,3 +1585,60 @@ def test_a_long_lived_child_still_does_not_hold_the_run():
     elapsed = _time.monotonic() - started
     assert result.passed, result.detail
     assert elapsed < SESSION_GRACE_S + 3, elapsed
+
+
+def test_more_gpus_than_the_task_declares_is_refused():
+    """The last of the seven constraints to demand equality. Its loose side was measured
+    first and held nothing, 343 passes all exact, so this refuses nothing anyone has
+    written; it closes a hole rather than correcting an observed error, which is the reason
+    it could wait until the other six were done. Both spellings are read, since `--gres`
+    and `--gpus` are the same request."""
+    task = Task(id="t", prompt="p",
+                constraints={"nodes": 1, "gpus_min": 1, "time_max_minutes": 10,
+                             "mem_min_mb": 512},
+                expects_in_body=["ANVIL_OK"])
+    head = ("#!/bin/bash\n#SBATCH --nodes=1\n#SBATCH --time=00:10:00\n"
+            "#SBATCH --mem=512M\n")
+
+    for exact in ("#SBATCH --gres=gpu:1\n", "#SBATCH --gpus=1\n"):
+        assert check_resource_fit(head + exact + "echo ANVIL_OK\n", task).passed, exact
+
+    for over in ("#SBATCH --gres=gpu:8\n", "#SBATCH --gpus=4\n"):
+        result = check_resource_fit(head + over + "echo ANVIL_OK\n", task)
+        assert not result.passed, over
+        assert "gpus expected 1" in result.detail, result.detail
+
+    absent = check_resource_fit(head + "echo ANVIL_OK\n", task)
+    assert not absent.passed
+    assert "none requested" in absent.detail
+
+
+def test_every_declared_constraint_is_now_compared_from_both_sides():
+    """The property the six changes were working toward, asserted once rather than inferred
+    from six tests. A constraint compared from one side lets an artifact overshoot it in
+    silence, which is how `--time`, `--mem` and finally `--gpus` each passed something they
+    should not have. `array` is absent because it is declared as a boolean and has no value
+    to compare, which is its own deferred item."""
+    from anvil.schema import Task as _Task
+
+    base = {"nodes": 1, "ntasks": 1, "cpus_per_task": 1, "time_max_minutes": 10,
+            "mem_min_mb": 512, "gpus_min": 1}
+    exact = ("#!/bin/bash\n#SBATCH --nodes=1\n#SBATCH --ntasks=1\n"
+             "#SBATCH --cpus-per-task=1\n#SBATCH --time=00:10:00\n"
+             "#SBATCH --mem=512M\n#SBATCH --gres=gpu:1\necho ANVIL_OK\n")
+    task = _Task(id="t", prompt="p", constraints=base, expects_in_body=["ANVIL_OK"])
+    assert check_resource_fit(exact, task).passed, check_resource_fit(exact, task).detail
+
+    # One directive at a time, doubled: every constraint must refuse the overshoot.
+    over = {
+        "nodes": ("--nodes=1", "--nodes=2"),
+        "ntasks": ("--ntasks=1", "--ntasks=2"),
+        "cpus_per_task": ("--cpus-per-task=1", "--cpus-per-task=2"),
+        "time_max_minutes": ("--time=00:10:00", "--time=00:20:00"),
+        "mem_min_mb": ("--mem=512M", "--mem=1024M"),
+        "gpus_min": ("--gres=gpu:1", "--gres=gpu:2"),
+    }
+    for constraint, (was, now) in over.items():
+        script = exact.replace(was, now)
+        assert script != exact, constraint
+        assert not check_resource_fit(script, task).passed, f"{constraint} accepts an overshoot"

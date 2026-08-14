@@ -862,9 +862,21 @@ def check_resource_fit(script: str, task: Task) -> LevelResult:
             m = re.search(r"(\d+)\s*$", raw)
             n = int(m.group(1)) if m else None
         if n is None:
-            problems.append(f"gpus expected >= {c['gpus_min']}, none requested")
+            problems.append(f"gpus expected {c['gpus_min']}, none requested")
         elif n < c["gpus_min"]:
-            problems.append(f"gpus expected >= {c['gpus_min']}, found {n}")
+            problems.append(f"gpus expected {c['gpus_min']}, found {n}")
+        elif n > c["gpus_min"]:
+            # The last of the seven constraints to demand equality, and the one where the
+            # loose side was closed by measurement first: 343 passes, every one of them
+            # exact, so this refuses nothing that has ever been written. It is here because
+            # a hole nobody has fallen into is still a hole, and because a GPU count is the
+            # request on this task set whose over-statement costs a site the most.
+            #
+            # `gpus_min` keeps its name for the reason `mem_min_mb` did: renaming a
+            # constraint edits `tasks/t1_slurm.jsonl`, which moves `tasks_sha` and
+            # invalidates every generation ever measured against it. A misleading name is
+            # the smaller price.
+            problems.append(f"gpus expected {c['gpus_min']}, found {n}")
 
     if "time_max_minutes" in c:
         raw = directive_value(d, "--time", "-t")
