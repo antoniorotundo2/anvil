@@ -1551,3 +1551,37 @@ def test_a_derived_count_is_not_reported_as_a_default():
     detail = check_resource_fit(script, task).detail
     assert "effective 6" in detail
     assert "SLURM default" not in detail
+
+
+def test_output_in_flight_survives_the_reaping():
+    """`exec > >(tee logs/out_$$.txt)` puts a background `tee` between the payload and the
+    harness with no `&` written anywhere. Killing the session the moment the shell exited
+    discarded whatever `tee` had not yet written, so the same artifact passed one
+    verification and failed the next with `expected output not found`. Under a real
+    scheduler the job completes and its output arrives, so failing it was a false negative,
+    and it was found by verifying one cell twice and diffing the levels."""
+    task = Task(id="t", prompt="p", constraints={"nodes": 1, "ntasks": 1},
+                expects_in_body=["ANVIL_OK"])
+    script = ('#!/bin/bash\n#SBATCH --time=20:00\nmkdir -p logs\n'
+              'exec > >(tee "logs/out_$$.txt")\necho ANVIL_OK\n')
+    for _ in range(5):
+        result = check_functional(script, task)
+        assert result.passed, result.detail
+
+
+def test_a_long_lived_child_still_does_not_hold_the_run():
+    """The grace is bounded on purpose. Waiting for whatever a script leaves behind is how
+    a matrix fills the host with orphans, which is the failure the reaping was added for;
+    this keeps the wait short and the kill unconditional."""
+    import time as _time
+
+    from anvil.verifier import SESSION_GRACE_S
+
+    task = Task(id="t", prompt="p", constraints={"nodes": 1, "ntasks": 1},
+                expects_in_body=["ANVIL_OK"])
+    script = "#!/bin/bash\n( sleep 120 ) &\necho ANVIL_OK\n"
+    started = _time.monotonic()
+    result = check_functional(script, task)
+    elapsed = _time.monotonic() - started
+    assert result.passed, result.detail
+    assert elapsed < SESSION_GRACE_S + 3, elapsed

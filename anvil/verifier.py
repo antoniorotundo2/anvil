@@ -568,6 +568,37 @@ def sandbox_mem_mb() -> int | None:
     return _sandbox_cap
 
 
+# Half a second: long enough for a process that is already exiting to flush, far too
+# short for backgrounded work to finish. The distinction is the whole point, and the
+# test that a child sleeping two seconds never runs is what pins the order of
+# magnitude: a grace that lets that one complete has given up the orphan guarantee.
+SESSION_GRACE_S = 0.5
+
+
+def _settle_session(proc: subprocess.Popen, grace: float = SESSION_GRACE_S) -> None:
+    """Give what the script left running a bounded moment to finish writing.
+
+    Killing the session the instant the shell exits discards output that was still in
+    flight, and the shape that does it is not exotic: `exec > >(tee logs/out_$$.txt)` puts
+    a `tee` between the payload and this harness, with no `&` anywhere in the script. That
+    artifact passed on one verification and failed the next with `expected output not
+    found`, which is a false negative, since under a real scheduler the job completes and
+    its output arrives.
+
+    Bounded, and bounded short, because the reaping it defers is what keeps a matrix from
+    filling the host with orphans. A script whose children exit at once costs one `killpg`
+    probe; one that leaves real work running waits the grace and is killed with the work
+    unfinished, which is the intended outcome and not a regression.
+    """
+    deadline = time.time() + grace
+    while time.time() < deadline:
+        try:
+            os.killpg(proc.pid, 0)
+        except (ProcessLookupError, PermissionError):
+            return
+        time.sleep(0.02)
+
+
 def _kill_session(proc: subprocess.Popen) -> None:
     """Reap whatever the script left running, itself included.
 
@@ -630,6 +661,10 @@ def _run_under_bash(workdir: str, script: str, task: Task, timeout: int) -> Leve
         except subprocess.TimeoutExpired:
             _kill_session(proc)
             return LevelResult(Level.FUNCTIONAL, False, f"timed out after {timeout}s")
+        else:
+            # Only on the path where the shell exited by itself: a script that ran out of
+            # time has nothing in flight worth waiting for.
+            _settle_session(proc)
         finally:
             _kill_session(proc)
 

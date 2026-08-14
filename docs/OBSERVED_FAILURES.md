@@ -1050,6 +1050,42 @@ The fix is in the verifier and not in the tasks, like the walltime and memory bo
 it costs a re-verification rather than a regeneration. It does move `verifier_sha`, and every entry
 measured under the previous digest reads *stale rules* until the matrix is verified again.
 
+### The same artifact, verified twice, two answers
+
+Verifying one cell twice with the same generations, the same verifier and the same image
+returned `functional` 0.85 and then 0.875. One sample in forty had changed its mind. The
+level that moved is the one that runs the payload, and it moved without any of the four
+static levels moving, which is why it left `strict_all_levels` untouched and went unnoticed
+across earlier regrades: a per-level number drifted while the headline did not.
+
+Diffing the two reports level by level named the artifact:
+
+```bash
+exec > >(tee "logs/out_$$.txt")
+exec 2> >(tee "logs/err_$$.txt")
+echo ANVIL_OK
+```
+
+Process substitution puts a `tee` between the payload and the harness, and no `&` appears
+anywhere in the script. The sandbox kills the session as soon as the shell exits, then reads
+the captured files, so whatever `tee` had not yet written was gone. Under a real scheduler
+the job completes and its output arrives, so failing it was a false negative, intermittent
+because it is a race.
+
+The reaping itself is not the mistake: without it a matrix fills the host with orphans, and
+that is a failure this project has already had. What was missing is the distinction between
+a process that is *finishing* and one that is *working*. The sandbox now waits up to half a
+second for the session to empty and then kills it regardless, which lets an exiting `tee`
+flush and still stops a background worker with its work unfinished. The test asserting that
+a child sleeping two seconds never completes is what fixes that duration: a grace long
+enough to let it through would have traded one defect for the other.
+
+Two things this changes about reading any number here. A single grading is not sufficient
+evidence for a `functional` figure, since the level is the only one that executes and the
+only one that can disagree with itself; and `verifier_sha` bounds which rules produced a
+verdict without bounding the verdict, so two gradings under one digest can still differ. The
+practical consequence is that a cell worth publishing is worth verifying twice.
+
 ## What to change when the T2 set is regenerated
 
 `tasks/t2_repair.jsonl` is the denominator of every T2 number published here, so nothing is
