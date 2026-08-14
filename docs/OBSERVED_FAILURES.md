@@ -1086,6 +1086,17 @@ only one that can disagree with itself; and `verifier_sha` bounds which rules pr
 verdict without bounding the verdict, so two gradings under one digest can still differ. The
 practical consequence is that a cell worth publishing is worth verifying twice.
 
+Verifying twice then found a second one, in the other executor. Across two gradings of the
+execution matrix under real submission, one artifact that had come back OUT_OF_MEMORY did
+not: 358 kills against 357, moving `functional` for one model by six thousandths. The grace
+above cannot account for it, being reached only from the bash path, so this is a separate
+instability and the likely mechanism is the one the set was built to exercise: a job whose
+peak sits against the allocation it requested crosses the cgroup limit or does not, and
+which of the two can depend on the moment. That reading is not verified, and unlike the
+race it may not be a defect at all, since a real scheduler would answer the same way. It
+does mean the execution set carries jitter that the main set does not, which is worth
+knowing before reading six thousandths as a difference between models.
+
 ## What to change when the T2 set is regenerated
 
 `tasks/t2_repair.jsonl` is the denominator of every T2 number published here, so nothing is
