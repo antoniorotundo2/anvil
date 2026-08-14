@@ -1084,7 +1084,9 @@ Two things this changes about reading any number here. A single grading is not s
 evidence for a `functional` figure, since the level is the only one that executes and the
 only one that can disagree with itself; and `verifier_sha` bounds which rules produced a
 verdict without bounding the verdict, so two gradings under one digest can still differ. The
-practical consequence is that a cell worth publishing is worth verifying twice.
+practical consequence is that a cell worth publishing is worth verifying twice, and
+`./scripts/regrade_diff.py results/first results/second` is what reads the second answer:
+per level, not per strict verdict, which is the distinction that kept this hidden.
 
 Verifying twice then found a second one, in the other executor. Across two gradings of the
 execution matrix under real submission, one artifact that had come back OUT_OF_MEMORY did
