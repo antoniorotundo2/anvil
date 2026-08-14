@@ -89,3 +89,27 @@ def test_the_typed_tables_match_the_entries_they_report():
                 checked += 1
     # Two documents, two task files, five models, six or seven columns each.
     assert checked >= 120, checked
+
+
+def test_the_verifier_results_md_names_is_the_one_that_graded_the_entries():
+    """The page opens by saying which verifier produced everything on it, and that sentence
+    is prose: nothing regenerates it. It went stale twice, and the second time it named a
+    digest two changes old while also asserting that every leaderboard row was marked
+    *stale rules*, which the regrade had just stopped being true. A reader has no way to
+    check that claim, so the suite does.
+    """
+    import re
+
+    from anvil.provenance import verifier_sha
+
+    body = (ROOT / "docs" / "RESULTS.md").read_text(encoding="utf-8")
+    claimed = re.search(r"graded by verifier `([0-9a-f]{12})`", body)
+    assert claimed, "docs/RESULTS.md no longer says which verifier graded it"
+    assert claimed.group(1) == verifier_sha(), (
+        f"docs/RESULTS.md says {claimed.group(1)}, this checkout grades with {verifier_sha()}"
+    )
+
+    entries = [json.loads(p.read_text(encoding="utf-8")) for p in ENTRIES.glob("*.json")]
+    assert entries
+    stale = sorted({e["verifier_sha"] for e in entries} - {claimed.group(1)})
+    assert not stale, f"entries graded by {stale}, which the page does not mention"

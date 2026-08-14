@@ -4,14 +4,30 @@ Every measured number this project stands behind, on one page, so it can be read
 running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
-Everything here was graded by verifier `20dd4a2e4159`, which every report and every leaderboard
-entry records. The current verifier is `a4685dcb0234`, so every leaderboard row is marked *stale
-rules* again. What moved is a ceiling on the `bash` sandbox, machine protection rather than a rule
-about artifacts, added after a generated script with an unbounded allocation took a host down. It
-can change a verdict, which is why the digest moved and the rows are marked, but no payload in
-`tasks/t1_slurm.jsonl` or `tasks/t2_repair.jsonl` comes within three orders of magnitude of the
-ceiling, so the figures below are expected to survive it unchanged. Expected, not verified: the
-next reverification says.
+Everything here was graded by verifier `bbaa1665c35e`, which every report and every leaderboard
+entry records, and which is the verifier this checkout carries: no row is marked *stale rules*.
+
+Three changes to the verifier have landed since the figures were first measured, and all three
+have now been answered by regrading the same generations rather than by expectation. A ceiling on
+the `bash` sandbox, machine protection rather than a rule about artifacts, added after a generated
+script with an unbounded allocation took a host down. `--ntasks-per-node` counted toward the
+effective request, which it had not been, so `--nodes=2 --ntasks-per-node=2` was read as two tasks
+where SLURM makes four. And a bounded wait before the sandbox reaps what a script left running,
+after an artifact writing through `tee` was failed for output the harness had discarded.
+
+The regrade moved nothing: every figure on this page came back identical across 3900 sample
+comparisons. That is the useful outcome and not a foregone one, since the second and third changes
+can both move a verdict; what it says is that nothing published here rested on the defects they
+fixed.
+
+One qualification the regrade produced, which applies to every `functional` figure below.
+Verifying one cell twice, under one verifier and one image, returned two different numbers: the
+level that executes is the only one that can disagree with itself, and `verifier_sha` bounds which
+rules produced a verdict without bounding the verdict. The instance behind it is fixed, and the
+property is not a claim that it was the only one. Figures here come from a single grading unless
+stated; `./scripts/regrade_diff.py` compares a second, and
+[the section on it](OBSERVED_FAILURES.md#the-same-artifact-verified-twice-two-answers) has the
+detail.
 
 Two earlier gradings of the same generations are superseded, both of them for a one-sided comparison
 in `check_resource_fit`. The first had no floor on `--time`: adding one moved five of the ten cells
