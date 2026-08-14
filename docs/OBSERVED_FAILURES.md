@@ -1092,16 +1092,25 @@ practical consequence is that a cell worth publishing is worth verifying twice, 
 `./scripts/regrade_diff.py results/first results/second` is what reads the second answer:
 per level, not per strict verdict, which is the distinction that kept this hidden.
 
-Verifying twice then found a second one, in the other executor. Across two gradings of the
-execution matrix under real submission, one artifact that had come back OUT_OF_MEMORY did
-not: 358 kills against 357, moving `functional` for one model by six thousandths. The grace
-above cannot account for it, being reached only from the bash path, so this is a separate
-instability and the likely mechanism is the one the set was built to exercise: a job whose
-peak sits against the allocation it requested crosses the cgroup limit or does not, and
-which of the two can depend on the moment. That reading is not verified, and unlike the
-race it may not be a defect at all, since a real scheduler would answer the same way. It
-does mean the execution set carries jitter that the main set does not, which is worth
-knowing before reading six thousandths as a difference between models.
+Verifying twice then found a second one, in the other executor, and verifying a third time
+showed it was not what the first reading called it. Across three gradings of the execution
+matrix under real submission the OUT_OF_MEMORY count went 358, 357, 356: one artifact fewer
+each time, in the same direction, which is a drift and not the jitter this paragraph first
+described. The grace above cannot account for it, being reached only from the bash path.
+
+`regrade_diff.py` names the artifact behind the last step: `t1_memory_workers__F8`, sample
+45 of the 9B at seed 2, job 12440, OUT_OF_MEMORY in one grading and COMPLETED with the
+expected output in the next. The mechanism is the one the set exists to exercise, arrived at
+from the least convenient direction: F8 is the class that only an enforced allocation can
+refuse, `t1_memory_workers` is the task whose cost is four concurrent workers rather than
+one buffer, and a repair of that pair sits against the cgroup limit by construction. Whether
+the same artifact moved at each step or three different ones did is not established; one
+pair was compared, and the answer for the other two is a comparison away.
+
+Unlike the race, this may not be a defect: a real scheduler would answer the same way, and
+an artifact that close to its allocation is the thing being measured. What it does mean is
+that this cell is worth reading as plus or minus one artifact, and that six thousandths
+there is not a difference between models.
 
 ## What to change when the T2 set is regenerated
 
