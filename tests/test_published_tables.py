@@ -113,3 +113,27 @@ def test_the_verifier_results_md_names_is_the_one_that_graded_the_entries():
     assert entries
     stale = sorted({e["verifier_sha"] for e in entries} - {claimed.group(1)})
     assert not stale, f"entries graded by {stale}, which the page does not mention"
+
+
+def test_the_figures_the_prose_repeats_are_still_the_facts():
+    """Eight T1 tasks, five levels, five models, three seeds. Those four numbers are written
+    out in prose across seven documents, thirty-odd times, none of them generated. Changing
+    any of the underlying facts leaves every one of those sentences quietly wrong, and the
+    only reason this file can check them is that they are facts about the repository rather
+    than measurements.
+
+    The check is deliberately failable: adding a sixth model should stop the suite, because
+    the documents then need a pass. `docs/DATASET.md` claiming 220 repair tasks where the
+    file holds 44 is what this class of drift looks like once it has gone unnoticed.
+    """
+    from anvil.schema import Level, Task
+
+    tasks = Task.load_jsonl(ROOT / "tasks" / "t1_slurm.jsonl")
+    entries = [json.loads(p.read_text(encoding="utf-8")) for p in ENTRIES.glob("*.json")]
+    models = {e["model"] for e in entries}
+    seeds = {tuple(e["seeds"]) for e in entries}
+
+    assert len(tasks) == 8, f"{len(tasks)} T1 tasks: the documents say eight"
+    assert len(list(Level)) == 5, f"{len(list(Level))} levels: the documents say five"
+    assert len(models) == 5, f"{len(models)} models on the leaderboard: the documents say five"
+    assert seeds == {(0, 1, 2)}, f"seed sets {seeds}: the documents say three seeds, 0 to 2"
