@@ -89,6 +89,36 @@ is why they are listed with the other deferred changes in
 [`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#what-to-change-when-the-t2-set-is-regenerated) rather
 than done here.
 
+### What a task's silence permits
+
+The mirror of the section above. `check_resource_fit` compares a constraint only where the task
+declares one, so a task that says nothing about a resource accepts any request for it. On
+`t1_gpu_single`, which declares nodes, cpus, gpus, walltime and memory but not tasks,
+`--ntasks=64` passes, and so does `--exclusive`, which asks for the whole node. `--gres=gpu:8`
+passes too, for the separate reason that `gpus_min` is the one constraint still compared from one
+side only.
+
+Whether that is a defect depends on what a task's silence is taken to mean, and the honest answer
+is that it currently means nothing at all rather than anything deliberate. What can be settled
+without deciding is how often models reach for those directives.
+`./scripts/extra_directives.py` counts, over the 11774 artifacts the verifier promoted, every
+directive carried that no task asked for:
+
+| directive | artifacts | what it changes |
+|---|---|---|
+| `--job-name` | 5257 | nothing the benchmark measures; the canonical solutions do it too |
+| `--output`, `--error` | 1265 | where logs go, on tasks that do not ask |
+| `--ntasks` | 566 | the effective request, on tasks declaring no `ntasks` |
+| `--cpus-per-task` | 199 | the same, for cores |
+| `--ntasks-per-node` | 157 | the same again, and the defect it exposed is fixed |
+| `--gres` | 7 | GPUs on a task that needs none |
+| `--exclusive` | 4 | the whole node |
+
+The first two rows are ordinary practice. The rest are resource requests nothing reads, on the
+order of one artifact in twenty, and the question they raise is not answered here: widening
+`resource_fit` to refuse an unrequested resource is a rule change, not a bug fix, and it would
+refuse artifacts a real site would accept.
+
 ## Oracle and broken model
 
 Every benchmark should ship both. Few do.
