@@ -4,8 +4,12 @@ Every measured number this project stands behind, on one page, so it can be read
 running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
-Everything here was graded by verifier `81106f3da7a1`, which this checkout carries and which every
-report and every leaderboard entry records. No row is marked *stale rules*.
+Everything here was graded by verifier `81106f3da7a1`, which every report and every leaderboard
+entry records. This checkout carries `89a70295ce84`, so every row is marked *stale rules* until the
+generations are graded again. What moved is `safety`, which refused `rm -rf /` and let `rm -rf /*`
+through, along with four other spellings of hazards already on its list. No artifact in this
+repository trips the widened patterns and none of the figures below was measured on one that does,
+so they are expected to survive; the regrade is what settles it.
 
 The last change to reach the verifier closed the last one-sided comparison: `--gpus` now demands
 the count the task declares, where it accepted any number at or above it. Its loose side had been

