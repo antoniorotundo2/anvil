@@ -108,19 +108,27 @@ def test_the_verifier_results_md_names_is_the_one_that_graded_the_entries():
 
     entries = [json.loads(p.read_text(encoding="utf-8")) for p in ENTRIES.glob("*.json")]
     assert entries
-    stale = sorted({e["verifier_sha"] for e in entries} - {claimed.group(1)})
-    assert not stale, f"entries graded by {stale}, which the page does not name"
+    digests = {e["verifier_sha"] for e in entries}
+    assert claimed.group(1) in digests, (
+        f"the page says {claimed.group(1)} graded it; the entries carry {sorted(digests)}"
+    )
 
-    # The page describes the entries, and a verifier change makes those older than the
-    # checkout until the regrade lands on the machine that holds the generations. That gap
-    # is legitimate and has to be sayable; what is not legitimate is passing over it in
-    # silence, so the page must name the current digest too and mark the rows.
-    if claimed.group(1) != verifier_sha():
+    # Every digest the entries carry has to appear on the page. A regrade lands one arm at a
+    # time, since each is a separate run on the machine that holds the generations, so a
+    # mixed state is legitimate: the fp16 row sat one verifier behind the other forty for
+    # exactly that reason. What is not legitimate is a page that names one of them and lets
+    # the reader take it for all.
+    unnamed = sorted(d for d in digests if d not in body)
+    assert not unnamed, f"entries graded by {unnamed}, which docs/RESULTS.md does not name"
+
+    # And a row graded by anything other than this checkout is not comparable, which the
+    # page has to say rather than leave to whoever notices the digests differ.
+    if digests != {verifier_sha()}:
         assert verifier_sha() in body, (
-            f"the entries were graded by {claimed.group(1)} and this checkout grades with "
-            f"{verifier_sha()}, which docs/RESULTS.md does not mention"
+            f"this checkout grades with {verifier_sha()}, which docs/RESULTS.md does not "
+            f"mention while publishing rows graded by {sorted(digests)}"
         )
-        assert "stale rules" in body, "the page does not say the rows are not comparable"
+        assert "stale rules" in body, "the page does not say those rows are not comparable"
 
 
 def test_the_figures_the_prose_repeats_are_still_the_facts():

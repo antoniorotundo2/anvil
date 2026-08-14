@@ -4,14 +4,24 @@ Every measured number this project stands behind, on one page, so it can be read
 running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
-Everything here was graded by verifier `bbaa1665c35e`, which every report and every leaderboard
-entry records. This checkout carries `81106f3da7a1`, so every row is marked *stale rules* until the
-generations are graded again on the machine that holds them. What moved is the last one-sided
-comparison: `--gpus` now demands the count the task declares, where it accepted any number at or
-above it. Its loose side was measured before being closed, 343 passes and every one exact, so the
-figures below are expected to survive unchanged. Expected, not verified, and the regrade is what
-settles it: the same sentence stood here before the previous two changes and was right both times,
-which is a reason to check and not a reason to skip checking.
+Everything here was graded by verifier `81106f3da7a1`, which this checkout carries and which every
+report and every leaderboard entry records, with one exception: the fp16 row is still at
+`bbaa1665c35e` and is marked *stale rules* until that arm is graded again. A regrade lands one arm
+at a time, each being its own run on the machine that holds the generations.
+
+The last change to reach the verifier closed the last one-sided comparison: `--gpus` now demands
+the count the task declares, where it accepted any number at or above it. Its loose side had been
+measured before it was closed, 343 passes and every one exact, and the regrade bore that out: every
+figure on this page came back identical across 3900 sample comparisons, as it had for the two
+changes before it. Three times the prediction held, which is a reason to keep checking rather than
+to start assuming.
+
+The execution set is the exception, and not because of this change. One artifact there,
+`t1_memory_workers__F8` on the 9B, has come back OUT_OF_MEMORY in one grading and COMPLETED in the
+next across three consecutive regrades, moving that cell by one artifact each time. It is a repair
+of a memory under-request sitting against the allocation it asked for, which is what the set exists
+to exercise, so the number to read there is plus or minus one artifact. The detail is in
+[`OBSERVED_FAILURES.md`](OBSERVED_FAILURES.md#the-same-artifact-verified-twice-two-answers).
 
 Three changes to the verifier have landed since the figures were first measured, and all three
 have now been answered by regrading the same generations rather than by expectation. A ceiling on
