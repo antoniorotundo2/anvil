@@ -100,3 +100,20 @@ def test_every_task_file_is_covered_by_the_package_data_pattern():
 
     suffixes = {p.suffix for p in (ROOT / "tasks").iterdir() if p.is_file()}
     assert suffixes == {".jsonl"}, f"not covered by {patterns}: {sorted(suffixes - {'.jsonl'})}"
+
+
+def test_the_counts_the_dataset_page_states_are_the_counts_on_disk():
+    """`DATASET.md` said the repair file holds 220 tasks. It holds 44, and 220 is what a run
+    at `-n 5` produces from them, which is the figure `RESULTS.md` reports. One document
+    describing the file and another describing a pass over it, with the same word for both,
+    is how a reader ends up citing a dataset five times its size.
+    """
+    import re
+
+    body = (ROOT / "docs" / "DATASET.md").read_text(encoding="utf-8")
+    claims = re.findall(r"`(tasks/[a-z0-9_]+\.jsonl)` holds (\d+)", body)
+    assert claims, "docs/DATASET.md no longer states the size of any task file"
+    for path, stated in claims:
+        records = sum(1 for line in (ROOT / path).read_text(encoding="utf-8").splitlines()
+                      if line.strip())
+        assert records == int(stated), f"{path}: page says {stated}, file holds {records}"

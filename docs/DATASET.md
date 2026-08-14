@@ -24,8 +24,10 @@ Licence MIT, the same as the code.
 | `expects_in_body` | strings the script must print when it runs |
 | `tags` | topic labels, used by the retrieval ablation and nothing else |
 
-**T2, diagnosing and repairing.** `tasks/t2_repair.jsonl` holds 220 repair tasks: a broken script,
-the fault category it carries, and the T1 task it must satisfy once repaired. It is not
+**T2, diagnosing and repairing.** `tasks/t2_repair.jsonl` holds 44 repair tasks: a broken script,
+the fault category it carries, and the T1 task it must satisfy once repaired. A run at `-n 5`
+therefore produces 220 repairs per seed, which is the figure `docs/RESULTS.md` reports against;
+the two are the file and a pass over it, not two counts of the same thing. It is not
 hand-written. `anvil induce` applies seven fault injectors to the T1 reference solutions and keeps
 only the variants that actually fail verification, because an inducer that produces an
 accidentally-valid script is a bug in the inducer rather than a fault worth teaching a model to
