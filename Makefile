@@ -465,7 +465,12 @@ paper:
 # package still builds under a toolchain that does run BibTeX, which is how the missing
 # `.bbl` was found in the first place.
 arxiv: paper
-	@cd paper && tectonic -X compile --keep-intermediates anvil.tex >/dev/null
+	@# The same SOURCE_DATE_EPOCH as `paper`, because this second compile overwrites
+	@# `anvil.pdf`, and without it tectonic writes a fresh random /ID: the tracked PDF
+	@# stopped reproducing the moment this target was added, and only a byte comparison
+	@# against the committed copy showed it.
+	@cd paper && SOURCE_DATE_EPOCH=$$(git log -1 --format=%ct -- anvil.tex anvil.bib data) \
+		tectonic -X compile --keep-intermediates anvil.tex >/dev/null
 	tar -czf paper/anvil-arxiv.tar.gz -C paper anvil.tex anvil.bib anvil.bbl data
 	@echo "paper/anvil-arxiv.tar.gz: upload this, not the PDF"
 
