@@ -166,3 +166,31 @@ def test_every_deferred_item_is_reachable_from_the_regeneration_list():
         assert anchor in listing, anchor
     # And the sections that defer must point back, so neither side can be edited alone.
     assert doc.count("#what-to-change-when-the-t2-set-is-regenerated") >= 2
+
+
+def test_the_build_epoch_is_the_date_the_title_page_carries():
+    """`PAPER_EPOCH` in the Makefile and `\\date` in the manuscript are two literals saying
+    the same thing, and nothing but this makes them agree.
+
+    The epoch used to be the commit time of the sources, which reproduced only until the
+    next commit: it advances the moment the `.tex` is committed, so the PDF committed
+    alongside it never rebuilt identically again. Pinning it closed that, at the cost of a
+    second place to change the date.
+    """
+    import datetime as dt
+    import re
+
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    epoch = re.search(r"^PAPER_EPOCH\s*=\s*(\d+)", makefile, re.M)
+    assert epoch, "the Makefile no longer pins a build epoch"
+
+    tex = (ROOT / "paper" / "anvil.tex").read_text(encoding="utf-8")
+    stamped = re.search(r"\\date\{([^}]+)\}", tex)
+    assert stamped, "the manuscript no longer carries a fixed date"
+    assert "today" not in stamped.group(1), "the date floats again, so the epoch cannot pin it"
+
+    named = dt.datetime.strptime(stamped.group(1), "%B %d, %Y").replace(tzinfo=dt.timezone.utc)
+    assert int(epoch.group(1)) == int(named.timestamp()), (
+        f"the Makefile builds at {epoch.group(1)} and the title page says "
+        f"{stamped.group(1)} ({int(named.timestamp())})"
+    )

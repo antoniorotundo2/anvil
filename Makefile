@@ -441,16 +441,22 @@ docker-verify-recipe: docker-build-apptainer
 # quote a run that has since been re-imported. latexmk is not a dependency of this project:
 # the target says so plainly rather than failing with a shell error nobody can read.
 #
-# SOURCE_DATE_EPOCH is the commit time of the manuscript's own sources, which does two
-# things. The build becomes byte-reproducible, so `git status` after `make paper` answers
-# whether the paper changed instead of always reporting a modified binary: two consecutive
-# compiles of identical sources used to differ by 64 bytes of embedded timestamp. And the
-# date on the title page becomes the date the manuscript last changed rather than the date
-# somebody happened to rebuild it, which for a preprint is the more honest of the two.
+# SOURCE_DATE_EPOCH makes the build byte-reproducible, so `git status` after `make paper`
+# answers whether the paper changed instead of always reporting a modified binary: two
+# compiles of identical sources used to differ by 64 bytes of embedded timestamp, and later
+# by the whole document /ID.
+#
+# It was the commit time of the manuscript's sources, which reproduced only until the next
+# commit: the epoch advances the moment the `.tex` is committed, so the PDF committed
+# alongside it never rebuilt identically again. Pinned to the date the title page carries
+# instead, now that `\date` is fixed rather than `\today`. The two are separate literals
+# and `tests/test_paper.py` holds them to each other.
+PAPER_EPOCH = 1786752000
+
 paper:
 	./scripts/paper_data.py
 	@cd paper && if command -v tectonic >/dev/null 2>&1; then \
-		SOURCE_DATE_EPOCH=$$(git log -1 --format=%ct -- anvil.tex anvil.bib data) \
+		SOURCE_DATE_EPOCH=$(PAPER_EPOCH) \
 		tectonic -X compile anvil.tex; \
 	elif command -v latexmk >/dev/null 2>&1; then latexmk -pdf anvil.tex; \
 	else \
@@ -469,7 +475,7 @@ arxiv: paper
 	@# `anvil.pdf`, and without it tectonic writes a fresh random /ID: the tracked PDF
 	@# stopped reproducing the moment this target was added, and only a byte comparison
 	@# against the committed copy showed it.
-	@cd paper && SOURCE_DATE_EPOCH=$$(git log -1 --format=%ct -- anvil.tex anvil.bib data) \
+	@cd paper && SOURCE_DATE_EPOCH=$(PAPER_EPOCH) \
 		tectonic -X compile --keep-intermediates anvil.tex >/dev/null
 	tar -czf paper/anvil-arxiv.tar.gz -C paper anvil.tex anvil.bib anvil.bbl data
 	@echo "paper/anvil-arxiv.tar.gz: upload this, not the PDF"
