@@ -4,14 +4,16 @@ Every measured number this project stands behind, on one page, so it can be read
 running anything. The reasoning behind each is in [DESIGN.md](DESIGN.md) and
 [OBSERVED_FAILURES.md](OBSERVED_FAILURES.md); this page is the numbers and their provenance.
 
-Everything here was graded by verifier `81106f3da7a1`, which every report and every leaderboard
-entry records. This checkout carries `30c55f210a8d`, so every row is marked *stale rules* until the
-generations are graded again. Two things moved. `safety` refused `rm -rf /` and let `rm -rf /*`
-through, along with four other spellings of hazards already on its list; no artifact in this
-repository trips the widened patterns, so the figures below are expected to survive it. And the
+Everything here was graded by verifier `30c55f210a8d`, which this checkout carries and which every
+report and every leaderboard entry records. No row is marked *stale rules*.
+
+Two changes reached the verifier since the previous grading and the regrade has answered both.
+`safety` refused `rm -rf /` and let `rm -rf /*` through, along with four other spellings of hazards
+already on its list, and no artifact here trips the widened patterns, so nothing moved. And the
 `sbatch` executor now waits for a finished job's output to arrive before concluding it wrote
-nothing, which is a false negative it produced once, intermittently, on an artifact that had
-passed the grading before. That one can move a figure, and only the regrade says whether it did.
+nothing: that one did move a figure, by recovering one artifact whose job had completed and whose
+output the harness read too early, and every other number came back to the value it had held for
+three gradings before that false negative appeared.
 
 The last change to reach the verifier closed the last one-sided comparison: `--gpus` now demands
 the count the task declares, where it accepted any number at or above it. Its loose side had been
