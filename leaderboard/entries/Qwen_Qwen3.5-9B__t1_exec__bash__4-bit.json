@@ -2,7 +2,7 @@
   "model": "Qwen/Qwen3.5-9B",
   "tasks_file": "tasks/t1_exec.jsonl",
   "tasks_sha": "6a7c2fe00c37",
-  "verifier_sha": "81106f3da7a1",
+  "verifier_sha": "30c55f210a8d",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/regrade_gpus_exec",
+  "source": "results/regrade_30c55f210a8d_20260808_161623",
   "scores": {
     "syntax": {
       "mean": 0.833333,

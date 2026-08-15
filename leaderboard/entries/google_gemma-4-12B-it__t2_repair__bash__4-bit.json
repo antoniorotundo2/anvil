@@ -2,7 +2,7 @@
   "model": "google/gemma-4-12B-it",
   "tasks_file": "tasks/t2_repair.jsonl",
   "tasks_sha": "723aa7ec4463",
-  "verifier_sha": "81106f3da7a1",
+  "verifier_sha": "30c55f210a8d",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "bash",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/regrade_gpus",
+  "source": "results/regrade_30c55f210a8d_20260802_091236",
   "scores": {
     "syntax": {
       "mean": 1.0,

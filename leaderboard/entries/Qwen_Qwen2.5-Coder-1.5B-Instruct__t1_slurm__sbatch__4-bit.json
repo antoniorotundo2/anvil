@@ -2,7 +2,7 @@
   "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
   "tasks_file": "tasks/t1_slurm.jsonl",
   "tasks_sha": "bbc74707a030",
-  "verifier_sha": "81106f3da7a1",
+  "verifier_sha": "30c55f210a8d",
   "seeds": [
     0,
     1,
@@ -12,7 +12,7 @@
   "executor": "sbatch",
   "base_image": "ubuntu:24.04",
   "quantization": "4-bit",
-  "source": "results/regrade_gpus",
+  "source": "results/regrade_30c55f210a8d_20260802_091236",
   "scores": {
     "syntax": {
       "mean": 0.575,
