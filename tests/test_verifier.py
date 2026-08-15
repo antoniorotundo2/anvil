@@ -1696,3 +1696,42 @@ def test_no_task_or_reference_in_the_repository_trips_the_probe():
                 continue
             result = check_safety(body)
             assert result.passed, f"{name} {record['id']}: {result.detail}"
+
+
+def test_the_job_output_is_given_time_to_arrive(tmp_path, monkeypatch):
+    """`scontrol` says COMPLETED when the job is done, not when `slurmstepd` has closed its
+    output file, so reading at once can find nothing. That produced `COMPLETED but wrote
+    nothing` on an artifact which had passed the grading before, and is the same race as the
+    sandbox reaping output in flight, reached from the other executor."""
+    import threading
+
+    from anvil import verifier as v
+
+    workdir = tmp_path
+    script = "#!/bin/bash\n#SBATCH --output=out.txt\necho ANVIL_OK\n"
+    late = workdir / "out.txt"
+
+    def write_later():
+        time.sleep(0.3)
+        late.write_text("ANVIL_OK\n", encoding="utf-8")
+
+    writer = threading.Thread(target=write_later)
+    writer.start()
+    try:
+        combined = v._settled_job_output(script, str(workdir), ["ANVIL_OK"])
+    finally:
+        writer.join()
+    assert "ANVIL_OK" in combined
+
+
+def test_output_that_never_arrives_still_gives_up(tmp_path):
+    """Bounded, like the sandbox grace: an artifact that genuinely writes nothing must be
+    failed rather than waited on, and the wait is what a reader pays for that verdict."""
+    from anvil import verifier as v
+
+    started = time.monotonic()
+    combined = v._settled_job_output(
+        "#!/bin/bash\n#SBATCH --output=out.txt\n", str(tmp_path), ["ANVIL_OK"], grace=0.4)
+    elapsed = time.monotonic() - started
+    assert combined.strip() == ""
+    assert 0.3 < elapsed < 3.0, elapsed

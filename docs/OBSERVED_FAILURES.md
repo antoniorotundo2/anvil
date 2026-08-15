@@ -1092,11 +1092,13 @@ practical consequence is that a cell worth publishing is worth verifying twice, 
 `./scripts/regrade_diff.py results/first results/second` is what reads the second answer:
 per level, not per strict verdict, which is the distinction that kept this hidden.
 
-Verifying twice then found a second one, in the other executor, and verifying a third time
-showed it was not what the first reading called it. Across three gradings of the execution
-matrix under real submission the OUT_OF_MEMORY count went 358, 357, 356: one artifact fewer
-each time, in the same direction, which is a drift and not the jitter this paragraph first
-described. The grace above cannot account for it, being reached only from the bash path.
+Verifying twice then found a second one, in the other executor, and each further grading
+changed what it looked like. Across four gradings of the execution matrix under real
+submission the OUT_OF_MEMORY count went 358, 357, 356, 357. Three points read as a drift and
+this section said so, correcting an earlier reading that had called it jitter; the fourth
+point says it oscillates, and the second reading was as wrong as the first. Three points are
+not enough to name a shape, which is the part of this worth keeping. The grace above cannot
+account for any of it, being reached only from the bash path.
 
 `regrade_diff.py` names the artifact behind the last step: `t1_memory_workers__F8`, sample
 45 of the 9B at seed 2, job 12440, OUT_OF_MEMORY in one grading and COMPLETED with the
@@ -1107,8 +1109,17 @@ one buffer, and a repair of that pair sits against the cgroup limit by construct
 the same artifact moved at each step or three different ones did is not established; one
 pair was compared, and the answer for the other two is a comparison away.
 
-Unlike the race, this may not be a defect: a real scheduler would answer the same way, and
-an artifact that close to its allocation is the thing being measured. What it does mean is
+The fourth grading also moved a cell in the main matrix, which had reproduced exactly three
+times running: one artifact under real submission came back `COMPLETED but wrote nothing`.
+That one is a defect and is fixed. `scontrol` reports COMPLETED when the job is done, not
+when `slurmstepd` has closed its output file, so reading at once can find no file or a
+partial one, and the executor now waits up to two seconds for what the task expects before
+concluding the job wrote nothing. It is the sandbox race again, on the other executor, found
+because a regrade for an unrelated change happened to run the matrix a fourth time.
+
+The OUT_OF_MEMORY oscillation is not that, and may not be a defect at all: a real scheduler
+would answer the same way, and an artifact that close to its allocation is the thing being
+measured. What it does mean is
 that this cell is worth reading as plus or minus one artifact, and that six thousandths
 there is not a difference between models.
 

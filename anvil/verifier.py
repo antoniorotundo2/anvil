@@ -328,6 +328,32 @@ def _prepare_output_dirs(script: str, workdir: str) -> None:
             target.mkdir(parents=True, exist_ok=True)
 
 
+OUTPUT_GRACE_S = 2.0
+
+
+def _settled_job_output(script: str, workdir: str, expects: list[str],
+                        grace: float = OUTPUT_GRACE_S) -> str:
+    """The job's output, once it has stopped arriving or the grace has run out.
+
+    `scontrol` reports COMPLETED when the job is done, not when `slurmstepd` has finished
+    writing and closing its output file, so reading immediately can find no file at all or a
+    partial one. That produced `job 12345 COMPLETED but wrote nothing`, intermittently, on an
+    artifact that had passed the previous grading: the same shape as the sandbox reaping
+    output in flight on the bash side, arrived at from the other executor.
+
+    Returns as soon as everything the task expects is present, so the ordinary path pays one
+    read. Only an artifact that genuinely wrote nothing, or wrote the wrong thing, waits.
+    """
+    deadline = time.time() + grace
+    combined = _read_job_output(script, workdir)
+    while time.time() < deadline:
+        if combined.strip() and all(s in combined for s in expects):
+            return combined
+        time.sleep(0.05)
+        combined = _read_job_output(script, workdir)
+    return combined
+
+
 def _read_job_output(script: str, workdir: str) -> str:
     """Everything the job wrote to its declared stdout/stderr files.
 
@@ -763,7 +789,7 @@ def _functional_via_sbatch(script: str, task: Task, timeout: int) -> LevelResult
             tail = " ".join(_read_job_output(script, workdir).split())[-200:]
             return LevelResult(Level.FUNCTIONAL, False, f"{states}: {tail}" if tail else states)
 
-        combined = _read_job_output(script, workdir)
+        combined = _settled_job_output(script, workdir, task.expects_in_body)
         if not combined.strip():
             return LevelResult(
                 Level.FUNCTIONAL, False,
