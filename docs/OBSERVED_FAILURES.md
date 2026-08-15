@@ -1097,8 +1097,8 @@ changed what it looked like. Across four gradings of the execution matrix under 
 submission the OUT_OF_MEMORY count went 358, 357, 356, 357, 356. Three points read as a
 drift and this section said so, correcting an earlier reading that had called it jitter; the
 fourth and fifth say it oscillates by one, and the second reading was as wrong as the first.
-Three points are not enough to name a shape, which is the part of this worth keeping. The grace above cannot
-account for any of it, being reached only from the bash path.
+Three points are not enough to name a shape, which is the part of this worth keeping. The
+grace above cannot account for any of it, being reached only from the bash path.
 
 `regrade_diff.py` names the artifact behind the last step: `t1_memory_workers__F8`, sample
 45 of the 9B at seed 2, job 12440, OUT_OF_MEMORY in one grading and COMPLETED with the
