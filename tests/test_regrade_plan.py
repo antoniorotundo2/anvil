@@ -138,3 +138,34 @@ def test_the_follow_up_note_appears_only_when_a_run_was_planned(tmp_path, capsys
     out = capsys.readouterr().out
     assert "leaderboard.py import" in out
     assert "run this again on the OUT directories" not in out
+
+
+def test_the_out_directory_carries_the_verifier_that_will_grade_it(tmp_path, capsys, monkeypatch):
+    """Without the digest a second regrade lands on the first one's directory, and
+    `executor_ablation.sh` resumes rather than overwrites: every cell is skipped and the
+    reports handed back are the old ones, graded by the rules the regrade exists to replace.
+    Caught by the planner printing the same OUT twice on consecutive verifier changes."""
+    from anvil.provenance import verifier_sha
+
+    directory = tmp_path / "run"
+    _generations(directory, "a", "tasks/t1_slurm.jsonl")
+    monkeypatch.chdir(tmp_path)
+
+    assert main([str(directory), "--out-prefix", "out/regrade"]) == 0
+    printed = capsys.readouterr().out
+    assert f"OUT=out/regrade_{verifier_sha()}_run" in printed
+
+
+def test_a_grading_that_already_exists_is_refused(tmp_path, capsys, monkeypatch):
+    """Resuming is the right behaviour for an interrupted run and the wrong one for a new
+    grading, and the two are told apart only by whether the directory is already there."""
+    from anvil.provenance import verifier_sha
+
+    directory = tmp_path / "run"
+    _generations(directory, "a", "tasks/t1_slurm.jsonl")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "out").mkdir()
+    (tmp_path / "out" / f"regrade_{verifier_sha()}_run").mkdir()
+
+    assert main([str(directory), "--out-prefix", "out/regrade"]) == 1
+    assert "already exists" in capsys.readouterr().err

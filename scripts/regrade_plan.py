@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from anvil.cli import _file_sha  # noqa: E402
+from anvil.provenance import verifier_sha  # noqa: E402
 
 # A T1 task file and the repair file induced from it. `executor_ablation.sh` needs both,
 # since one run covers a from-scratch matrix and the repairs beside it.
@@ -115,7 +116,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--quantization", default="4-bit")
     parser.add_argument("--n", type=int, default=5, help="samples per task in the run")
     parser.add_argument("--out-prefix", default="results/regrade",
-                        help="OUT for each ablation, suffixed with the source directory name")
+                        help="OUT for each ablation, with the verifier digest and the source "
+                             "directory name appended")
     args = parser.parse_args(argv)
 
     complaints, planned, ablations = [], 0, 0
@@ -125,8 +127,18 @@ def main(argv: list[str]) -> int:
             complaints.append(f"{directory}: not a directory")
             continue
         if any(directory.glob("*.generations.jsonl")):
-            command, complaint = ablation_command(
-                directory, f"{args.out_prefix}_{directory.name}")
+            # The digest belongs in the name. Without it a second regrade lands on the
+            # first one's directory, and `executor_ablation.sh` resumes rather than
+            # overwrites: every cell is skipped and the reports it returns are the old
+            # ones, graded by the rules the regrade exists to replace. It also makes a
+            # directory say which verifier produced it, which is the question that took a
+            # session to answer for the directories named before this existed.
+            out = f"{args.out_prefix}_{verifier_sha()}_{directory.name}"
+            if Path(out).exists():
+                complaints.append(f"{out} already exists: this grading has been run, and "
+                                  f"rerunning resumes it rather than redoing it")
+                continue
+            command, complaint = ablation_command(directory, out)
             if complaint:
                 complaints.append(complaint)
             else:
