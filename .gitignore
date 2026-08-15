@@ -46,5 +46,14 @@ dist/
 .vscode/
 *.swp
 
+# --- LaTeX intermediates ---
+# `anvil.pdf` is tracked, the rest is regenerated. `anvil.bbl` is not an exception even
+# though the arXiv package needs it: arXiv does not run BibTeX and uses whatever `.bbl`
+# the upload contains, so `make arxiv` regenerates it rather than trusting a stale one.
+paper/*.aux
+paper/*.bbl
+paper/*.out
+paper/*.log
+
 # --- Secrets ---
 .env

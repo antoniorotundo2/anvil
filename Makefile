@@ -97,6 +97,7 @@ help:
 	@echo "  make docker-guards-enforcement  a memory under-request must be OOM-killed:"
 	@echo "                       the bracket for cgroup enforcement ($(EXEC_TASKS))"
 	@echo "  make paper           regenerate the figures' data and build the preprint"
+	@echo "  make arxiv           package the preprint sources for upload"
 	@echo "  make docker-guards-coreutils  one task must be judged differently by GNU"
 	@echo "                       coreutils and by uutils ($(COREUTILS_TASKS))"
 	@echo "  make generate        generate scripts with MODEL (needs an accelerator)"
@@ -457,6 +458,16 @@ paper:
 		echo "needs) or a TeX distribution with latexmk."; \
 		echo "The generated data in paper/data/ is up to date regardless."; exit 1; \
 	fi
+
+# The upload arXiv wants: sources, not a PDF. `anvil.bbl` is in it because arXiv does not
+# run BibTeX and renders whatever bibliography the package carries; a submission without it
+# builds with an empty References section and no error. `anvil.bib` is in it too, so the
+# package still builds under a toolchain that does run BibTeX, which is how the missing
+# `.bbl` was found in the first place.
+arxiv: paper
+	@cd paper && tectonic -X compile --keep-intermediates anvil.tex >/dev/null
+	tar -czf paper/anvil-arxiv.tar.gz -C paper anvil.tex anvil.bib anvil.bbl data
+	@echo "paper/anvil-arxiv.tar.gz: upload this, not the PDF"
 
 clean:
 	rm -rf .pytest_cache .ruff_cache build dist *.egg-info
