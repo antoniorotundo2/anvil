@@ -9,7 +9,7 @@ description = "Executable benchmarking of LLM-generated and LLM-repaired HPC ope
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Antonio Rotundo", email = "antonio.rotundo@gmail.com" }]
+authors = [{ name = "Antonio Rotundo" }]
 keywords = ["hpc", "slurm", "benchmark", "llm", "evaluation", "apptainer"]
 classifiers = [
     "Development Status :: 3 - Alpha",
