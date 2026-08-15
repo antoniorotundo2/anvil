@@ -1094,10 +1094,10 @@ per level, not per strict verdict, which is the distinction that kept this hidde
 
 Verifying twice then found a second one, in the other executor, and each further grading
 changed what it looked like. Across four gradings of the execution matrix under real
-submission the OUT_OF_MEMORY count went 358, 357, 356, 357. Three points read as a drift and
-this section said so, correcting an earlier reading that had called it jitter; the fourth
-point says it oscillates, and the second reading was as wrong as the first. Three points are
-not enough to name a shape, which is the part of this worth keeping. The grace above cannot
+submission the OUT_OF_MEMORY count went 358, 357, 356, 357, 356. Three points read as a
+drift and this section said so, correcting an earlier reading that had called it jitter; the
+fourth and fifth say it oscillates by one, and the second reading was as wrong as the first.
+Three points are not enough to name a shape, which is the part of this worth keeping. The grace above cannot
 account for any of it, being reached only from the bash path.
 
 `regrade_diff.py` names the artifact behind the last step: `t1_memory_workers__F8`, sample
@@ -1116,6 +1116,12 @@ when `slurmstepd` has closed its output file, so reading at once can find no fil
 partial one, and the executor now waits up to two seconds for what the task expects before
 concluding the job wrote nothing. It is the sandbox race again, on the other executor, found
 because a regrade for an unrelated change happened to run the matrix a fourth time.
+
+The regrade after that fix is the check on it. One level moved, `t1_output_paths` on granite
+at seed 2 under real submission, from `COMPLETED but wrote nothing to slurm-%j.out` to the
+expected output present, and every other figure in the main matrix came back to the value it
+had held for three gradings before the false negative appeared. A fix whose effect is one
+artifact and no collateral is what the per-level comparison was built to be able to say.
 
 The OUT_OF_MEMORY oscillation is not that, and may not be a defect at all: a real scheduler
 would answer the same way, and an artifact that close to its allocation is the thing being
