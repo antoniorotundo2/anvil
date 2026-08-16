@@ -414,7 +414,9 @@ were then audited on purpose. Memory had the same shape, compared from below onl
 $2298$ passes requested more than the task named, all of them repairs in which the model rewrote a
 directive the induced fault had not touched. Tightening it moved one cell, by the amount the audit
 had predicted to three decimals before the change was made. Requested GPU counts were exact in all
-$343$ cases and needed nothing.
+$343$ cases, so the measurement asked for no correction; the check was made two-sided anyway, on
+the grounds that a hole nobody has fallen into is still a hole, and regrading confirmed that it
+moved nothing. All six constraints carrying a value now demand equality.
 
 \section{Threats to validity}
 
@@ -429,6 +431,17 @@ token budget it would otherwise be cut off before producing a script. One refere
 declared by this work rather than borrowed from a centre in production. All prompts written by one
 author, in one language and one style. No result here has
 been replicated independently.
+
+One figure per cell, which is less of a guarantee than it looks. Verifying one set of generations
+twice, under one verifier and one container image, returned two different values for
+\emph{functional}: it is the only level that executes, so it is the only one that can disagree with
+itself, and the digest of the verifier bounds which rules produced a verdict without bounding the
+verdict. The instance behind that observation was a race in the harness and is fixed, but the
+property is general and the fix is not a proof that it was the only one. Under real submission a
+job sitting against the allocation it requested is killed in one grading and not the next, five
+gradings running, which is arguably the measurement working rather than failing. Every figure here
+comes from a single grading, and a difference of a few thousandths between two rows should be read
+with that in mind.
 
 \section{Availability}
 
