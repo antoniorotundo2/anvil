@@ -479,6 +479,28 @@ How large that disagreement is turns out to be a property of the task set rather
 method: 0.15% where the requirements are stated in the prompt, 33% where only the payload knows
 them. Run it against both before concluding anything about how much real submission is worth.
 
+## The manuscript
+
+`paper/anvil.tex` is a preliminary manuscript describing the benchmark and the measurements
+on this page. It is not posted anywhere yet.
+
+```
+make paper
+make arxiv
+```
+
+`make paper` regenerates the figures' data from `leaderboard/entries/` and compiles the PDF,
+so the manuscript cannot quote a run that has since been re-imported; `tests/test_paper.py`
+fails when the two disagree. `make arxiv` writes `paper/anvil-arxiv.tar.gz`, which is what an
+arXiv submission wants: sources rather than a PDF. The package carries `anvil.bbl` because
+arXiv does not run BibTeX and renders whatever bibliography it is given, so a submission
+without it builds with an empty References section and no error at all.
+
+The build is byte-reproducible. `SOURCE_DATE_EPOCH` is pinned to the date the title page
+carries, which is why `\date` is a fixed date and not `\today`: two compiles of identical
+sources otherwise differ, and after `make paper` a `git status` that reports a modified
+binary would say nothing about whether the paper changed.
+
 ## Documentation
 
 - [`docs/DESIGN.md`](docs/DESIGN.md): why execution-based verification, the five levels, the preflight
