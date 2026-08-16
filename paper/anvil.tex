@@ -301,8 +301,12 @@ resource requirements in its prompt, so a static check can reach them and the ex
 left to decide. A second set states no memory minimum: the payload is written by the model, what it
 needs is a property of that payload, and no level that reads the text can know it. Graded the same
 way, five models and three seeds and $900$ sample comparisons, the same executor comparison reads
-\textbf{$297$ artifacts of $900$}, with $356$ of the $394$ stopped artifacts returning
-\texttt{OUT\_OF\_MEMORY}. From $0.15\%$ to $33\%$, on the same harness and the same models.
+\textbf{$288$ artifacts of $900$}, with $356$ of the $394$ stopped artifacts returning
+\texttt{OUT\_OF\_MEMORY}. From $0.15\%$ to $32\%$, on the same harness and the same models.
+That figure is one grading. Repeated under five successive verifiers it read $290$, $289$, $288$,
+$289$ and $288$, moving by the single artifact discussed in the previous section; the sample it
+turns on is a repair of a memory under-request sitting against the allocation it asked for, which
+is what this set exists to exercise.
 
 Table~\ref{tab:exec} gives the from-scratch half, one row per arm. Qwen2.5-Coder 7B is the case:
 the sandbox promotes $29$ of its $30$ artifacts and the scheduler kills every one, so
