@@ -188,6 +188,33 @@ def test_the_executor_figure_reads_the_same_on_every_surface_that_states_it():
     assert len(set(said.values())) == 1, said
 
 
+def test_the_percentage_beside_that_figure_reads_the_same_too():
+    """The count and the percentage are the same measurement said twice, and correcting the
+    count left `33%` standing in the README while three other surfaces read `32%`. A check on
+    the numerator alone does not notice it, which is why this is a second assertion rather
+    than a stricter version of the first.
+
+    One pattern per surface, because each states the pair in its own words: two put it beside
+    the `0.15%` from the other task set, one folds it into the bolded figure, and the
+    manuscript writes both as maths.
+    """
+    import re
+
+    surfaces = {
+        "README.md": r"0\.15% where[^.]*?, (\d+)% where only the payload",
+        "docs/RESULTS.md": r"artifacts of 900, (\d+)%",
+        "docs/OBSERVED_FAILURES.md": r"from 0\.15% to (\d+)%",
+        "paper/anvil.tex": r"From \$0\.15\\%\$ to \$(\d+)\\%\$",
+    }
+    said = {}
+    for name, pattern in surfaces.items():
+        body = (ROOT / name).read_text(encoding="utf-8")
+        found = re.search(pattern, body)
+        assert found, f"{name} no longer states the percentage where this test looks"
+        said[name] = found.group(1)
+    assert len(set(said.values())) == 1, said
+
+
 def test_the_number_of_sizes_reads_the_same_in_the_page_and_the_paper():
     """`docs/RESULTS.md` said four and the manuscript said five, and the leaderboard has held
     five models at five distinct sizes since the fifth was added. The count of models is pinned

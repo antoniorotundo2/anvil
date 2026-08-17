@@ -476,7 +476,7 @@ as the dependency task waiting on a job that never completes, which are skipped 
 charged to the model.
 
 How large that disagreement is turns out to be a property of the task set rather than of the
-method: 0.15% where the requirements are stated in the prompt, 33% where only the payload knows
+method: 0.15% where the requirements are stated in the prompt, 32% where only the payload knows
 them. Run it against both before concluding anything about how much real submission is worth.
 
 ## The manuscript
