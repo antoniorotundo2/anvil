@@ -194,3 +194,52 @@ def test_the_build_epoch_is_the_date_the_title_page_carries():
         f"the Makefile builds at {epoch.group(1)} and the title page says "
         f"{stamped.group(1)} ({int(named.timestamp())})"
     )
+
+
+def test_the_figures_the_prose_quotes_are_the_ones_the_entries_hold():
+    """The tables are generated and the check above pins them. The prose is typed, and a
+    regrade can invalidate a sentence with nothing to notice: `288 artifacts of 900` stood in
+    this manuscript as `297` after a fix moved one artifact, printed in bold beside a second
+    figure from a different grading, so the pair could not be reproduced by any single run.
+
+    Only the claims the entries can answer are checked here. The historical audit counts
+    (`123 of 2421`, `30 of 2298`, `343`) come from gradings whose reports are not in the
+    repository, and no test can recompute them.
+    """
+    import json
+    import re
+
+    entries = [json.loads(p.read_text(encoding="utf-8"))
+               for p in (ROOT / "leaderboard" / "entries").glob("*.json")]
+
+    def score(suffix, tasks_file, executor, quantization, level):
+        for e in entries:
+            if (e["model"].endswith(suffix) and e["tasks_file"] == tasks_file
+                    and e["executor"] == executor and e["quantization"] == quantization):
+                return e["scores"][level]["mean"]
+        raise AssertionError(f"no entry for {suffix} {tasks_file} {executor} {quantization}")
+
+    tex = _tex()
+
+    # The quantization arm, quoted as a difference in points on three levels.
+    quoted = re.search(
+        r"fp16 gains \$([\d.]+)\$ points of syntax, \$([\d.]+)\$ of submittability "
+        r"and \$([\d.]+)\$ of resource fit", tex)
+    assert quoted, "the fp16 sentence no longer reads as this test expects"
+    for said, level in zip(quoted.groups(),
+                           ("syntax", "submittability", "resource_fit"), strict=True):
+        fp16 = score("Qwen2.5-Coder-1.5B-Instruct", "tasks/t1_slurm.jsonl", "bash", "fp16", level)
+        four = score("Qwen2.5-Coder-1.5B-Instruct", "tasks/t1_slurm.jsonl", "bash", "4-bit", level)
+        assert float(said) == round((fp16 - four) * 100, 1), (
+            f"{level}: the paper says {said} points, the entries give "
+            f"{round((fp16 - four) * 100, 1)}"
+        )
+
+    # The 7B on the execution set, quoted as an artifact count and as both arms' scores.
+    assert re.search(r"promotes \$29\$ of its \$30\$ artifacts", tex), \
+        "the sentence about the 7B on the execution set no longer reads as expected"
+    bash = score("Qwen2.5-Coder-7B-Instruct", "tasks/t1_exec.jsonl", "bash", "4-bit", "functional")
+    sbatch = score("Qwen2.5-Coder-7B-Instruct", "tasks/t1_exec.jsonl", "sbatch", "4-bit",
+                   "functional")
+    assert round(bash * 30) == 29, f"the sandbox promotes {round(bash * 30)} of 30, not 29"
+    assert sbatch == 0.0, f"the scheduler leaves {sbatch}, so 'kills every one' is wrong"
