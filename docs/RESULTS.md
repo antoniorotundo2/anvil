@@ -157,7 +157,7 @@ method. See [Real submission was almost redundant until a model wrote
 The 0.15% above is measured on tasks whose resource requirements are written in their prompts.
 `tasks/t1_exec.jsonl` states no memory minimum, so what a script needs is a property of the payload
 it wrote itself and only execution knows it. Graded the same way, five models and three seeds, the
-same comparison reads **297 artifacts of 900, 33%**, with 356 of the 394 stopped artifacts coming
+same comparison reads **288 artifacts of 900, 32%**, with 356 of the 394 stopped artifacts coming
 back `OUT_OF_MEMORY`. Qwen2.5-Coder 7B goes from 0.967 to **0.000** on `functional`: the sandbox
 promotes 29 of its 30 from-scratch artifacts and the scheduler kills every one. Gemma 4 12B is the
 only model that solves the set, 1.000 under both arms. See [On a task set where only execution knows
@@ -243,7 +243,7 @@ make guards && make guards-t2 && make docker-guards-enforcement && make docker-g
 
 ## What these numbers are not
 
-Three seeds and 24 to 220 verifications per cell. Three model families at four sizes, from 1.5B to
+Three seeds and 24 to 220 verifications per cell. Three model families at five sizes, from 1.5B to
 12B, quantized to 4 bit except where a row says otherwise. Eight T1 tasks, which is a small
 denominator and makes each task worth 0.125 of every T1 figure on this page. One reference
 topology, declared rather than borrowed

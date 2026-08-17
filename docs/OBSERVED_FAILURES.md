@@ -131,10 +131,10 @@ real submission with no other level failing.** Both tasks now do that, and
 Five models, three seeds, `tasks/t1_exec.jsonl` and its repair set, graded twice in the same image,
 900 sample comparisons. Verdicts in `results/exec_matrix/`, verifier `1727a930156d`.
 
-**297 artifacts of 900 change their strict verdict with the executor.** On the main task set the
+**288 artifacts of 900 change their strict verdict with the executor.** On the main task set the
 same comparison reads 6 of 3900. The published claim that real submission was nearly redundant is
 not wrong about the runs it was made on, and it is wrong as a claim about the method: what changes
-is the task set, from 0.15% to 33%, and 356 of the 394 stopped artifacts come back
+is the task set, from 0.15% to 32%, and 356 of the 394 stopped artifacts come back
 `OUT_OF_MEMORY`.
 
 **T1, from scratch, `functional` per arm:**

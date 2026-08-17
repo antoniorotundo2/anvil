@@ -153,3 +153,52 @@ def test_the_figures_the_prose_repeats_are_still_the_facts():
     assert len(list(Level)) == 5, f"{len(list(Level))} levels: the documents say five"
     assert len(models) == 5, f"{len(models)} models on the leaderboard: the documents say five"
     assert seeds == {(0, 1, 2)}, f"seed sets {seeds}: the documents say three seeds, 0 to 2"
+
+
+def test_the_executor_figure_reads_the_same_on_every_surface_that_states_it():
+    """One measurement, five surfaces: the README, `docs/RESULTS.md`,
+    `docs/OBSERVED_FAILURES.md`, and both the abstract and the body of the manuscript. All
+    typed by hand, three of them in bold, and nothing tied them together.
+
+    Correcting it took three passes because of that. The body went from 297 to 288, the
+    abstract kept 297 for an hour, and the other three kept it until a grep found them. A
+    figure quoted in five places needs one check, not five careful readers.
+    """
+    import re
+
+    surfaces = {
+        "README.md": r"\*\*(\d+) artifacts of 900 change",
+        "docs/RESULTS.md": r"reads \*\*(\d+) artifacts of 900",
+        "docs/OBSERVED_FAILURES.md": r"\*\*(\d+) artifacts of 900 change their strict verdict",
+        "paper/anvil.tex": r"the same comparison reads \$(\d+)\$ of \$900\$",
+    }
+    said = {}
+    for name, pattern in surfaces.items():
+        body = (ROOT / name).read_text(encoding="utf-8")
+        found = re.search(pattern, body)
+        assert found, f"{name} no longer states the figure where this test looks"
+        said[name] = found.group(1)
+
+    # The manuscript's body states it a second time, in bold, beside the OOM breakdown.
+    tex = (ROOT / "paper" / "anvil.tex").read_text(encoding="utf-8")
+    in_body = re.search(r"\\textbf\{\$(\d+)\$ artifacts of \$900\$\}", tex)
+    assert in_body, "the manuscript body no longer states the figure in bold"
+    said["paper/anvil.tex (body)"] = in_body.group(1)
+
+    assert len(set(said.values())) == 1, said
+
+
+def test_the_number_of_sizes_reads_the_same_in_the_page_and_the_paper():
+    """`docs/RESULTS.md` said four and the manuscript said five, and the leaderboard has held
+    five models at five distinct sizes since the fifth was added. The count of models is pinned
+    against the entries above; this pins the phrasing that escaped it, because the sentence
+    says sizes rather than models and no grep for one finds the other."""
+    import re
+
+    said = {}
+    for name in ("docs/RESULTS.md", "paper/anvil.tex"):
+        body = (ROOT / name).read_text(encoding="utf-8")
+        found = re.search(r"model families at (\w+) sizes", body)
+        assert found, f"{name} no longer states how many sizes were measured"
+        said[name] = found.group(1)
+    assert len(set(said.values())) == 1, said
