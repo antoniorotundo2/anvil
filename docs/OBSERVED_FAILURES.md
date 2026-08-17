@@ -1156,6 +1156,14 @@ place, so that the pass does not have to be repeated because one of them was mis
    candidate always applies and the other two are never reached. As instantiated the category is
    about one directive. That may be the right scope, but it should be a decision rather than a
    consequence of the ordering.
+
+   Proposed, pending the author's assent: keep the category about one directive and make it say
+   so, by dropping the *declared* directive chosen per task rather than by the first hit of a
+   fixed order. `t1_gpu_single` then loses `--gpus` and the memory tasks lose `--mem`, so the
+   category exercises three directives across the set instead of one, without becoming a
+   category about dropping several at once, which is a different fault and would need its own
+   name. Cost: F4 gains variants where a task declares more than one candidate, so the induced
+   set grows, and every T2 number is measured against a larger denominator.
 5. **Decide what verifies the values a prompt names.** `required_directives` asks whether a
    directive is written, never what it says, which is the deliberate refusal of surface-form
    matching argued in [`DESIGN.md`](DESIGN.md#what-that-choice-leaves-unchecked); the measured
@@ -1176,6 +1184,22 @@ place, so that the pass does not have to be repeated because one of them was mis
    and leaves the five indices alone, so the audit was wrong and not the artifacts. The opening
    is therefore real and unexploited, which lowers its priority against the four items above
    without closing it: five models writing the obvious thing is not a property of the check.
+
+   Proposed for the array, pending assent, since it is the one of the four with an unambiguous
+   fix: replace `"array": true` with `"array": {"first": 1, "last": 5}` and have
+   `check_resource_fit` compare the index set, keeping the `%N` throttle out of the comparison
+   as `./scripts/unchecked_values.py` already does. The other three want execution rather than a
+   declared value: have the payload print what it resolved, `PATH=` for the log paths and
+   `IMAGE=` for the container, and let `expects_in_body` judge it, which is how T3 judges
+   `%environment`. Both are edits to `tasks/t1_slurm.jsonl`, so both move `tasks_sha`.
+
+The order this pass has to come in, which is not obvious and cost a check to establish.
+`tests/test_repair.py` compares the committed repair set against a fresh induction, so
+registering an inducer breaks the suite until `tasks/t2_repair.jsonl` is regenerated, and
+regenerating it moves `tasks_sha` and invalidates every T2 figure published, including the ones
+in `paper/anvil.tex`. None of the five can therefore be done a little at a time: the pass is
+atomic, and it has to follow the release of whatever version of the manuscript is meant to stand
+on the current numbers, not precede it.
 
 Two things that are *not* on this list, deliberately. The execution-sensitive set has its own file
 and its own digest, so `tasks/t1_exec.jsonl` and `tasks/t2_exec_repair.jsonl` can grow without
