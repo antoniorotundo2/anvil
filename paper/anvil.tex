@@ -64,14 +64,14 @@ metrics, because no benchmark verifies whether the artifacts they produce actual
 verifies them by execution against a declared reference cluster: five levels covering syntax,
 submittability, execution, effective resource fit and safety, bracketed by an oracle that must
 score $1.0$ and a deliberately faulty model that must score $0.0$. On eight from-scratch tasks and
-$220$ induced repair tasks we measure five models across three families and two generations of one
+$44$ induced repair tasks we measure five models across three families and two generations of one
 of them. Submittability is not ordered by model size: on the from-scratch set a 3B model of one
 family and a 12B of another lead it while a 7B trails both, and within one family the level falls
 as size rises. Real job submission looked nearly redundant against a \texttt{bash} sandbox, one
 verdict in $3120$ artifacts, until a fifth model wrote \texttt{srun} inside its scripts: the
 sandbox has no allocation for a job step to attach to, and the count moved to six in $3900$ with
 $32$ samples failing in the sandbox and passing on the scheduler. On a task set whose memory need
-only the payload knows, the same comparison reads $297$ of $900$. Retrieved documentation costs
+only the payload knows, the same comparison reads $288$ of $900$. Retrieved documentation costs
 the smaller model $28$ points of resource fit whatever the
 text says, while the larger one is unaffected by irrelevant text and loses $6$ points to the one
 document that addresses the level it concerns. A task built so that GNU coreutils and
@@ -140,7 +140,7 @@ where theirs cannot.
 with a machine-readable specification: node and task counts, walltime and memory bounds, GPUs,
 directives the task demands explicitly, and strings the script must print when it runs.
 
-\paragraph{T2, diagnosing and repairing.} $220$ tasks derived mechanically from the T1 canonical
+\paragraph{T2, diagnosing and repairing.} $44$ tasks derived mechanically from the T1 canonical
 solutions by seven fault injectors, anchored to classes observed on a real model rather than
 invented: an omitted directive whose SLURM default hides it, a misplaced directive, prose leaking
 into a value, an absent no-default directive, a script stripped of every directive, a payload that

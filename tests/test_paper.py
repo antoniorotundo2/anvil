@@ -243,3 +243,34 @@ def test_the_figures_the_prose_quotes_are_the_ones_the_entries_hold():
                    "functional")
     assert round(bash * 30) == 29, f"the sandbox promotes {round(bash * 30)} of 30, not 29"
     assert sbatch == 0.0, f"the scheduler leaves {sbatch}, so 'kills every one' is wrong"
+
+
+def test_the_paper_states_the_size_of_the_repair_set_it_measured():
+    """`44` tasks, not `220`. The abstract and the method section both said 220, which is what
+    a run at five samples produces from them, and `docs/DATASET.md` said the same until the
+    file was counted. Two documents describing the file and a pass over it with the same
+    word is how a reader ends up citing a dataset five times its size.
+    """
+    from anvil.schema import RepairTask
+
+    held = len(RepairTask.load_jsonl(ROOT / "tasks" / "t2_repair.jsonl"))
+    tex = _tex()
+    for claim in re.findall(r"\$(\d+)\$ (?:induced repair tasks|tasks derived mechanically)", tex):
+        assert int(claim) == held, f"the paper says {claim} repair tasks, the file holds {held}"
+
+
+def test_the_abstract_and_the_body_quote_the_same_executor_figure():
+    """The body was corrected from $297$ to $288$ and the abstract was not, so for an hour the
+    two disagreed with each other in the one place a reader looks first. arXiv shows the
+    abstract on its own page, which makes it the least forgiving place to leave a stale
+    number."""
+    tex = _tex()
+    abstract = tex.split(r"\begin{abstract}")[1].split(r"\end{abstract}")[0]
+    body = tex.split(r"\end{abstract}")[1]
+
+    in_abstract = re.search(r"the same comparison reads \$(\d+)\$ of \$900\$", abstract)
+    in_body = re.search(r"reads\s*\n?\\textbf\{\$(\d+)\$ artifacts of \$900\$\}", body)
+    assert in_abstract and in_body, "one of the two sentences no longer reads as expected"
+    assert in_abstract.group(1) == in_body.group(1), (
+        f"the abstract says {in_abstract.group(1)} and the body says {in_body.group(1)}"
+    )
