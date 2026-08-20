@@ -517,6 +517,15 @@ binary would say nothing about whether the paper changed.
 - [`docs/OBSERVED_FAILURES.md`](docs/OBSERVED_FAILURES.md): failure classes observed on a real model
 - [`docs/HARDWARE.md`](docs/HARDWARE.md): development machine vs experiment machine
 
+## Questions
+
+Something that does not work, or a published number that does not reproduce, is an
+[issue](https://github.com/antoniorotundo2/anvil/issues). Everything else belongs in
+[Discussions](https://github.com/antoniorotundo2/anvil/discussions/categories/q-a): whether a
+declared topology is a sensible one, why a level grades an artifact the way it does, what a
+measured number does and does not license you to claim. An issue gets closed, and the reasoning
+in it stops being findable; an answered discussion stays.
+
 ## Sponsorship
 
 Anvil is developed on one desktop with a single consumer GPU, which is what bounds the
