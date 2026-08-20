@@ -1,0 +1,21 @@
+# The workflow pins every action to a major tag, which is the right default: a run
+# that resolves differently from one week to the next cannot be used to explain a
+# result. The cost is that a pin stays where it was put, and the checkout that built
+# a published number is not necessarily the one a reader gets today. This opens a pull
+# request when a major moves, so the bump is a reviewed change with a CI run behind it
+# rather than something noticed months later.
+#
+# Monthly, not weekly: the suite builds containers and submits jobs to a real scheduler,
+# and there is nothing here worth spending that on more often.
+#
+# Only github-actions. The core has no runtime dependencies by design (see pyproject.toml),
+# and the model extras are deliberately loose because they track hardware support, not a
+# lockfile: dependabot has nothing useful to say about either.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
