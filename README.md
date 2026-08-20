@@ -1,5 +1,11 @@
 <h1 align="center"><a id="anvil"></a><img src="docs/assets/logo.svg" alt="Anvil" width="420"></h1>
 
+<p align="center">
+  <a href="https://github.com/antoniorotundo2/anvil/actions/workflows/ci.yml"><img src="https://github.com/antoniorotundo2/anvil/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.10%20%7C%203.12-blue" alt="Python 3.10 and 3.12">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+</p>
+
 The project aims to measure whether the operational artifacts an LLM writes for a supercomputer
 (SLURM job scripts and Apptainer container recipes) are actually correct: verified by submission,
 execution and resource fit, not by textual similarity. Beyond writing scripts from scratch (T1),
