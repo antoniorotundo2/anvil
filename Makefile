@@ -478,6 +478,7 @@ arxiv: paper
 	@cd paper && SOURCE_DATE_EPOCH=$(PAPER_EPOCH) \
 		tectonic -X compile --keep-intermediates anvil.tex >/dev/null
 	tar -czf paper/anvil-arxiv.tar.gz -C paper anvil.tex anvil.bib anvil.bbl data
+	@./scripts/plain_abstract.py
 	@echo "paper/anvil-arxiv.tar.gz: upload this, not the PDF"
 
 clean:

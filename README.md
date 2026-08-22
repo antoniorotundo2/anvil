@@ -492,7 +492,9 @@ make arxiv
 `make paper` regenerates the figures' data from `leaderboard/entries/` and compiles the PDF,
 so the manuscript cannot quote a run that has since been re-imported; `tests/test_paper.py`
 fails when the two disagree. `make arxiv` writes `paper/anvil-arxiv.tar.gz`, which is what an
-arXiv submission wants: sources rather than a PDF. The package carries `anvil.bbl` because
+arXiv submission wants: sources rather than a PDF. It also writes `paper/abstract.txt`, the
+abstract flattened to plain text for a submission form that renders no markup.
+The package carries `anvil.bbl` because
 arXiv does not run BibTeX and renders whatever bibliography it is given, so a submission
 without it builds with an empty References section and no error at all.
 

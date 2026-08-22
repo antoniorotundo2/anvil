@@ -54,6 +54,8 @@ paper/*.aux
 paper/*.bbl
 paper/*.out
 paper/*.log
+# Derived from the manuscript by `make arxiv`, for pasting into the submission form.
+paper/abstract.txt
 
 # --- Secrets ---
 .env

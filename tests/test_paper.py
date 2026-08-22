@@ -274,3 +274,23 @@ def test_the_abstract_and_the_body_quote_the_same_executor_figure():
     assert in_abstract.group(1) == in_body.group(1), (
         f"the abstract says {in_abstract.group(1)} and the body says {in_body.group(1)}"
     )
+
+
+def test_the_plain_abstract_carries_no_markup_and_says_what_the_paper_says():
+    """arXiv's abstract field is a textarea, so `$288$` and `\\texttt{bash}` reach the listing
+    page verbatim. The flattener refuses rather than emits anything it could not flatten,
+    since an abstract is the one part of a submission that cannot be quietly wrong.
+    """
+    import re
+    import sys as _sys
+
+    _sys.path.insert(0, str(ROOT / "scripts"))
+    from plain_abstract import flatten
+
+    text = flatten(_tex())
+    assert not re.findall(r"\\[a-zA-Z]+|[${}]", text), "markup survived the flattening"
+
+    # The figures the manuscript states must survive it too: flattening is not editing.
+    for figure in ("288 of 900", "44 induced repair tasks", "1.0", "0.0"):
+        assert figure in text, figure
+    assert len(text) > 800, "the abstract came out suspiciously short"
