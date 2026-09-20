@@ -451,7 +451,7 @@ docker-verify-recipe: docker-build-apptainer
 # alongside it never rebuilt identically again. Pinned to the date the title page carries
 # instead, now that `\date` is fixed rather than `\today`. The two are separate literals
 # and `tests/test_paper.py` holds them to each other.
-PAPER_EPOCH = 1786752000
+PAPER_EPOCH = 1789862400
 
 paper:
 	./scripts/paper_data.py
