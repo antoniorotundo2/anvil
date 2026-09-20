@@ -45,8 +45,8 @@
 }
 
 \title{Anvil: executable verification of LLM-generated\\HPC operational artifacts}
-% No institutional affiliation: the work was done independently, with no supervision or
-% review from anyone at a university, and naming one would put the reading of an
+% No institutional affiliation, and this is deliberate rather than an omission: the work
+% was done independently, and naming an institution would put the reading of an
 % endorsement on a party that never gave it.
 \author{Antonio Rotundo\\
   \small Independent researcher}
@@ -63,22 +63,21 @@ Assistants that write SLURM job scripts for supercomputer users are evaluated wi
 metrics, because no benchmark verifies whether the artifacts they produce actually work. Anvil
 verifies them by execution against a declared reference cluster: five levels covering syntax,
 submittability, execution, effective resource fit and safety, bracketed by an oracle that must
-score $1.0$ and a deliberately faulty model that must score $0.0$. On eight from-scratch tasks and
-$44$ induced repair tasks we measure five models across three families and two generations of one
-of them. Submittability is not ordered by model size: on the from-scratch set a 3B model of one
-family and a 12B of another lead it while a 7B trails both, and within one family the level falls
-as size rises. Real job submission looked nearly redundant against a \texttt{bash} sandbox, one
-verdict in $3120$ artifacts, until a fifth model wrote \texttt{srun} inside its scripts: the
-sandbox has no allocation for a job step to attach to, and the count moved to six in $3900$ with
-$32$ samples failing in the sandbox and passing on the scheduler. On a task set whose memory need
-only the payload knows, the same comparison reads $288$ of $900$. Retrieved documentation costs
-the smaller model $28$ points of resource fit whatever the
-text says, while the larger one is unaffected by irrelevant text and loses $6$ points to the one
-document that addresses the level it concerns. A task built so that GNU coreutils and
-\texttt{uutils} must judge it differently is failed by all three models asked for reasons that
-precede the difference. We also report, rather than conceal, three measurement faults found and
-corrected
-during the work, one of which had already been published.
+score $1.0$ and a deliberately faulty model that must score $0.0$. The benchmark covers five
+models across three families and two generations of one of them, on eight from-scratch tasks and
+$44$ induced repair tasks. Submittability is not ordered by model size: on the from-scratch set a
+3B model of one family and a 12B of another lead it while a 7B trails both, and within one family
+the level falls as size rises. Real job submission looked nearly redundant against a \texttt{bash}
+sandbox, one verdict in $3120$ artifacts, until a fifth model wrote \texttt{srun} inside its
+scripts: the sandbox has no allocation for a job step to attach to, and the count moved to six in
+$3900$ with $32$ samples failing in the sandbox and passing on the scheduler. On a task set whose
+memory need only the payload knows, the same comparison reads $288$ of $900$. Retrieved
+documentation costs the smaller model $28$ points of resource fit whatever the text says, while
+the larger one is unaffected by irrelevant text and loses $6$ points to the one document that
+addresses the level it concerns. A task built so that GNU coreutils and \texttt{uutils} must judge
+it differently is failed by all three models asked for reasons that precede the difference. The
+paper reports, rather than conceals, three measurement faults found and corrected during the work,
+one of which had already been published.
 \end{abstract}
 
 \section{Introduction}
