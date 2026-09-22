@@ -427,9 +427,11 @@ make docker-guards-t3
 
 ## Retrieval ablation
 
-Three ways to prompt a model for T1: `zero-shot` (the default, no change from the rest of this
+Four ways to prompt a model for T1: `zero-shot` (the default, no change from the rest of this
 README), `vector` (TF-IDF similarity against `tasks/retrieval_corpus.jsonl`), `vectorless` (exact
-tag match, no scoring). `anvil run --retrieval` selects the arm:
+tag match, no scoring), `dense` (sentence-embedding similarity through a LangChain retrieval
+pipeline, the only arm with dependencies: `pip install -e ".[dense]"`). `anvil run --retrieval`
+selects the arm:
 
 ```
 anvil run --model oracle --tasks tasks/t1_slurm.jsonl --retrieval vector -v
@@ -440,11 +442,13 @@ anvil run --model <hf-model-id> --tasks tasks/t1_slurm.jsonl --retrieval vectorl
 `prompt.startswith(task.prompt)`, since retrieved context is always appended after the original
 prompt, never before it), so `make guards` stays valid for any `--retrieval` value.
 
-Compare all three arms on the same model, seeds and tasks:
+Compare the three published arms on the same model, seeds and tasks, and add `dense` by naming
+it:
 
 ```
 ./scripts/retrieval_ablation.sh
 MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_ablation.sh
+STRATEGIES=dense N=3 ./scripts/retrieval_ablation.sh
 ```
 
 ## Cross-distribution ablation

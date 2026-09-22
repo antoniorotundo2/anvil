@@ -442,7 +442,7 @@ out of reach.
 ## Retrieval ablation
 
 Does giving a model reference material about SLURM semantics change how correctly it writes a
-script? Three conditions, compared on the same model, seeds and tasks:
+script? Four conditions, compared on the same model, seeds and tasks:
 
 * **zero-shot**: the task prompt alone. This is what T1/T2/T3 have always done; introducing the
   other two arms changes nothing about the default behaviour.
@@ -452,6 +452,14 @@ script? Three conditions, compared on the same model, seeds and tasks:
 * **vectorless**: exact tag overlap between the task and a document, no similarity scoring.
   Structure-based, not similarity-based: a document is retrieved because it is declared to be
   *about* the task's topic, not because its text happens to resemble the prompt.
+* **dense**: a LangChain retrieval pipeline, added after the other three were published. The
+  corpus goes into an in-memory LangChain vector store over sentence embeddings
+  (`sentence-transformers/all-MiniLM-L6-v2`, pinned by revision) and is searched with the task
+  prompt. It reopens the question the `vector` bullet settles on purpose: that lexical overlap is
+  enough for a corpus this small says nothing about whether a retriever judged by meaning would
+  change the finding. The prompt assembly and the generation are the ones every arm shares, and
+  its dependencies sit behind the `dense` extra, so the other three still run on the standard
+  library alone.
 
 The corpus is anchored to the same F1–F7 taxonomy as T2: the two most-referenced documents state
 SLURM's silent resource defaults (F1) and the directive-placement rule (F2) directly, so the
@@ -473,6 +481,7 @@ real scheduler and GNU coreutils. Mean pass@1 across seeds, plus half the range:
 | zero-shot | 0.58±0.04 | 0.82±0.02 | 0.54±0.04 | **0.49±0.02** | 1.00±0.00 | **0.31±0.02** |
 | vector | 0.54±0.04 | 0.83±0.04 | 0.49±0.06 | 0.42±0.08 | 1.00±0.00 | 0.21±0.04 |
 | vectorless | 0.53±0.02 | 0.79±0.00 | 0.44±0.06 | **0.19±0.04** | 1.00±0.00 | **0.11±0.02** |
+| dense | 0.50±0.00 | 0.88±0.00 | 0.40±0.10 | 0.38±0.10 | 1.00±0.00 | 0.18±0.02 |
 
 **Two of these columns were measured twice.** `scripts/retrieval_ablation.sh` grades with the
 project venv against whatever scheduler the machine happens to run, and the machine it ran on has
@@ -509,6 +518,33 @@ declared topology the pilot's ordering is exactly what comes back, with the arms
 than it saw. The three-seed run was right that the pilot's magnitudes were one draw of a spread;
 it was the grading environment, not the seeds, that inverted the ranking.
 
+**The `dense` row was measured later, and the other three were measured again beside it.** It was
+generated on the experiment machine under the same protocol, the ablation script's defaults then
+and now (4-bit weights) with n=3, seeds 0/1/2 and the same 8 tasks, and graded in `anvil:sched`
+under verifier `30c55f210a8d`. That verifier postdates the table, and several rules that decide
+`resource_fit` changed in between, so the published arms' saved generations were graded again in
+the same run (`results/retrieval_dense_regraded/`). All nine cells came back equal to the table in
+every column, to the digit: the four rows compare retrievers, not rule sets. The same run is a
+fourth confirmation that `syntax`, `functional` and `resource_fit` do not depend on the scheduler,
+since `dense` graded on the host, where `submittability` is skipped, reported the same means and
+ranges for all three as in the container.
+
+**Retrieval by meaning does not change the finding.** `dense` lands where `vector` does. Strict is
+0.18 against `vector`'s 0.21, below zero-shot's 0.31 with the two ranges well apart, and above
+`vectorless`'s 0.11. `resource_fit` is 0.38 against 0.42, with the widest range in the column,
+±0.10, which reaches zero-shot's: on three seeds that level does not separate `dense` from
+zero-shot, the position `vector` is in too. The agreement with `vector` is less surprising than it
+sounds, because on this corpus the two retrievers mostly attach the same documents, the same pair
+on four of the eight tasks and the same first document on six. Neither ever attaches
+`doc_directive_placement`, the document `vectorless` puts on every task.
+
+Two columns move where the published arms left them, and neither is explained here.
+`submittability` is 0.88 in every seed, above all three published arms and outside zero-shot's
+range, where the other arms were read above as not moving that level at all. `syntax` is 0.50 in
+every seed, the lowest of the four and below zero-shot's range, which continues the drift the
+other arms showed inside theirs. Three seeds of one model and one arm: recorded as observed, not
+accounted for.
+
 ### Three explanations, all tested, all refuted
 
 `scripts/retrieval_copying.py` reads the saved generations and measures each candidate
@@ -538,6 +574,21 @@ that idiom upward under retrieved context would fail `resource_fit` on a value t
 and is not. The direction fits and the size does not: zero scripts do it zero-shot, one under
 vector, two under vectorless, out of 72 per arm. `resource_fit` loses about 21 samples of 72
 between the outer arms, and three scripts across two arms cannot carry that.
+
+**The `dense` arm, through the same script.** Run on its three cells beside the published
+zero-shot cells as the control (`results/retrieval_dense_copying/`). It is the first arm where the
+script's test for copying is met: `--output=logs/out_%j` appears in 22 scripts against 9
+zero-shot, and all 22 are scripts whose prompt carried the document that states it. None of those
+values was wrong for its task, the same null as before, so copying is visible here and still cannot
+be what costs `resource_fit`. The omission account fares worse than it did for the other arms.
+`dense` writes more directives than zero-shot, 4.53 per script against 4.43, while its
+`resource_fit` falls, though 9 of its 72 scripts carry none against 6. Omissions are 77% of its
+problems against 81%, and wrong values grow faster than omissions (times 1.7 against times 1.4),
+the shape the other arms showed. `--array=1-5` stays at 9, as under every arm, and `--nodes=2`
+falls from 3 to 0, as it did by `vectorless`.
+
+The shell-expansion count was not taken for this arm: `retrieval_copying.py` does not report it,
+and the count above was not repeated for `dense`. It is open in the roadmap.
 
 ### What the level breaks on
 
@@ -734,6 +785,11 @@ say so plainly.
         preflight and its own guard (`make guards-sbatch`), see [Real submission](#real-submission-the-sbatch-executor)
   - [x] cgroup enforcement: `task/cgroup` with RAM, swap and cores constrained, plus the task set
         that exercises it (`tasks/t1_exec.jsonl`, fault F8) and `make docker-guards-enforcement`
+  - [x] dense retrieval arm: a LangChain retrieval pipeline behind the `dense` extra, measured
+        under the published protocol with the three published arms graded again beside it as a
+        control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
+  - [ ] shell expansion under `dense`: the one mechanism check not run for the new arm, since
+        `scripts/retrieval_copying.py` does not report it
   - [ ] binding: a task that reads the affinity and the GPU it was actually given, which needs
         real devices rather than the placeholder files the declared topology stands on
   - [ ] Podman as a second verification runtime, rootless by default, so the confinement Docker
