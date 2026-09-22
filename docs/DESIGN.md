@@ -800,6 +800,30 @@ The aggregates cannot say which of two things carries the excess, a higher cost 
 document or a cost of `doc_time_mem` concentrated on the tasks it reaches here; a per-task count
 would. The prediction above stays as it was written.
 
+**Per task.** Recomputed from the saved generations with the current rules, for all seven
+conditions measured at 7B; the totals come back equal to the published `syntax` and `resource_fit`
+columns for every one of them. Passes out of nine samples, `syntax`/`resource_fit`, on the three
+tasks where anything is lost; every other task is 9/9 under every appended condition:
+
+| task | zero-shot | `dense` | `doc_time_mem` | `doc_directive_placement` | off-topic |
+|---|---|---|---|---|---|
+| `t1_array_job` | 9/9 | 9/9 | 6/6 | 5/9 | 9/9 |
+| `t1_output_paths` | 9/9 | 3/9 | 0/8 | 0/9 | 9/9 |
+| `t1_container_apptainer` | 9/9 | 0/2 | 9/9 | 9/9 | 9/9 |
+
+The excess sits on one task. `t1_container_apptainer` loses all nine `syntax` samples and seven of
+`resource_fit` under `dense` and nothing under any other condition, and it carries the whole of
+`dense`'s `resource_fit` loss. `dense` gives it its own document plus `doc_defaults`, a pairing no
+condition of the series produced. `t1_output_paths` accounts for the rest of the `syntax` loss and
+is not specific to `dense`: every appended condition that attaches a SLURM document costs that task
+most or all of its `syntax`, and the off-topic ones cost it nothing. The four tasks that receive
+`doc_time_mem` under `dense` lose nothing, and they lose nothing under `doc_time_mem` either.
+
+Of the two readings, then, the second is refuted outright and the first holds only narrowly. The
+excess comes from a task that received another task's document, but two tasks in the same
+position, `t1_array_job` with `doc_defaults` and `t1_dependency_chain` with `doc_io_paths`, lose
+nothing. It is one task and one pairing, not a property of off-task documents.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox by default, and every number published so
@@ -848,8 +872,8 @@ say so plainly.
         control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
   - [x] `dense` on the 7B: two of three predictions refuted on magnitude, see [The dense arm at
         7B, predicted before it was run](#the-dense-arm-at-7b-predicted-before-it-was-run)
-  - [ ] per-task count of the 7B `dense` result: the one measurement that separates the two
-        readings of its excess cost
+  - [x] per-task count of the 7B `dense` result: the excess is one task and one document
+        pairing, `t1_container_apptainer` with `doc_defaults`
   - [x] shell expansion under `dense`: none, counted with a definition now kept in
         `scripts/retrieval_copying.py`, which also corrected the published `vector` count from one
         to none, see [Retrieval ablation](#retrieval-ablation)
