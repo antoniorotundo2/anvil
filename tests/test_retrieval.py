@@ -18,9 +18,12 @@ import pytest
 
 from anvil import retrieval
 from anvil.retrieval import (
+    RANKERS,
     STRATEGIES,
     Document,
     build_prompt_with_context,
+    provenance,
+    rank_vector,
     retrieve_dense,
     retrieve_vector,
     retrieve_vectorless,
@@ -320,6 +323,54 @@ def test_dense_runs_end_to_end_and_leaves_the_oracle_at_its_bound(monkeypatch, t
     assert rows and all(row["retrieval"] == "dense" for row in rows)
     assert all(set(row["retrieved_docs"]) <= ids for row in rows)
     assert fake.calls > 0
+    # The record names the retriever, so two revisions of the embedding model can be told
+    # apart after the fact, and carries the score each attached document was chosen by.
+    assert report["retrieval_model"] == provenance("dense")
+    for row in rows:
+        assert row["retrieval_model"] == provenance("dense")
+        scores = row["retrieved_scores"]
+        assert len(scores) == len(row["retrieved_docs"])
+        assert scores == sorted(scores, reverse=True) and all(x > 0 for x in scores)
+
+
+# ---------------------------------------------------------------- provenance and scores
+def test_a_scoring_retriever_is_its_ranking_cut_at_k():
+    """The CLI records scores from the ranking and attaches documents from it, so the arm
+    as published and the arm as recorded are one list. Checked on the real corpus for
+    every T1 task, where the published `vector` numbers came from."""
+    tasks = Task.load_jsonl(ROOT / "tasks" / "t1_slurm.jsonl")
+    corpus = Document.load_jsonl(CORPUS)
+    for task in tasks:
+        ranked = rank_vector(task, corpus)
+        scores = [score for score, _ in ranked]
+        assert scores == sorted(scores, reverse=True) and all(x > 0 for x in scores)
+        for k in (1, 2, 3):
+            assert retrieve_vector(task, corpus, k) == [d for _, d in ranked[:k]], (task.id, k)
+
+
+def test_dense_is_its_ranking_cut_at_k(fake_embedder):
+    corpus = Document.load_jsonl(CORPUS)
+    task = _task(prompt="request a gpu, an array index and some memory")
+    for k in (1, 2, 3):
+        assert retrieve_dense(task, corpus, k) == [
+            d for _, d in RANKERS["dense"](task, corpus)[:k]
+        ]
+
+
+def test_arms_record_scores_only_when_they_score(tmp_path):
+    """`vector` scores and depends on nothing outside the package; `zero-shot` and
+    `vectorless` do not score. A key present with nothing behind it would read as a
+    measurement."""
+    from anvil.cli import main  # noqa: PLC0415
+
+    for arm, scored in (("zero-shot", False), ("vectorless", False), ("vector", True)):
+        gens = tmp_path / f"{arm}.jsonl"
+        assert main(["run", "--model", "oracle", "--retrieval", arm, "--no-exec",
+                     "--save-generations", str(gens)]) == 0
+        rows = [json.loads(line) for line in gens.read_text(encoding="utf-8").splitlines()]
+        assert rows
+        assert all(("retrieved_scores" in row) is scored for row in rows), arm
+        assert all("retrieval_model" not in row for row in rows), arm
 
 
 # ---------------------------------------------------------------- prompt augmentation

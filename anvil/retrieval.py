@@ -94,6 +94,14 @@ def retrieve_vector(task: Task, corpus: list[Document], k: int = 2) -> list[Docu
     Documents with zero overlap (similarity 0) are never returned: a
     similarity-based retriever that always returns k documents regardless of
     relevance is not actually measuring similarity."""
+    return [d for _, d in rank_vector(task, corpus)[:k]]
+
+
+def rank_vector(task: Task, corpus: list[Document]) -> list[tuple[float, Document]]:
+    """`retrieve_vector` before the cut at k, scores kept. Split out so that a run can record
+    how similar each attached document was, which a threshold on similarity has to be set
+    from, and so that the arm and its record cannot disagree: the retriever is this list,
+    truncated."""
     if not corpus:
         return []
 
@@ -127,7 +135,7 @@ def retrieve_vector(task: Task, corpus: list[Document], k: int = 2) -> list[Docu
     ]
     scored = [(score, d) for score, d in scored if score > 0]
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [d for _, d in scored[:k]]
+    return scored
 
 
 # Pinned by revision as well as by name: a model id on the Hub is a moving reference, and
@@ -183,6 +191,12 @@ def retrieve_dense(task: Task, corpus: list[Document], k: int = 2) -> list[Docum
     milliseconds on the CPU, and a cache keyed on the corpus would be state for tests to
     reset and for a changed corpus to go stale in.
     """
+    return [d for _, d in rank_dense(task, corpus)[:k]]
+
+
+def rank_dense(task: Task, corpus: list[Document]) -> list[tuple[float, Document]]:
+    """`retrieve_dense` before the cut at k, scores kept, for the same reason as
+    `rank_vector`."""
     if not corpus:
         return []
     try:
@@ -211,7 +225,7 @@ def retrieve_dense(task: Task, corpus: list[Document], k: int = 2) -> list[Docum
         ((score, hit.metadata["position"]) for hit, score in hits if score > 0),
         key=lambda pair: (-pair[0], pair[1]),
     )
-    return [corpus[position] for _, position in ranked[:k]]
+    return [(score, corpus[position]) for score, position in ranked]
 
 
 STRATEGIES = {
@@ -220,6 +234,26 @@ STRATEGIES = {
     "vectorless": retrieve_vectorless,
     "dense": retrieve_dense,
 }
+
+# The arms that score documents. `zero-shot` attaches nothing and `vectorless` matches tags
+# without a score, so there is nothing for them to record.
+RANKERS = {
+    "vector": rank_vector,
+    "dense": rank_dense,
+}
+
+
+def provenance(strategy: str) -> str | None:
+    """What a run's retrieval depended on beyond this package's code, or None.
+
+    Only `dense` has such a thing: the embedding model, by name and revision. Without it in
+    the record, two runs of the arm under different revisions would be indistinguishable,
+    which is the confusion `tasks_sha` and `verifier_sha` exist to prevent for the task
+    files and the rules.
+    """
+    if strategy == "dense":
+        return f"{DENSE_MODEL}@{DENSE_REVISION}"
+    return None
 
 
 POSITIONS = ("append", "prepend")

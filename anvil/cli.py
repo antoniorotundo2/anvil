@@ -36,10 +36,12 @@ from .repair import (
 from .resources import resolve
 from .retrieval import (
     POSITIONS,
+    RANKERS,
     STRATEGIES,
     Document,
     build_prompt_with_context,
     dense_embedder,
+    provenance,
 )
 from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task, _satisfied
 from .verifier import (
@@ -208,6 +210,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     corpus = Document.load_jsonl(args.retrieval_corpus) if args.retrieval != "zero-shot" else []
     retrieve = STRATEGIES[args.retrieval]
+    rank = RANKERS.get(args.retrieval)
+    retrieval_model = provenance(args.retrieval)
 
     _warn_about_skipped_levels()
 
@@ -215,7 +219,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     generations: list[dict] = []
     t0 = time.time()
     for task in tasks:
-        docs = retrieve(task, corpus, k=args.retrieval_k)
+        # A scoring arm is read through its ranking, so the scores recorded are the ones
+        # the documents were chosen by and not a second computation that could drift.
+        scores: list[float] | None = None
+        if rank is not None:
+            ranked = rank(task, corpus)[: args.retrieval_k]
+            docs = [d for _, d in ranked]
+            scores = [round(score, 6) for score, _ in ranked]
+        else:
+            docs = retrieve(task, corpus, k=args.retrieval_k)
         prompt = build_prompt_with_context(task.prompt, docs, args.retrieval_position)
         raw_outputs = model.generate(prompt, n=args.n, seed=args.seed)
         first = len(results)
@@ -231,6 +243,8 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "retrieval_position": args.retrieval_position,
                 "disable_thinking": getattr(args, "disable_thinking", False),
                 "retrieved_docs": [d.id for d in docs],
+                **({"retrieved_scores": scores} if scores is not None else {}),
+                **({"retrieval_model": retrieval_model} if retrieval_model else {}),
                 "script": script,
             })
             results.append(verify(script, task, run_functional=not args.no_exec))
@@ -857,6 +871,8 @@ def _report(
         if getattr(args, "retrieval", None):
             payload["retrieval"] = args.retrieval
             payload["retrieval_position"] = getattr(args, "retrieval_position", "append")
+            if model := provenance(args.retrieval):
+                payload["retrieval_model"] = model
         Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Full results written to {args.out}")
 
