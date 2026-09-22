@@ -452,6 +452,16 @@ MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_abl
 STRATEGIES=dense N=3 ./scripts/retrieval_ablation.sh
 ```
 
+The curated corpus is eight documents, too few for the choice of retriever to decide much. A
+corpus cut from the `sbatch` man page of the version the verification image runs gives the
+ranking arms 446 documents to choose from. It is generated rather than committed, since SLURM's
+documentation is GPL-2.0:
+
+```
+.venv/bin/python scripts/man_corpus.py
+CORPUS=results/corpus/sbatch_man.jsonl STRATEGIES="vector dense" N=3 ./scripts/retrieval_ablation.sh
+```
+
 ## Cross-distribution ablation
 
 Verify one set of generations inside several base images and report where the verdicts
