@@ -748,6 +748,34 @@ have scored a benchmark whose own reference solutions had quietly gone missing. 
 prompt anywhere in what it receives instead, and `tests/test_retrieval.py` checks that the oracle
 returns the same script under both positions for all eight tasks.
 
+### The dense arm at 7B, predicted before it was run
+
+`dense` was measured on the 1.5B only, and the two factors above say what it should do on the 7B.
+This section was committed before the run: the commit that adds it is older than the one that adds
+the numbers, which is the only way a prediction written here can be told from one written to fit.
+
+What `dense` attaches is a matter of record rather than of the model. On three tasks it is the
+task's own document plus `doc_time_mem` (`t1_cpus_per_task`, `t1_gpu_single`,
+`t1_mpi_multinode`), on `t1_hello_serial` it is `doc_time_mem` with another task's document in
+place of its own, and on the other four it is the task's own document plus another task's. It
+never attaches `doc_directive_placement`, and nothing it attaches is off-topic. The series measured
+`doc_time_mem` in the second slot and never measured another task's document there, which is
+relevant to SLURM and not to the task.
+
+* `syntax` falls to between 0.82 and 0.92. `doc_time_mem` costs the 7B 17 points when it reaches
+  all eight tasks and reaches four here, and the other four documents cost somewhere between
+  nothing, as off-topic text does, and what a relevant document does. Refuted by a mean above
+  0.95 or below 0.80.
+* `resource_fit` stays at or above 0.94, its value with `doc_time_mem` on every task. Refuted by a
+  mean below 0.92.
+* `strict_all_levels` does not rise above zero-shot's 0.67: with nothing off-topic attached, the
+  0.81 of the off-topic rows has no reason to appear. Refuted by a range lying entirely above 0.67.
+* `submittability`: no prediction. The series left its movement at 7B unexplained, and a
+  prediction without a mechanism would only be a guess written down early.
+
+The magnitudes assume that a document's cost is spread evenly over the tasks it reaches, which the
+aggregates above cannot confirm, so a miss on them weighs less than a miss on direction.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox by default, and every number published so
@@ -794,6 +822,8 @@ say so plainly.
   - [x] dense retrieval arm: a LangChain retrieval pipeline behind the `dense` extra, measured
         under the published protocol with the three published arms graded again beside it as a
         control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
+  - [ ] `dense` on the 7B: predicted in [The dense arm at 7B, predicted before it was
+        run](#the-dense-arm-at-7b-predicted-before-it-was-run), not yet run
   - [x] shell expansion under `dense`: none, counted with a definition now kept in
         `scripts/retrieval_copying.py`, which also corrected the published `vector` count from one
         to none, see [Retrieval ablation](#retrieval-ablation)
