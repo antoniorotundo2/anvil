@@ -17,9 +17,10 @@ mechanism: the share of failures that are omissions does not rise with the damag
 **Shell expansion in the directive block.** The corpus teaches `${SLURM_NTASKS:-4}` for
 the payload, and a model moving it into an `#SBATCH` line writes a value that looks
 derived and reaches `sbatch` as literal text. Refuted on size: too few scripts do it.
-That count was first taken by hand, from the errors of one regrade, and no definition
-was kept, so the dense arm could not be measured the same way; it is computed here now,
-and a definition that did not give back the published 0, 1 and 2 would not be this one.
+That count was first taken by hand and no definition was kept, so the dense arm could
+not be measured the same way; it is computed here now. Checked against the published
+figure it agreed on two arms and corrected the third: the one `vector` script counted
+by hand wrote its expansion after the first command, where `sbatch` never reads it.
 
 The design point that makes any of this readable is the **zero-shot arm as a control**.
 A value the model would have written anyway is evidence of nothing, and a count that

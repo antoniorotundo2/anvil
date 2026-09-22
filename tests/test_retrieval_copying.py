@@ -1,9 +1,10 @@
 """The shell-expansion count in `scripts/retrieval_copying.py`.
 
-The published figure (0, 1 and 2 scripts of 72) was taken by hand from one regrade's
-`sbatch` errors, and no definition was kept, so a fourth arm could not be counted the same
-way. These tests pin the definition that replaced it: which lines count, and which only
-look as if they should.
+The published figure was taken by hand and no definition was kept, so a fourth arm could
+not be counted the same way. These tests pin the definition that replaced it: which lines
+count, and which only look as if they should. The late-directive case is the one that
+corrected the hand count, which had included a `vector` script whose expansion sat after
+the first command.
 """
 
 from __future__ import annotations

@@ -571,9 +571,9 @@ absolute terms and wrong values grow faster (times 2.4 against times 1.7).
 corpus teaches for the payload, appearing where it cannot work: `sbatch` reads the `#SBATCH` lines
 before any shell expands anything, so the directive receives the literal text. A model migrating
 that idiom upward under retrieved context would fail `resource_fit` on a value that looks derived
-and is not. The direction fits and the size does not: zero scripts do it zero-shot, one under
+and is not. The direction fits and the size does not: zero scripts do it zero-shot or under
 vector, two under vectorless, out of 72 per arm. `resource_fit` loses about 21 samples of 72
-between the outer arms, and three scripts across two arms cannot carry that.
+between the outer arms, and two scripts in one arm cannot carry that.
 
 **The `dense` arm, through the same script.** Run on its three cells beside the published
 zero-shot cells as the control (`results/retrieval_dense_copying/`). It is the first arm where the
@@ -587,18 +587,12 @@ problems against 81%, and wrong values grow faster than omissions (times 1.7 aga
 the shape the other arms showed. `--array=1-5` stays at 9, as under every arm, and `--nodes=2`
 falls from 3 to 0, as it did by `vectorless`.
 
-The shell-expansion count for this arm is none. It was taken with the definition
-`retrieval_copying.py` now carries, since the figure above was counted by hand and no definition
-was kept: a script counts when an `#SBATCH` line of the directive block, before the first command,
-holds something bash would expand. On the published generations the same definition gives 0, 0 and
-2 rather than 0, 1 and 2. The two `vectorless` scripts are the idiom above,
-`--ntasks=${SLURM_NTASKS:-4}` in `t1_mpi_multinode`. The one `vector` script writes
-`#SBATCH --dependency=afterok:$SLURM_JOB_ID` after the first command: `sbatch` never reads that line
-and reported nothing for it in either regrade, the verifier charges it to `syntax` as a misplaced
-directive, and `--dependency` is not a resource that task asks for. It fits the mechanism on none
-of those three counts, and the figure above still carries it only because this pass left the
-published analysis as written. The size argument stands either way, and more firmly: two scripts
-across the four arms.
+The shell-expansion count for this arm is none, taken with the definition `retrieval_copying.py`
+now carries: a script counts when an `#SBATCH` line of the directive block, before the first
+command, holds something bash would expand. The figure above was first counted by hand, with no
+definition kept, and read one `vector` script that the definition does not: it writes
+`#SBATCH --dependency=afterok:$SLURM_JOB_ID` after the first command, a line `sbatch` never reads,
+which the verifier charges to `syntax` as misplaced. The figure above now reads none for `vector`.
 
 ### What the level breaks on
 
@@ -799,8 +793,8 @@ say so plainly.
         under the published protocol with the three published arms graded again beside it as a
         control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
   - [x] shell expansion under `dense`: none, counted with a definition now kept in
-        `scripts/retrieval_copying.py`. The same definition reads the published `vector` count of
-        one as a line `sbatch` never reads, see [Retrieval ablation](#retrieval-ablation)
+        `scripts/retrieval_copying.py`, which also corrected the published `vector` count from one
+        to none, see [Retrieval ablation](#retrieval-ablation)
   - [ ] binding: a task that reads the affinity and the GPU it was actually given, which needs
         real devices rather than the placeholder files the declared topology stands on
   - [ ] Podman as a second verification runtime, rootless by default, so the confinement Docker
