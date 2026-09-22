@@ -328,8 +328,9 @@ def test_build_prompt_with_context_no_docs_returns_prompt_unchanged():
 
 
 def test_build_prompt_with_context_starts_with_original_prompt():
-    """Oracle/broken prompt-matching relies on this: the augmented prompt
-    must always start with the exact original task prompt."""
+    """The default position, the one every published arm was measured at. The oracle
+    used to rely on it and no longer does: it matches the task prompt anywhere, which
+    `test_oracle_resolves_the_task_under_either_position` holds."""
     docs = [Document(id="d1", text="some reference text", tags=[])]
     augmented = build_prompt_with_context("write a script", docs)
     assert augmented.startswith("write a script")

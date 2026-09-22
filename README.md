@@ -438,9 +438,10 @@ anvil run --model oracle --tasks tasks/t1_slurm.jsonl --retrieval vector -v
 anvil run --model <hf-model-id> --tasks tasks/t1_slurm.jsonl --retrieval vectorless
 ```
 
-`OracleModel` still recognises the task regardless of which arm is active (it matches on
-`prompt.startswith(task.prompt)`, since retrieved context is always appended after the original
-prompt, never before it), so `make guards` stays valid for any `--retrieval` value.
+`OracleModel` still recognises the task whichever arm is active and wherever the context sits:
+it looks for the task prompt anywhere in what it receives, longest match first, since
+`--retrieval-position prepend` puts the reference material before the prompt rather than after
+it. So `make guards` stays valid for any `--retrieval` value.
 
 Compare the three published arms on the same model, seeds and tasks, and add `dense` by naming
 it:

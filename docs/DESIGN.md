@@ -466,10 +466,12 @@ SLURM's silent resource defaults (F1) and the directive-placement rule (F2) dire
 hypothesis is not "does retrieval help in general" but "does surfacing the exact fact a model
 tends to get wrong change whether it gets it wrong."
 
-**`--retrieval` never changes the oracle/broken baseline.** `OracleModel` matches on
-`prompt.startswith(task.prompt)`, not exact equality, because `build_prompt_with_context` always
-appends retrieved material after the original prompt, never before it. `make guards` therefore
-stays valid regardless of which retrieval arm is active.
+**`--retrieval` never changes the oracle/broken baseline.** `OracleModel` looks for the task
+prompt anywhere in what it receives, longest match first, rather than for equality or a prefix:
+`build_prompt_with_context` puts retrieved material after the prompt by default and before it
+under `--retrieval-position prepend`. `BrokenModel` draws its defects from a hash of the whole
+prompt, so an arm changes which defect a task gets and not that every one of them fails.
+`make guards` therefore stays valid regardless of which retrieval arm is active.
 
 ### Result
 
