@@ -587,8 +587,18 @@ problems against 81%, and wrong values grow faster than omissions (times 1.7 aga
 the shape the other arms showed. `--array=1-5` stays at 9, as under every arm, and `--nodes=2`
 falls from 3 to 0, as it did by `vectorless`.
 
-The shell-expansion count was not taken for this arm: `retrieval_copying.py` does not report it,
-and the count above was not repeated for `dense`. It is open in the roadmap.
+The shell-expansion count for this arm is none. It was taken with the definition
+`retrieval_copying.py` now carries, since the figure above was counted by hand and no definition
+was kept: a script counts when an `#SBATCH` line of the directive block, before the first command,
+holds something bash would expand. On the published generations the same definition gives 0, 0 and
+2 rather than 0, 1 and 2. The two `vectorless` scripts are the idiom above,
+`--ntasks=${SLURM_NTASKS:-4}` in `t1_mpi_multinode`. The one `vector` script writes
+`#SBATCH --dependency=afterok:$SLURM_JOB_ID` after the first command: `sbatch` never reads that line
+and reported nothing for it in either regrade, the verifier charges it to `syntax` as a misplaced
+directive, and `--dependency` is not a resource that task asks for. It fits the mechanism on none
+of those three counts, and the figure above still carries it only because this pass left the
+published analysis as written. The size argument stands either way, and more firmly: two scripts
+across the four arms.
 
 ### What the level breaks on
 
@@ -788,8 +798,9 @@ say so plainly.
   - [x] dense retrieval arm: a LangChain retrieval pipeline behind the `dense` extra, measured
         under the published protocol with the three published arms graded again beside it as a
         control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
-  - [ ] shell expansion under `dense`: the one mechanism check not run for the new arm, since
-        `scripts/retrieval_copying.py` does not report it
+  - [x] shell expansion under `dense`: none, counted with a definition now kept in
+        `scripts/retrieval_copying.py`. The same definition reads the published `vector` count of
+        one as a line `sbatch` never reads, see [Retrieval ablation](#retrieval-ablation)
   - [ ] binding: a task that reads the affinity and the GPU it was actually given, which needs
         real devices rather than the placeholder files the declared topology stands on
   - [ ] Podman as a second verification runtime, rootless by default, so the confinement Docker
