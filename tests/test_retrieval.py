@@ -149,8 +149,17 @@ class _SynonymEmbeddings:
         return [self._embed(t) for t in texts]
 
 
+def _needs_the_pipeline() -> None:
+    """The pipeline is LangChain's vector store, whose cosine needs numpy. Both come with the
+    `dev` extra, so CI runs these; the verification image installs neither and skips them
+    with this reason rather than failing on an import."""
+    pytest.importorskip("langchain_core.vectorstores", reason="dense pipeline: langchain-core")
+    pytest.importorskip("numpy", reason="dense pipeline: numpy")
+
+
 @pytest.fixture
 def fake_embedder(monkeypatch):
+    _needs_the_pipeline()
     fake = _SynonymEmbeddings()
     monkeypatch.setattr(retrieval, "dense_embedder", lambda: fake)
     return fake
@@ -192,6 +201,15 @@ def test_dense_respects_k(fake_embedder):
     assert len(retrieve_dense(task, corpus, k=100)) <= len(corpus)
 
 
+def test_dense_with_a_zero_query_embedding_returns_nothing(fake_embedder):
+    """Every cosine is 0/0, which the store raises on and the rule reads as 0. Found by the
+    end-to-end test below, whose fake embedding maps most T1 prompts to the zero vector."""
+    corpus = [Document(id="gpu_doc", text="request a gpu", tags=[])]
+    assert retrieve_dense(_task(prompt="hello world"), corpus) == []
+    assert retrieve_dense(_task(prompt="request a gpu"), [
+        Document(id="blank", text="hello world", tags=[])]) == []
+
+
 def test_dense_on_an_empty_corpus_never_loads_the_model(monkeypatch):
     """Nothing to rank means nothing to embed, and no reason to need the extra."""
     def _fail():
@@ -202,6 +220,9 @@ def test_dense_on_an_empty_corpus_never_loads_the_model(monkeypatch):
 
 
 def test_dense_is_deterministic_and_breaks_ties_by_corpus_order(fake_embedder):
+    """Three documents with the same embedding. The vector store alone returns them in the
+    order a reversed, unstable argsort leaves them, which is the reverse of the corpus here;
+    the order is fixed after the search, and this is what would catch that step going."""
     corpus = [
         Document(id="first", text="gpu", tags=[]),
         Document(id="second", text="accelerator", tags=[]),
@@ -210,6 +231,36 @@ def test_dense_is_deterministic_and_breaks_ties_by_corpus_order(fake_embedder):
     task = _task(prompt="gpus")
     runs = [[d.id for d in retrieve_dense(task, corpus, k=3)] for _ in range(3)]
     assert runs == [["first", "second", "third"]] * 3
+
+
+def test_dense_retrieves_through_the_langchain_vector_store(fake_embedder, monkeypatch):
+    """The arm is defined as a LangChain retrieval pipeline, not as an embedding model with
+    anvil's own ranking around it. Every query goes through the store's scored search."""
+    from langchain_core.vectorstores import InMemoryVectorStore  # noqa: PLC0415
+
+    calls = []
+    original = InMemoryVectorStore.similarity_search_with_score_by_vector
+
+    def _spy(self, embedding, *args, **kwargs):
+        calls.append(embedding)
+        return original(self, embedding, *args, **kwargs)
+
+    monkeypatch.setattr(InMemoryVectorStore, "similarity_search_with_score_by_vector", _spy)
+    corpus = [Document(id="gpu_doc", text="request a gpu", tags=[])]
+    assert [d.id for d in retrieve_dense(_task(prompt="one gpu please"), corpus)] == ["gpu_doc"]
+    assert calls == [fake_embedder.embed_query("one gpu please")]
+
+
+def test_dense_without_langchain_is_a_refusal_not_an_import_error(monkeypatch):
+    """The pipeline half of the extra missing, with the embedding half faked: still the one
+    line the CLI prints, never a bare ImportError from inside a retrieval."""
+    from anvil.errors import UnsupportedRequest  # noqa: PLC0415
+
+    monkeypatch.setattr(retrieval, "dense_embedder", _SynonymEmbeddings)
+    monkeypatch.setitem(sys.modules, "langchain_core.vectorstores", None)
+    corpus = [Document(id="gpu_doc", text="request a gpu", tags=[])]
+    with pytest.raises(UnsupportedRequest, match=r"\[dense\]"):
+        retrieve_dense(_task(prompt="one gpu please"), corpus)
 
 
 def test_every_strategy_is_named_in_the_cli_help(capsys):
@@ -250,6 +301,7 @@ def test_dense_runs_end_to_end_and_leaves_the_oracle_at_its_bound(monkeypatch, t
     copying analysis reads."""
     from anvil import cli  # noqa: PLC0415
 
+    _needs_the_pipeline()
     fake = _SynonymEmbeddings()
     monkeypatch.setattr(retrieval, "dense_embedder", lambda: fake)
     monkeypatch.setattr(cli, "dense_embedder", lambda: fake)

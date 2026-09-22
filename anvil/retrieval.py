@@ -17,15 +17,19 @@ reference documents:
                   similarity-based: it retrieves a document because it is
                   *about* the same topic (same declared tag), not because its
                   text happens to look similar to the prompt.
-  * dense       - cosine similarity between sentence embeddings of the task
-                  prompt and of each document, computed through LangChain.
-                  Added after the three above were published, to reopen the
-                  one question `vector` leaves open on purpose: the reason
-                  given for skipping an embedding model was that lexical
-                  overlap is enough for a corpus this small, which says
-                  nothing about whether a retriever judged by meaning would
-                  change the finding. The only arm with dependencies, so it
-                  lives behind the `dense` extra and imports them lazily.
+  * dense       - a LangChain retrieval pipeline: the corpus goes into an
+                  in-memory LangChain vector store over sentence embeddings,
+                  and the task prompt is the query. Only retrieval runs in
+                  LangChain; the prompt assembly and the generation are the
+                  ones every arm shares, since they are what the comparison
+                  holds fixed. Added after the three above were published,
+                  to reopen the one question `vector` leaves open on
+                  purpose: the reason given for skipping an embedding model
+                  was that lexical overlap is enough for a corpus this
+                  small, which says nothing about whether a retriever judged
+                  by meaning would change the finding. The only arm with
+                  dependencies, so it lives behind the `dense` extra and
+                  imports them lazily.
 """
 
 from __future__ import annotations
@@ -130,6 +134,7 @@ def retrieve_vector(task: Task, corpus: list[Document], k: int = 2) -> list[Docu
 # an arm whose retriever can change underneath it between two runs is not one arm.
 DENSE_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DENSE_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+_DENSE_EXTRA = '--retrieval dense needs the dense extra: pip install -e ".[dense]"'
 
 
 @functools.lru_cache(maxsize=1)
@@ -149,50 +154,64 @@ def dense_embedder():
     try:
         from langchain_huggingface import HuggingFaceEmbeddings  # noqa: PLC0415
     except ImportError as exc:
-        raise UnsupportedRequest(
-            '--retrieval dense needs the dense extra: pip install -e ".[dense]"'
-        ) from exc
+        raise UnsupportedRequest(_DENSE_EXTRA) from exc
     return HuggingFaceEmbeddings(
         model_name=DENSE_MODEL,
         model_kwargs={"device": "cpu", "revision": DENSE_REVISION},
     )
 
 
-def _dense_cosine(a: list[float], b: list[float]) -> float:
-    num = sum(x * y for x, y in zip(a, b, strict=True))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(y * y for y in b))
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return num / (norm_a * norm_b)
-
-
 def retrieve_dense(task: Task, corpus: list[Document], k: int = 2) -> list[Document]:
-    """Cosine similarity between sentence embeddings of the task prompt and of each
-    document. The same contract as `retrieve_vector`, so that the embedding is the only
-    thing that differs between the two arms: ranking by descending similarity, ties left in
-    corpus order, and a document with similarity 0 or below never returned.
+    """Cosine similarity between sentence embeddings, through LangChain: the documents are
+    loaded into an `InMemoryVectorStore` over `dense_embedder()` and searched with the task
+    prompt. The contract is `retrieve_vector`'s, so that the retriever is the only thing
+    that differs between the two arms: descending similarity, ties left in corpus order,
+    and a document with similarity 0 or below never returned.
 
-    That exclusion rarely fires here, which is a property of dense embeddings rather than
-    a looser rule: unrelated English sentences still share a direction, and on the
-    published corpus the lowest cosine between any T1 prompt and any document is about
-    0.1. `vector` returns fewer than k documents when nothing overlaps; this arm almost
-    never does.
+    The store is asked for every document and the order is then fixed here, because its own
+    ranking is `argsort()[::-1]`, which is not stable: equal scores come back in whatever
+    order the sort leaves them, and an arm whose retrieval can reorder between two runs of
+    the same input is not deterministic. The zero rule is applied here too, since the store
+    has no notion of a similarity too low to be worth attaching.
 
-    The cosine is computed here rather than by a vector store so that the ranking, like
-    the other arms', is plain Python whose behaviour the tests can pin without the model.
+    That rule rarely fires, which is a property of dense embeddings rather than a looser
+    rule: unrelated English sentences still share a direction, and on the published corpus
+    the lowest cosine between any T1 prompt and any document is about 0.1. `vector` returns
+    fewer than k documents when nothing overlaps; this arm almost never does.
+
+    A new store per call rather than one per corpus: eight short documents embed in
+    milliseconds on the CPU, and a cache keyed on the corpus would be state for tests to
+    reset and for a changed corpus to go stale in.
     """
     if not corpus:
         return []
+    try:
+        from langchain_core.documents import Document as LangChainDocument  # noqa: PLC0415
+        from langchain_core.vectorstores import InMemoryVectorStore  # noqa: PLC0415
+    except ImportError as exc:
+        raise UnsupportedRequest(_DENSE_EXTRA) from exc
+
     embedder = dense_embedder()
     query = embedder.embed_query(task.prompt)
-    vectors = embedder.embed_documents([d.text for d in corpus])
-    scored = [
-        (_dense_cosine(query, vector), d) for d, vector in zip(corpus, vectors, strict=True)
-    ]
-    scored = [(score, d) for score, d in scored if score > 0]
-    scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [d for _, d in scored[:k]]
+    # A zero vector on either side makes every cosine 0/0. The store raises on that instead
+    # of scoring it, and 0 is what the rule above excludes, so the answer is known without
+    # searching. Unreachable with a sentence-embedding model, reached by the first fake
+    # embedding the tests used, and cheaper to state than to leave to the store's message.
+    if not any(query) or not any(any(v) for v in embedder.embed_documents(
+            [d.text for d in corpus])):
+        return []
+
+    store = InMemoryVectorStore(embedding=embedder)
+    store.add_documents(
+        [LangChainDocument(page_content=d.text, metadata={"position": i})
+         for i, d in enumerate(corpus)]
+    )
+    hits = store.similarity_search_with_score_by_vector(query, k=len(corpus))
+    ranked = sorted(
+        ((score, hit.metadata["position"]) for hit, score in hits if score > 0),
+        key=lambda pair: (-pair[0], pair[1]),
+    )
+    return [corpus[position] for _, position in ranked[:k]]
 
 
 STRATEGIES = {

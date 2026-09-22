@@ -31,8 +31,11 @@ Issues = "https://github.com/antoniorotundo2/anvil/issues"
 models = ["transformers>=4.40", "torch>=2.2", "accelerate>=0.30"]
 quant = ["bitsandbytes>=0.43"]        # requires an NVIDIA GPU
 ssm = ["mamba-ssm", "causal-conv1d"]  # for Mamba-Codestral (can be finicky to build)
-dense = ["langchain-huggingface>=1.2", "sentence-transformers>=6.0"]  # --retrieval dense only
-dev = ["pytest>=8", "ruff>=0.5"]
+# --retrieval dense only. langchain-core is the pipeline, the other two the embedding model.
+dense = ["langchain-core>=1.6", "langchain-huggingface>=1.2", "sentence-transformers>=6.0"]
+# langchain-core and numpy so the dense pipeline is exercised in CI with a fake embedding
+# model: both are light, and neither pulls in the model backend the `dense` extra adds.
+dev = ["pytest>=8", "ruff>=0.5", "langchain-core>=1.6", "numpy>=1.26"]
 
 [project.scripts]
 anvil = "anvil.cli:main"
