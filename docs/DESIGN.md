@@ -776,6 +776,30 @@ relevant to SLURM and not to the task.
 The magnitudes assume that a document's cost is spread evenly over the tasks it reaches, which the
 aggregates above cannot confirm, so a miss on them weighs less than a miss on direction.
 
+**Result.** Graded in `anvil:sched` under `30c55f210a8d`, with the series' 7B zero-shot generations
+graded again beside it (`results/retrieval_dense_7b_regraded/`); those came back equal to the
+published zero-shot row in every column.
+
+| 7B | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
+|---|---|---|---|---|---|
+| zero-shot | 1.00±0.00 | 0.79±0.00 | 0.88±0.00 | 1.00±0.00 | 0.67±0.00 |
+| dense | 0.79±0.00 | 0.88±0.00 | 0.79±0.00 | 0.90±0.02 | 0.67±0.00 |
+
+Two of the three predictions are refuted, both on magnitude and both in the direction predicted.
+`syntax` is 0.79 on every seed, under the 0.80 set as the refutation: the 21 points `dense` costs
+are more than `doc_time_mem` costs when it reaches all eight tasks, and here it reaches four.
+`resource_fit` is 0.875, 0.917 and 0.917, a mean of 0.90 under the 0.92 set, and lower than with
+`doc_time_mem` on every task (0.958, 0.917, 0.958). The third holds: `strict_all_levels` is 0.667
+on every seed, zero-shot's value exactly, because `submittability` rises to 0.88 as `syntax` falls
+and the two cancel, as they did for the prepended document.
+
+What failed is the premise the magnitudes stood on, which this section named as the weaker part:
+that a document relevant to SLURM and not to the task costs somewhere between off-topic text and a
+relevant document. On this model it costs at least as much as the documents the series measured.
+The aggregates cannot say which of two things carries the excess, a higher cost for another task's
+document or a cost of `doc_time_mem` concentrated on the tasks it reaches here; a per-task count
+would. The prediction above stays as it was written.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox by default, and every number published so
@@ -822,8 +846,10 @@ say so plainly.
   - [x] dense retrieval arm: a LangChain retrieval pipeline behind the `dense` extra, measured
         under the published protocol with the three published arms graded again beside it as a
         control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
-  - [ ] `dense` on the 7B: predicted in [The dense arm at 7B, predicted before it was
-        run](#the-dense-arm-at-7b-predicted-before-it-was-run), not yet run
+  - [x] `dense` on the 7B: two of three predictions refuted on magnitude, see [The dense arm at
+        7B, predicted before it was run](#the-dense-arm-at-7b-predicted-before-it-was-run)
+  - [ ] per-task count of the 7B `dense` result: the one measurement that separates the two
+        readings of its excess cost
   - [x] shell expansion under `dense`: none, counted with a definition now kept in
         `scripts/retrieval_copying.py`, which also corrected the published `vector` count from one
         to none, see [Retrieval ablation](#retrieval-ablation)
