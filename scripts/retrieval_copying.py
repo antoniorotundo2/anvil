@@ -3,7 +3,7 @@
 
 The ablation found one clean effect: `resource_fit` falls from 0.49 zero-shot to 0.19
 vectorless while the other four levels barely move. This script tests the mechanisms
-that could produce that shape. Two have been tested and both are refuted; the outcome
+that could produce that shape. Three have been tested and all are refuted; the outcome
 is recorded in `docs/DESIGN.md` under Retrieval ablation.
 
 **Copying.** The corpus states concrete values, so the model might reproduce them
@@ -13,6 +13,13 @@ reproduces them least, and no sample used a retrieved value where it was wrong.
 **Omission.** Retrieval does suppress directives, and `check_resource_fit` passes only
 on an empty problem list, so one absent directive sinks a sample. Refuted as the
 mechanism: the share of failures that are omissions does not rise with the damage.
+
+**Shell expansion in the directive block.** The corpus teaches `${SLURM_NTASKS:-4}` for
+the payload, and a model moving it into an `#SBATCH` line writes a value that looks
+derived and reaches `sbatch` as literal text. Refuted on size: too few scripts do it.
+That count was first taken by hand, from the errors of one regrade, and no definition
+was kept, so the dense arm could not be measured the same way; it is computed here now,
+and a definition that did not give back the published 0, 1 and 2 would not be this one.
 
 The design point that makes any of this readable is the **zero-shot arm as a control**.
 A value the model would have written anyway is evidence of nothing, and a count that
@@ -81,6 +88,30 @@ def load_tasks() -> dict[str, dict]:
 OMISSION = re.compile(r"missing|not requested|not declared")
 
 
+# An expansion is `$` followed by what bash would expand: `${...}`, `$(...)` or a name.
+EXPANSION = re.compile(r"\$[{(A-Za-z_]")
+
+
+def expanding_directive(script: str) -> str | None:
+    """The first `#SBATCH` line of the directive block whose options carry a shell
+    expansion, or None.
+
+    Only the block counts. `sbatch` stops reading directives at the first command, so a
+    late `#SBATCH` line is a comment to it and cannot fail on its value; the published
+    count came from `sbatch` errors, which such a line never produces. A trailing comment
+    is not an option either, and a `$` in one is prose.
+    """
+    for line in script.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#!"):
+            continue
+        if not s.startswith("#"):
+            return None                      # the first command closes the block
+        if s.startswith("#SBATCH") and EXPANSION.search(s[len("#SBATCH"):].split("#", 1)[0]):
+            return s
+    return None
+
+
 def resource_fit_problems(run: Path) -> dict[str, dict[str, int]]:
     """Per arm, how many resource_fit problems were omissions and how many wrong values."""
     per_arm: dict[str, dict[str, int]] = defaultdict(lambda: {"omitted": 0, "wrong value": 0})
@@ -118,6 +149,7 @@ def main(run_dir: str) -> int:
     scripts_per_arm: dict[str, int] = defaultdict(int)
     per_arm_directives: dict[str, list[int]] = defaultdict(list)
     wrong_and_copied = []
+    expanding: list[tuple[str, str, str]] = []
 
     for path in gens:
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -130,6 +162,8 @@ def main(run_dir: str) -> int:
             shown_literals = {lit for d in shown for lit in lits.get(d, ())}
 
             script = g["script"]
+            if (found := expanding_directive(script)) is not None:
+                expanding.append((arm, g["task_id"], found))
             for lit in every_literal:
                 if lit in script:
                     seen[arm][lit][0] += 1
@@ -190,6 +224,14 @@ def main(run_dir: str) -> int:
         mean = sum(per_arm_directives[a]) / n if n else 0.0
         empty = sum(1 for c in per_arm_directives[a] if c == 0)
         print(f"  {a:<12} mean {mean:5.2f} directives   {empty:>3} of {n} scripts had none")
+
+    print("\nShell expansion inside the directive block, scripts per arm.")
+    print("sbatch reads these lines before any shell runs, so the value arrives as text.\n")
+    for a in arms:
+        hits = sum(1 for arm, _, _ in expanding if arm == a)
+        print(f"  {a:<12} {hits:>3} of {scripts_per_arm[a]} scripts")
+    for arm, task_id, found in sorted(expanding):
+        print(f"    {arm:<12} {task_id:<24} {found}")
 
     problems = resource_fit_problems(run)
     if problems:
