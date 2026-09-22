@@ -31,6 +31,7 @@ Issues = "https://github.com/antoniorotundo2/anvil/issues"
 models = ["transformers>=4.40", "torch>=2.2", "accelerate>=0.30"]
 quant = ["bitsandbytes>=0.43"]        # requires an NVIDIA GPU
 ssm = ["mamba-ssm", "causal-conv1d"]  # for Mamba-Codestral (can be finicky to build)
+dense = ["langchain-huggingface>=1.2", "sentence-transformers>=6.0"]  # --retrieval dense only
 dev = ["pytest>=8", "ruff>=0.5"]
 
 [project.scripts]

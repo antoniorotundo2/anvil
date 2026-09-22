@@ -1,7 +1,7 @@
 """Retrieval ablation: does giving a model reference material about SLURM
 semantics change how correctly it writes a script?
 
-Three conditions to compare, all operating on the same small corpus of
+Four conditions to compare, all operating on the same small corpus of
 reference documents:
 
   * zero-shot   - the current baseline: no extra context, the task prompt
@@ -17,10 +17,20 @@ reference documents:
                   similarity-based: it retrieves a document because it is
                   *about* the same topic (same declared tag), not because its
                   text happens to look similar to the prompt.
+  * dense       - cosine similarity between sentence embeddings of the task
+                  prompt and of each document, computed through LangChain.
+                  Added after the three above were published, to reopen the
+                  one question `vector` leaves open on purpose: the reason
+                  given for skipping an embedding model was that lexical
+                  overlap is enough for a corpus this small, which says
+                  nothing about whether a retriever judged by meaning would
+                  change the finding. The only arm with dependencies, so it
+                  lives behind the `dense` extra and imports them lazily.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import re
@@ -28,6 +38,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .errors import UnsupportedRequest
 from .resources import resolve
 from .schema import Task
 
@@ -115,10 +126,80 @@ def retrieve_vector(task: Task, corpus: list[Document], k: int = 2) -> list[Docu
     return [d for _, d in scored[:k]]
 
 
+# Pinned by revision as well as by name: a model id on the Hub is a moving reference, and
+# an arm whose retriever can change underneath it between two runs is not one arm.
+DENSE_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DENSE_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+
+
+@functools.lru_cache(maxsize=1)
+def dense_embedder():
+    """The LangChain embeddings object `retrieve_dense` uses, loaded once per process.
+
+    The import is here and not at the top of the module because the other three arms, and
+    everything else in the package, run on the standard library alone; importing anvil must
+    not start requiring LangChain because one arm of one ablation uses it. A missing extra
+    is a request this install cannot honour rather than a defect, hence `UnsupportedRequest`,
+    which the CLI turns into one line instead of a traceback.
+
+    Pinned to the CPU: the model being evaluated already holds the GPU, and a retriever
+    whose scores depend on which device it landed on would make the arm less repeatable
+    than the lexical one it is compared with.
+    """
+    try:
+        from langchain_huggingface import HuggingFaceEmbeddings  # noqa: PLC0415
+    except ImportError as exc:
+        raise UnsupportedRequest(
+            '--retrieval dense needs the dense extra: pip install -e ".[dense]"'
+        ) from exc
+    return HuggingFaceEmbeddings(
+        model_name=DENSE_MODEL,
+        model_kwargs={"device": "cpu", "revision": DENSE_REVISION},
+    )
+
+
+def _dense_cosine(a: list[float], b: list[float]) -> float:
+    num = sum(x * y for x, y in zip(a, b, strict=True))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return num / (norm_a * norm_b)
+
+
+def retrieve_dense(task: Task, corpus: list[Document], k: int = 2) -> list[Document]:
+    """Cosine similarity between sentence embeddings of the task prompt and of each
+    document. The same contract as `retrieve_vector`, so that the embedding is the only
+    thing that differs between the two arms: ranking by descending similarity, ties left in
+    corpus order, and a document with similarity 0 or below never returned.
+
+    That exclusion rarely fires here, which is a property of dense embeddings rather than
+    a looser rule: unrelated English sentences still share a direction, and on the
+    published corpus the lowest cosine between any T1 prompt and any document is about
+    0.1. `vector` returns fewer than k documents when nothing overlaps; this arm almost
+    never does.
+
+    The cosine is computed here rather than by a vector store so that the ranking, like
+    the other arms', is plain Python whose behaviour the tests can pin without the model.
+    """
+    if not corpus:
+        return []
+    embedder = dense_embedder()
+    query = embedder.embed_query(task.prompt)
+    vectors = embedder.embed_documents([d.text for d in corpus])
+    scored = [
+        (_dense_cosine(query, vector), d) for d, vector in zip(corpus, vectors, strict=True)
+    ]
+    scored = [(score, d) for score, d in scored if score > 0]
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [d for _, d in scored[:k]]
+
+
 STRATEGIES = {
     "zero-shot": retrieve_zero_shot,
     "vector": retrieve_vector,
     "vectorless": retrieve_vectorless,
+    "dense": retrieve_dense,
 }
 
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Compare zero-shot / vector / vectorless retrieval on the same model, seeds
-# and task set, and print pass@k side by side.
+# Compare zero-shot / vector / vectorless / dense retrieval on the same model,
+# seeds and task set, and print pass@k side by side.
 #
 #   ./scripts/retrieval_ablation.sh
 #   MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct SEEDS="0 1 2" N=5 ./scripts/retrieval_ablation.sh
 #   STRATEGIES=vectorless CORPUS=results/reordered.jsonl ./scripts/retrieval_ablation.sh
+#   STRATEGIES=dense N=3 ./scripts/retrieval_ablation.sh    # needs pip install -e ".[dense]"
 #
 # Every cell also writes its generated scripts beside its scores, so a finished sweep can
 # be handed to crossdist_ablation.sh without spending inference time again.
@@ -33,6 +34,15 @@ K="${K:-1}"
 SEEDS="${SEEDS:-0 1 2}"
 FOURBIT="${FOURBIT:-1}"
 STRATEGIES="${STRATEGIES:-zero-shot vector vectorless}"
+
+# `dense` is the one arm with dependencies, and not in the default list for that reason: the
+# default reproduces the published three arms on any install. Asked for explicitly without
+# the extra, every cell would fail the same way after a model load each, so check once here.
+if [[ " $STRATEGIES " == *" dense "* ]] \
+   && ! "$PYTHON" -c "import langchain_huggingface" 2>/dev/null; then
+  echo 'the dense arm needs the dense extra: pip install -e ".[dense]"' >&2
+  exit 2
+fi
 
 # A corpus other than the default one. What the arms retrieve depends on the order the
 # documents sit in, not only on their content: `vectorless` fills its remaining slots from
@@ -95,7 +105,7 @@ for f in sorted(out.glob("*__seed*.json")):
 if not rows:
     sys.exit("no results")
 
-order = ("zero-shot", "vector", "vectorless")
+order = ("zero-shot", "vector", "vectorless", "dense")
 strategies = sorted({s for s, _ in rows}, key=lambda s: order.index(s) if s in order else 99)
 levels = ["syntax", "submittability", "functional", "resource_fit", "safety", "strict_all_levels"]
 print(f"\n{'strategy':<14}" + "".join(f"{l[:12]:<14}" for l in levels))

@@ -34,7 +34,13 @@ from .repair import (
     verify_repair,
 )
 from .resources import resolve
-from .retrieval import POSITIONS, STRATEGIES, Document, build_prompt_with_context
+from .retrieval import (
+    POSITIONS,
+    STRATEGIES,
+    Document,
+    build_prompt_with_context,
+    dense_embedder,
+)
 from .schema import Level, RecipeLevel, RecipeTask, RepairTask, Task, _satisfied
 from .verifier import (
     FUNCTIONAL_EXECUTORS,
@@ -184,6 +190,11 @@ def _prepare_output_paths(args: argparse.Namespace) -> None:
 def cmd_run(args: argparse.Namespace) -> int:
     _prepare_output_paths(args)
     tasks = Task.load_jsonl(args.tasks)
+    if args.retrieval == "dense":
+        # Before the model, not at the first retrieval: loading weights takes minutes, and
+        # an install without the extra should cost one line rather than that wait followed
+        # by the same line.
+        dense_embedder()
     model_kw: dict = {}
     if args.model not in ("oracle", "broken"):
         model_kw = {
@@ -922,7 +933,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--verbose", "-v", action="store_true")
     r.add_argument("--retrieval", choices=list(STRATEGIES), default="zero-shot",
                    help="retrieval ablation: zero-shot (default, no change) | vector "
-                   "(TF-IDF similarity) | vectorless (tag match)")
+                   "(TF-IDF similarity) | vectorless (tag match) | dense (sentence "
+                   'embeddings, needs pip install -e ".[dense]")')
     r.add_argument("--retrieval-corpus", default="tasks/retrieval_corpus.jsonl")
     r.add_argument("--retrieval-k", type=int, default=2,
                    help="max documents retrieved per task (ignored for zero-shot)")
