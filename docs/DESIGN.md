@@ -558,7 +558,10 @@ them instead of deriving the ones the task asks for. It does not. `--array=1-5` 
 times in all three arms, unchanged by whether it was retrieved. `--nodes=2` falls from 3 to 0
 as retrieval strengthens, and `--output=logs/out_%j` from 9 to 3 under vectorless. Not one
 sample used a retrieved value where that value was wrong for its task. The arm whose
-`resource_fit` collapses is the arm that reproduces corpus values *least*.
+`resource_fit` collapses is the arm that reproduces corpus values *least*. That sentence was first
+backed by a check that could not fire: it looked up `nodes` where the parser returns `--nodes`, so
+it never had a value to compare. `retrieval_copying.py` now takes the verdict on a copied value
+from `check_resource_fit` itself, and on the published generations it still finds none.
 
 **Omission is refuted too, as a mechanism.** Retrieval does suppress directives, monotonically
 and in the same order as the damage: 4.43 written per script zero-shot, 4.24 vector, 3.49
@@ -849,6 +852,46 @@ passage to one.
 * At 7B, `resource_fit` stays at or above 0.85 for both arms. Refuted by a mean below 0.85.
 * No prediction on `submittability`, nor on which arm does better at 7B.
 
+**Result.** The corpus built on the experiment machine came from the same `slurm-client`,
+23.11.4-1.2ubuntu5, with the same 446 documents. Both sizes, both arms, n=3, seeds 0/1/2, graded
+in `anvil:sched` under `30c55f210a8d` (`results/retrieval_man_{1p5b,7b}_regraded/`), against the
+zero-shot rows that reproduced exactly under that verifier:
+
+| | `syntax` | `submittability` | `functional` | `resource_fit` | strict |
+|---|---|---|---|---|---|
+| 1.5B zero-shot | 0.58±0.04 | 0.82±0.02 | 0.54±0.04 | 0.49±0.02 | 0.31±0.02 |
+| 1.5B `vector` | 0.65±0.06 | 0.71±0.06 | 0.46±0.08 | 0.29±0.04 | 0.21±0.04 |
+| 1.5B `dense` | 0.69±0.04 | 0.88±0.00 | 0.49±0.04 | 0.28±0.06 | 0.21±0.04 |
+| 7B zero-shot | 1.00±0.00 | 0.79±0.00 | 0.88±0.00 | 1.00±0.00 | 0.67±0.00 |
+| 7B `vector` | 1.00±0.00 | 0.71±0.04 | 0.88±0.00 | 0.88±0.00 | 0.54±0.00 |
+| 7B `dense` | 1.00±0.00 | 0.83±0.00 | 0.88±0.00 | 0.96±0.00 | 0.67±0.00 |
+
+Three of the four predictions hold and one is refuted. At 1.5B `resource_fit` is 0.29 and 0.28,
+under the 0.35 set, though above the "about 0.20" the bullet named: between the toll and the 0.42
+of the rows that carry `doc_time_mem`. The two arms are not told apart there, and on strict they
+are identical seed by seed, 0.250, 0.208 and 0.167 each, with no document in common. At 7B
+`resource_fit` holds at 0.96 and 0.88.
+
+`syntax` at 7B is the refutation, and the larger finding: 1.00 on every seed for both arms. Every
+earlier 7B condition that attached a curated document cost that level 17 to 25 points, and the
+prediction read that as a cost of SLURM documentation. Documentation of SLURM, cut from its own
+page, costs `syntax` nothing; the cost belonged to the curated documents. What about them does it,
+this run does not say.
+
+Unpredicted, and the first time the choice of retriever separates two arms: at 7B `dense` holds
+strict at zero-shot's 0.67 and `vector` does not, 0.54, with `resource_fit` at 0.958 on every seed
+against 0.875 on every seed. `dense` loses one sample per seed, on the same task:
+`t1_cpus_per_task`, where it wrote `--ntasks=4` for the four CPUs the task asks per task, with the
+`--threads-per-core` and `--cpus-per-task` passages attached. `vector`'s nine failures are all
+omissions. `dense` at 1.5B reads `submittability` 0.88 on every seed, as it did on the curated
+corpus; recorded, not explained.
+
+Copying, with the check corrected above, shows up for the first time. At 1.5B `dense` copies
+`--time=1` from the page's first example into two `t1_hello_serial` scripts, a minute against the
+ten the task declares: a retrieved value, used, and wrong for its task. Two scripts of 72 cannot
+carry the level, and at 7B the same example leaves `--time=1` in three scripts without it becoming
+the walltime any of them requests.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox by default, and every number published so
@@ -897,9 +940,10 @@ say so plainly.
         control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
   - [x] `dense` on the 7B: two of three predictions refuted on magnitude, see [The dense arm at
         7B, predicted before it was run](#the-dense-arm-at-7b-predicted-before-it-was-run)
-  - [ ] `vector` and `dense` on the man-page corpus, at 1.5B and 7B: predicted in [A corpus
-        where ranking has room, predicted before it was
-        run](#a-corpus-where-ranking-has-room-predicted-before-it-was-run), not yet run
+  - [x] `vector` and `dense` on the man-page corpus, at 1.5B and 7B: three of four predictions
+        hold, and the 7B `syntax` cost turns out to belong to the curated documents, see [A
+        corpus where ranking has room, predicted before it was
+        run](#a-corpus-where-ranking-has-room-predicted-before-it-was-run)
   - [x] per-task count of the 7B `dense` result: the excess is one task and one document
         pairing, `t1_container_apptainer` with `doc_defaults`
   - [x] shell expansion under `dense`: none, counted with a definition now kept in
