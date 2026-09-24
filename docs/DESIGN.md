@@ -824,6 +824,31 @@ excess comes from a task that received another task's document, but two tasks in
 position, `t1_array_job` with `doc_defaults` and `t1_dependency_chain` with `doc_io_paths`, lose
 nothing. It is one task and one pairing, not a property of off-task documents.
 
+### A corpus where ranking has room, predicted before it was run
+
+On the curated corpus `vector` and `dense` attach nearly the same documents, so the table cannot
+say whether the choice of retriever matters. `scripts/man_corpus.py` cuts the `sbatch` man page of
+the version the verification image runs into 446 documents of 12 to 499 characters, the scale of
+the curated ones, and on it the two arms attach different documents on all eight tasks: not one
+pair and not one first document in common. This section was committed before either arm was run on
+it, for the same reason as the one above.
+
+What either arm attaches is again a matter of record. Nothing retrieved states the rule
+`doc_time_mem` teaches, that `--time` and `--mem` have no SLURM-wide default; the `--time` entry of
+the page says the opposite, that the default is the partition's. `dense` attaches the page's first
+example, which writes `#SBATCH --time=1`, to three tasks, and `vector` attaches a `--mem-per-cpu`
+passage to one.
+
+* At 1.5B, `resource_fit` stays at the toll the series measured for text that does not teach the
+  missing rule, about 0.20, for both arms. Refuted by either arm's mean above 0.35.
+* At 1.5B, the two arms are not told apart by `resource_fit` or `strict_all_levels` although they
+  never attach the same pair: the toll is paid for having text attached, not for which text.
+  Refuted by ranges that do not overlap on either level.
+* At 7B, `syntax` falls below zero-shot's 1.00 for both arms, as it does under every condition that
+  attached SLURM documentation. Refuted by a range that reaches 1.00.
+* At 7B, `resource_fit` stays at or above 0.85 for both arms. Refuted by a mean below 0.85.
+* No prediction on `submittability`, nor on which arm does better at 7B.
+
 ## Limitations
 
 `functional` runs the script under `bash` in a sandbox by default, and every number published so
@@ -872,6 +897,9 @@ say so plainly.
         control, see [Retrieval ablation](#retrieval-ablation). It does not change the finding
   - [x] `dense` on the 7B: two of three predictions refuted on magnitude, see [The dense arm at
         7B, predicted before it was run](#the-dense-arm-at-7b-predicted-before-it-was-run)
+  - [ ] `vector` and `dense` on the man-page corpus, at 1.5B and 7B: predicted in [A corpus
+        where ranking has room, predicted before it was
+        run](#a-corpus-where-ranking-has-room-predicted-before-it-was-run), not yet run
   - [x] per-task count of the 7B `dense` result: the excess is one task and one document
         pairing, `t1_container_apptainer` with `doc_defaults`
   - [x] shell expansion under `dense`: none, counted with a definition now kept in
