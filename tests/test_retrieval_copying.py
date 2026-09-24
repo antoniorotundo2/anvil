@@ -16,7 +16,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from retrieval_copying import corpus_literals, expanding_directive, main  # noqa: E402
+from retrieval_copying import (  # noqa: E402
+    copied_and_wrong,
+    corpus_literals,
+    expanding_directive,
+    main,
+)
+
+from anvil.schema import Task  # noqa: E402
 
 
 def test_the_idiom_the_corpus_teaches_counts_in_the_directive_block():
@@ -83,3 +90,29 @@ def test_a_generated_corpus_is_read_past_its_header_and_its_placeholders(tmp_pat
         + json.dumps({"id": "d", "text": "--time=<time> or, say, #SBATCH --time=1", "tags": []})
         + "\n", encoding="utf-8")
     assert corpus_literals(corpus) == {"d": {"--time=1"}}
+
+
+def _t1(task_id: str) -> Task:
+    return next(t for t in Task.load_jsonl(ROOT / "tasks" / "t1_slurm.jsonl") if t.id == task_id)
+
+
+def test_a_copied_value_the_verifier_rejects_is_reported():
+    """`--nodes=2` on a one-node task is the case the old comparison existed for and never
+    caught: it looked up `nodes` where the parser returns `--nodes`."""
+    script = "#!/bin/bash\n#SBATCH --nodes=2\n#SBATCH --time=10\n#SBATCH --mem=512M\necho x\n"
+    assert copied_and_wrong(script, _t1("t1_hello_serial"), {"--nodes=2"}) == ["--nodes=2"]
+
+
+def test_every_key_the_verifier_checks_is_covered():
+    """A minute of walltime, copied from the man page's first example, against a task that
+    declares ten."""
+    script = "#!/bin/bash\n#SBATCH --time=1\n#SBATCH --mem=512M\necho x\n"
+    assert copied_and_wrong(script, _t1("t1_hello_serial"), {"--time=1"}) == ["--time=1"]
+
+
+def test_a_copied_value_that_is_right_or_not_used_is_not_reported():
+    task = _t1("t1_mpi_multinode")
+    script = ("#!/bin/bash\n#SBATCH --nodes=2\n#SBATCH --ntasks=4\n#SBATCH --time=30\n"
+              "#SBATCH --mem=4G\nsrun hostname\n")
+    assert copied_and_wrong(script, task, {"--nodes=2"}) == []
+    assert copied_and_wrong(script, task, {"--time=1"}) == []

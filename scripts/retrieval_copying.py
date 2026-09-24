@@ -38,13 +38,15 @@ from __future__ import annotations
 import json
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from anvil.parse import parse_directives  # noqa: E402
+from anvil.schema import Task  # noqa: E402
+from anvil.verifier import check_resource_fit  # noqa: E402
 
 CORPUS = ROOT / "tasks" / "retrieval_corpus.jsonl"
 TASKS = ROOT / "tasks" / "t1_slurm.jsonl"
@@ -78,12 +80,6 @@ def corpus_literals(corpus: Path = CORPUS) -> dict[str, set[str]]:
     return out
 
 
-def load_tasks() -> dict[str, dict]:
-    return {
-        json.loads(line)["id"]: json.loads(line)
-        for line in TASKS.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    }
 
 
 # `check_resource_fit` collects problems and passes only when the list is empty, so a
@@ -117,6 +113,29 @@ def expanding_directive(script: str) -> str | None:
     return None
 
 
+def copied_and_wrong(script: str, task: Task, shown_literals: set[str]) -> list[str]:
+    """The retrieved `--key=value` literals this script sets, whose directive the verifier
+    then reports a problem on.
+
+    The verdict on the value is `check_resource_fit`'s, not a comparison written here. The
+    comparison it replaces looked up `directives.get("nodes")` where `parse_directives`
+    returns `--nodes`, so it never found a value to compare, and it covered two keys where
+    the verifier checks six; a copied `--time=1` from the man page, a minute against tasks
+    that declare ten or more, went through it unseen.
+    """
+    directives = parse_directives(script)
+    problems = check_resource_fit(script, task).detail.split("; ")
+    wrong = []
+    for literal in sorted(shown_literals):
+        key, _, value = literal.partition("=")
+        if directives.get(key, "").strip() != value:
+            continue
+        name = key.lstrip("-")
+        if any(p.startswith((name + " ", key + " ")) for p in problems):
+            wrong.append(literal)
+    return wrong
+
+
 def resource_fit_problems(run: Path) -> dict[str, dict[str, int]]:
     """Per arm, how many resource_fit problems were omissions and how many wrong values."""
     per_arm: dict[str, dict[str, int]] = defaultdict(lambda: {"omitted": 0, "wrong value": 0})
@@ -143,7 +162,7 @@ def main(run_dir: str, corpus: str | Path = CORPUS) -> int:
         return 2
 
     lits = corpus_literals(corpus)
-    tasks = load_tasks()
+    tasks = {t.id: t for t in Task.load_jsonl(TASKS)}
     every_literal = {lit for s in lits.values() for lit in s}
     if not every_literal:
         print("the corpus states no concrete directive values: nothing to copy")
@@ -176,19 +195,9 @@ def main(run_dir: str, corpus: str | Path = CORPUS) -> int:
                         seen[arm][lit][1] += 1
 
             # A copied value only matters if it is also wrong for this task.
-            task = tasks.get(g["task_id"], {})
-            constraints = task.get("constraints", {})
-            directives = parse_directives(script)
-            per_arm_directives[arm].append(len(directives))
-            for key, expected in (("nodes", "nodes"), ("ntasks", "ntasks")):
-                want = constraints.get(expected)
-                got = directives.get(key)
-                if want is None or got is None:
-                    continue
-                if str(want) != str(got).strip() and f"--{key}={got}" in shown_literals:
-                    wrong_and_copied.append(
-                        (arm, g["task_id"], f"--{key}={got}", f"task asks {want}")
-                    )
+            per_arm_directives[arm].append(len(parse_directives(script)))
+            for literal in copied_and_wrong(script, tasks[g["task_id"]], shown_literals):
+                wrong_and_copied.append((arm, g["task_id"], literal))
 
     arms = sorted(scripts_per_arm, key=lambda a: (a != "zero-shot", a))
     if "zero-shot" not in arms:
@@ -218,8 +227,8 @@ def main(run_dir: str, corpus: str | Path = CORPUS) -> int:
     if not wrong_and_copied:
         print("  none found")
     else:
-        for arm, task_id, lit, why in sorted(set(wrong_and_copied)):
-            print(f"  {arm:<12} {task_id:<24} {lit:<16} {why}")
+        for (arm, task_id, lit), count in sorted(Counter(wrong_and_copied).items()):
+            print(f"  {arm:<12} {task_id:<24} {lit:<24} {count} script(s)")
 
     print("\nDirectives written per script, by arm.")
     print("A resource never requested fails resource_fit exactly as a wrong value does,")
