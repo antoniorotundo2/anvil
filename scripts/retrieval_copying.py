@@ -55,14 +55,18 @@ TASKS = ROOT / "tasks" / "t1_slurm.jsonl"
 # everywhere. Every placeholder in this corpus is marked by an uppercase run, and no
 # real value in it has one, so that is the test.
 LITERAL = re.compile(r"--[a-z][a-z-]*=[^\s,;.`'\"]+")
-PLACEHOLDER = re.compile(r"[A-Z]")
+# The man-page corpus writes its placeholders as `<time>`, which has no uppercase run; the
+# curated corpus has no `<` at all, so adding it changes nothing measured on that corpus.
+PLACEHOLDER = re.compile(r"[A-Z<]")
 
 
-def corpus_literals() -> dict[str, set[str]]:
-    """Concrete `--key=value` strings each document states, keyed by document id."""
+def corpus_literals(corpus: Path = CORPUS) -> dict[str, set[str]]:
+    """Concrete `--key=value` strings each document states, keyed by document id. Lines
+    starting with `//` are skipped, the rule `Document.load_jsonl` applies, since a
+    generated corpus records its source on its first line."""
     out: dict[str, set[str]] = {}
-    for line in CORPUS.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
+    for line in Path(corpus).read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("//"):
             continue
         doc = json.loads(line)
         found = set()
@@ -131,14 +135,14 @@ def resource_fit_problems(run: Path) -> dict[str, dict[str, int]]:
     return per_arm
 
 
-def main(run_dir: str) -> int:
+def main(run_dir: str, corpus: str | Path = CORPUS) -> int:
     run = Path(run_dir)
     gens = sorted(run.glob("*.generations.jsonl"))
     if not gens:
         print(f"no *.generations.jsonl in {run}", file=sys.stderr)
         return 2
 
-    lits = corpus_literals()
+    lits = corpus_literals(corpus)
     tasks = load_tasks()
     every_literal = {lit for s in lits.values() for lit in s}
     if not every_literal:
@@ -258,8 +262,8 @@ def main(run_dir: str) -> int:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         print(__doc__.strip().splitlines()[-4], file=sys.stderr)
-        print("usage: retrieval_copying.py <run directory>", file=sys.stderr)
+        print("usage: retrieval_copying.py <run directory> [corpus.jsonl]", file=sys.stderr)
         raise SystemExit(2)
-    raise SystemExit(main(sys.argv[1]))
+    raise SystemExit(main(*sys.argv[1:]))

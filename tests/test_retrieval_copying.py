@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from retrieval_copying import expanding_directive, main  # noqa: E402
+from retrieval_copying import corpus_literals, expanding_directive, main  # noqa: E402
 
 
 def test_the_idiom_the_corpus_teaches_counts_in_the_directive_block():
@@ -65,3 +65,21 @@ def test_the_count_is_reported_per_arm(tmp_path, capsys):
     assert "zero-shot      0 of 1 scripts" in section
     assert "dense          1 of 1 scripts" in section
     assert "t1_mpi_multinode" in section
+
+
+def test_the_curated_corpus_still_yields_the_published_literals():
+    """The copying rows in DESIGN.md are these three. Teaching the reader a second corpus
+    must not change what it finds in the first."""
+    found = {lit for lits in corpus_literals().values() for lit in lits}
+    assert found == {"--array=1-5", "--nodes=2", "--output=logs/out_%j"}
+
+
+def test_a_generated_corpus_is_read_past_its_header_and_its_placeholders(tmp_path):
+    """The man-page corpus opens with a `//` provenance line and writes placeholders as
+    `<time>`; neither is a document, and neither is a value a model could copy."""
+    corpus = tmp_path / "corpus.jsonl"
+    corpus.write_text(
+        "// generated\n"
+        + json.dumps({"id": "d", "text": "--time=<time> or, say, #SBATCH --time=1", "tags": []})
+        + "\n", encoding="utf-8")
+    assert corpus_literals(corpus) == {"d": {"--time=1"}}
